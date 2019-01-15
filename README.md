@@ -4,27 +4,43 @@
 事件驱动框架
 
 #### 软件架构
-软件架构说明
+ 以AppContext为系统运行上下文, 各小模块挂载运行
+ * 简单: 各模块不存在编译/启动上的依赖. 最大程度的解耦. 这样各个模块的界限清楚明了
+ * 稳定: 各种模块可独立编译打包运行测试. 模块自治
+ * 灵活: 可自定义模块, 可随意按需加入到系统中
+ * 高效: 事件网络到各个模块异步执行任务充分利用线程资源. 把系统分为两种角色, 执行器(线程池)和执行体.
+    ##### 系统运行上下文 AppContext
+        1. 环境系统. 为系统本身和各模块提供环境配置
+        2. EP 事件中心
+            * 事件中心包含了整个系统中的所有监听器, 每个监听器代表一个功能点.
+            * 每个模块被加入到系统中时, 系统会自动搜索模块所提供的监听器(即: 有注解@EL的方法)
+            * 各模块的功能调用, 只需要触发事件(@EL提供的)就行. coreEp.fire方法
+        3. 执行器(线程池). 系统的所有执行最终会扔到这个线程池
+        4. 各模块引用
 
 
 #### 安装教程
 
-1. xxxx
-2. xxxx
-3. xxxx
+```
+<dependency>
+    <groupId>org.xnatural</groupId>
+    <artifactId>enet-all</artifactId>
+    <version>0.0.1</version>
+</dependency>
+```
 
 #### 使用说明
-
-1. xxxx
-2. xxxx
-3. xxxx
+```
+AppContext app = new AppContext();
+app.addSource(new UndertowResteasySever()); // resteasy http 模块.提供http mvc服务
+app.addSource(new MViewServer()); // 系统界面管理模块. 提供系统界面化管理服务
+// TODO 加载自定义各个模块
+app.start();
+```
 
 #### 参与贡献
 
-1. Fork 本仓库
-2. 新建 Feat_xxx 分支
-3. 提交代码
-4. 新建 Pull Request
+xnatural@msn.cn
 
 
 #### 码云特技

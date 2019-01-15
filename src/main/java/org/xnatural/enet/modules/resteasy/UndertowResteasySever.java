@@ -1,0 +1,192 @@
+package org.xnatural.enet.modules.resteasy;
+
+import io.undertow.Undertow;
+import org.jboss.resteasy.plugins.server.undertow.UndertowJaxrsServer;
+import org.jboss.resteasy.spi.ResteasyDeployment;
+import org.xnatural.enet.common.Utils;
+import org.xnatural.enet.core.ServerTpl;
+import org.xnatural.enet.event.EC;
+import org.xnatural.enet.event.EL;
+import org.xnatural.enet.event.EP;
+
+import javax.ws.rs.Path;
+import javax.ws.rs.core.Application;
+import java.io.File;
+import java.util.LinkedList;
+import java.util.List;
+import java.util.Map;
+
+/**
+ *
+ */
+public class UndertowResteasySever extends ServerTpl {
+    /**
+     * http 服务监听端口
+     */
+    private int                 port;
+    /**
+     * http 服务绑定地址
+     */
+    private String              hostname;
+    /**
+     * see: {@link #collect()}
+     */
+    private List<Class>         scan = new LinkedList<>();
+    private UndertowJaxrsServer server;
+    private ResteasyDeployment  rd;
+
+
+    public UndertowResteasySever() {
+        setName("undertowRestEasy");
+        setPort(8080);
+        setHostname("localhost");
+    }
+
+
+    @EL(name = "sys.starting")
+    public void start() {
+        if (!running.compareAndSet(false, true)) {
+            log.warn("服务({})正在运行", getName()); return;
+        }
+        if (coreExec == null) initExecutor();
+        if (coreEp == null) coreEp = new EP(coreExec);
+        coreEp.fire(getNs() + ".starting");
+        // 先从核心取配置, 然后再启动
+        coreEp.fire("sys.env.ns", EC.of("ns", getNs()), (ec) -> {
+            if (ec.result != null) {
+                Map<String, Object> m = (Map) ec.result;
+                port = Utils.toInteger(m.get("port"), getPort());
+                hostname = (String) m.getOrDefault("hostname", getHostname());
+                if (attrs.containsKey("scan")) {
+                    try {
+                        for (String c : ((String) attrs.get("scan")).split(",")) {
+                            if (c != null && !c.trim().isEmpty()) scan.add(Class.forName(c.trim()));
+                        }
+                    } catch (ClassNotFoundException e) {
+                        log.error(e);
+                    }
+                }
+                attrs.putAll(m);
+            }
+            if (server == null) initServer();
+            server.start(
+                    Undertow.builder().setIoThreads(getInteger("ioThreads", 1))
+                            .setWorkerThreads(getInteger("workerThreads", 1))
+                            .addHttpListener(getPort(), getHostname())
+            );
+            log.info("创建({})服务. hostname: {}, port: {}", getName(), getHostname(), getPort());
+            collect();
+            coreEp.fire(getNs() + ".started");
+        });
+    }
+
+
+    @EL(name = "sys.stopping")
+    public void stop() {
+        if (server != null) {
+            log.info("停止({})服务. name: {}, hostname: {}, port: {}", getName(), getHostname(), getPort());
+            server.stop(); server = null; rd.stop(); rd = null;
+        }
+    }
+
+
+    public static void main(String[] args) {
+        new UndertowResteasySever().addResource(new RestTpl()).start();
+    }
+
+
+    /**
+     * 服务启动后自动扫描此类所在包下的 Handler({@link Path} 注解的类)
+     * @param clz
+     */
+    public UndertowResteasySever scan(Class clz) {
+        if (running.get()) throw new IllegalArgumentException("服务正在运行不允许更改");
+        scan.add(clz);
+        return this;
+    }
+
+
+    /**
+     * 添加 接口 资源
+     * @param o
+     * @return
+     */
+    @EL(name = "${ns}.addResource")
+    public UndertowResteasySever addResource(Object o) {
+        if (o instanceof Class) return this;
+        if (server == null) initServer();
+        Object s;
+        if (o instanceof EC) s = ((EC) o).getAttr("source");
+        else s = o;
+        if (rd.getRegistry() == null) rd.getResources().add(s);
+        else rd.getRegistry().addSingletonResource(s);
+        return this;
+    }
+
+
+    /**
+     * 创建 netty http 服务
+     * @return
+     */
+    private void initServer() {
+        rd = new ResteasyDeployment();
+        rd.setApplicationClass(Application.class.getName());
+        rd.start();
+        server = new UndertowJaxrsServer().deploy(rd);
+    }
+
+
+    /**
+     * 收集 {@link #scan} 类对的包下边所有的 有注解{@link Path}的类
+     */
+    private void collect() {
+        if (scan == null || scan.isEmpty()) return;
+        try {
+            for (Class clz : scan) {
+                String pkg = clz.getPackage().getName();
+                File pkgDir = new File(getClass().getClassLoader().getResource(pkg.replaceAll("\\.", "/")).getFile());
+                for (File f : pkgDir.listFiles(f -> f.getName().endsWith(".class"))) {
+                    load(pkg, f);
+                }
+            }
+        } catch (Exception e) {
+            log.error(e, "扫描Handler类出错!");
+        }
+    }
+
+
+    private void load(String pkg, File f) throws Exception {
+        if (f.isDirectory()) {
+            for (File ff : f.listFiles(ff -> ff.getName().endsWith(".class"))) {
+                load(pkg + "." + f.getName(), ff);
+            }
+        } else if (f.isFile() && f.getName().endsWith(".class")) {
+            Class<?> clz = getClass().getClassLoader().loadClass(pkg + "." + f.getName().replace(".class", ""));
+            if (clz.getAnnotation(Path.class) != null) addResource(clz.newInstance());
+        }
+    }
+
+
+    public String getHostname() {
+        return hostname;
+    }
+
+
+    public UndertowResteasySever setHostname(String hostname) {
+        if (running.get()) throw new RuntimeException("服务正在运行.不允许更新主机名");
+        attrs.put("hostname", hostname); this.hostname = hostname;
+        return this;
+    }
+
+
+    public int getPort() {
+        return port;
+    }
+
+
+    public UndertowResteasySever setPort(int port) {
+        if (running.get()) throw new RuntimeException("服务正在运行.不允许更新端口");
+        attrs.put("port", port); this.port = port;
+        return this;
+    }
+}

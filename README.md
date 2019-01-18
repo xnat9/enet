@@ -4,7 +4,7 @@
 事件驱动框架
 
 #### 软件架构
- 以AppContext为系统运行上下文, 各小模块挂载运行
+ 以AppContext为系统运行上下文, 各小模块服务挂载运行
  * 简单: 各模块不存在编译/启动上的依赖. 最大程度的解耦. 这样各个模块的界限清楚明了
  * 稳定: 各种模块可独立编译打包运行测试. 模块自治
  * 灵活: 可自定义模块, 可随意按需加入到系统中
@@ -31,12 +31,18 @@
 
 #### 使用说明
 ```
-AppContext app = new AppContext();
-app.addSource(new UndertowResteasySever()); // resteasy http 模块.提供http mvc服务
-app.addSource(new MViewServer()); // 系统界面管理模块. 提供系统界面化管理服务
+app.addSource(new Netty4HttpServer());
+app.addSource(new Netty4ResteasyServer());
+app.addSource(new MViewServer());
 // TODO 加载自定义各个模块
 app.start();
 ```
+
+#### 各模块说明
+
+* Netty4HttpServer: netty4 实现的 http服务
+* Netty4ResteasyServer: resteasy 实现的 mvc功能.(接收netty4 提供的http请求)
+* MViewServer: 一个界面管理系统
 
 #### 参与贡献
 

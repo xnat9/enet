@@ -1,0 +1,72 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>${serverName}</title>
+    <link rel="stylesheet" type="text/css" href="../css/bootstrap.min.4.0.0.css"></link>
+</head>
+<body>
+<div id="app" class="container-fluid">
+    <div class="row" v-if="properties">
+        <properties-view :properties="properties" />
+    </div>
+</div>
+
+<script type="text/x-template" id="properties-view-tpl">
+    <div class="panel panel-default">
+        <div class="panel-heading">
+            <h3>Properties View</h3>
+        </div>
+        <table class="table table-bordered table-condensed table-striped table-hover">
+            <thead>
+            <tr><th>Name</th><th>Value</th><th>Type</th></tr>
+            </thead>
+            <tbody>
+            <!--<tr is="prop-item" v-for="prop in properties" :prop="prop"/>-->
+            <tr v-for="prop in properties">
+                <td>
+                    <ul v-if="prop.annotations" class="list-unstyled">
+                        <li v-for="mark in prop.annotations">
+                            <i>{{mark}}</i>
+                        </li>
+                    </ul>
+                    {{prop.name}}
+                </td>
+                <td>
+                    {{prop.value}}
+                </td>
+                <td>{{prop.type}}</td>
+            </tr>
+            </tbody>
+            <tfoot>
+            <tr><td><total :total="properties.length"/></td></tr>
+            </tfoot>
+        </table>
+    </div>
+</script>
+
+
+
+</body>
+<script src="../js/lib/vue.js"></script>
+<script>
+    var state = {
+        rootPath: "${rootPath}",
+        _this: "${_this}",
+        properties: ${properties},
+        methods: ${methods}
+    };
+    Vue.component('total', {
+        props: ['total'],
+        template: '<span>Total: {{total}}</span>'
+    });
+    Vue.component('properties-view', {
+        props: ['properties'],
+        template: '#properties-view-tpl'
+    });
+    var app = new Vue({
+        el: '#app',
+        data: state
+    });
+</script>
+</html>

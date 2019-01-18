@@ -8,12 +8,11 @@ import org.xnatural.enet.event.EL;
 import org.xnatural.enet.event.EP;
 
 import java.lang.reflect.Field;
-import java.util.LinkedList;
-import java.util.List;
-import java.util.Objects;
+import java.util.*;
 import java.util.concurrent.*;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.function.Consumer;
+import java.util.stream.Collectors;
 
 /**
  * 简单, 稳定, 灵活, 高效
@@ -39,9 +38,6 @@ public class AppContext {
     protected List<Object>  sources = new LinkedList<>();
 
 
-    public AppContext() {}
-
-
     /**
      * 系统启动
      */
@@ -64,7 +60,7 @@ public class AppContext {
      * 系统停止
      */
     public void stop() {
-        // 通知各个功能模块关闭
+        // 通知各个模块服务关闭
         ep.fire("sys.stopping", EC.of(this), (ce) -> exec.shutdown());
     }
 
@@ -101,8 +97,11 @@ public class AppContext {
         return new EP(exec) {
             @Override
             protected void doPublish(String eName, EC ec, Consumer<EC> completeFn) {
-                if ("sys.starting".equals(eName) || "sys.stopping".equals(eName) || "sys.env.updateAttr".equals(eName)) {
+                if ("sys.starting".equals(eName) || "sys.stopping".equals(eName)) {
                     if (ec.source() != AppContext.this) throw new UnsupportedOperationException("不允许触发此事件");
+                }
+                if ("sys.env.updateAttr".equals(eName)) {
+                    if (ec.source() != env) throw new UnsupportedOperationException("不允许触发此事件");
                 }
                 super.doPublish(eName, ec, completeFn);
             }
@@ -110,6 +109,7 @@ public class AppContext {
             public String toString() { return "coreEp"; }
         };
     }
+
 
     /**
      * 初始化一个 {@link ThreadPoolExecutor}
@@ -129,12 +129,12 @@ public class AppContext {
                 }
         ) {
             long idleStartTime;
-            long oneMinute = TimeUnit.MINUTES.toMillis(1);
+            long idleMinute = TimeUnit.MINUTES.toMillis(5);
             @Override
             protected void beforeExecute(Thread t, Runnable r) {
                 super.beforeExecute(t, r);
                 if (idleStartTime != 0) {
-                    if (System.currentTimeMillis() - idleStartTime > oneMinute) {
+                    if (System.currentTimeMillis() - idleStartTime > idleMinute) {
                         log.info("executor池已空闲 " + ((System.currentTimeMillis() - idleStartTime) / 1000) + " 秒, 现在继续工作");
                     }
                     idleStartTime = 0;
@@ -195,6 +195,13 @@ public class AppContext {
         }
     }
 
+
+    @EL(name = "sys.info")
+    private Object info(EC ec) {
+        Map<String, Object> info = new HashMap<>(2);
+        info.put("modules", sources.stream().filter(o -> o instanceof ServerTpl).map(o -> ((ServerTpl) o).getName()).collect(Collectors.toList()));
+        return info;
+    }
 
 
     /**
@@ -262,11 +269,11 @@ public class AppContext {
 
     /**
      * 为 source 包装 Executor
-     * @param Source
+     * @param source
      * @return
      */
-    private Executor wrapExecForSource(Object Source) {
-        return cmd -> exec.execute(cmd);
+    private Executor wrapExecForSource(Object source) {
+        return fn -> exec.execute(fn);
     }
 
 

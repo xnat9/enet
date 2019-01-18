@@ -3,6 +3,7 @@ package org.xnatural.enet.common.builder;
 import org.apache.commons.beanutils.BeanUtils;
 import org.xnatural.enet.common.Context;
 import org.xnatural.enet.common.Utils;
+import org.xnatural.enet.server.mvc.cutome.ApiResp;
 
 import java.lang.reflect.InvocationTargetException;
 import java.util.*;
@@ -10,7 +11,7 @@ import java.util.*;
 
 /**
  * JavaBean对象构建器, 从一个运行上下文中, 构建一个结果对象.
- * 一般用于: rest 接口{@link org.xnatural.enet.modules.mvc.ApiResp#data}, 即service 方法返回一个对象, 对象的一些属性需要复杂计算的结果
+ * 一般用于: rest 接口{@link ApiResp#data}, 即service 方法返回一个对象, 对象的一些属性需要复杂计算的结果
  *
  * @param <T>
  * @author hubert

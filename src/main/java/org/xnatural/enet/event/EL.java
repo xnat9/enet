@@ -13,6 +13,7 @@ public @interface EL {
     /**
      * 事件名.可相同. 即: 一个事件可以对应多个监听器
      * 支持 ${attr} 替换
+     * TODO 多事件名
      * @return
      */
     String name();

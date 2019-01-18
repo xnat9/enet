@@ -19,6 +19,10 @@ public class EC {
      * 是否追踪执行.用于调试
      */
     boolean track;
+    /**
+     * 强制异步. 如果设置了就会忽略 @EL中的设置
+     */
+    Boolean async;
     EP ep;
     /**
      * 事件源
@@ -96,6 +100,13 @@ public class EC {
     public boolean noListener() {
         return willPass == null;
     }
+
+
+    /**
+     * 同步执行
+     * @return
+     */
+    public EC sync() { async = false; return this; }
 
 
     public EP ep() { return ep; }

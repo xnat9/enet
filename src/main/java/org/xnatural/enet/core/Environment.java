@@ -330,7 +330,7 @@ public class Environment {
      * @param ec
      * @return
      */
-    @EL(name = "sys.env.ns", async = false)
+    @EL(name = "sys.env.ns")
     private Map<String, String> ns(EC ec) {
         return getGroupAttr(ec.getAttr("ns", String.class));
     }

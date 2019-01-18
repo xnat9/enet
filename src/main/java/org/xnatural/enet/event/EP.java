@@ -20,7 +20,7 @@ import java.util.regex.Pattern;
 public class EP {
     final   Log                         log         = Log.of(getClass());
     private Executor                    exec;
-    private Map<String, List<Listener>> lsMap       = new ConcurrentHashMap<>(2);
+    private Map<String, List<Listener>> lsMap       = new ConcurrentHashMap<>(7);
     /**
      * 需要追踪的事件名字
      */
@@ -89,7 +89,7 @@ public class EP {
             ec.id = UUID.randomUUID().toString();
             log.info("开始执行事件链. name: {}, id: {}", eName, ec.id);
         }
-        if (exec == null) {
+        if (exec == null) { // 同步执行
             for (Listener l : ls) l.invoke(ec);
             if (completeFn != null) {
                 completeFn.accept(ec);
@@ -99,9 +99,14 @@ public class EP {
             // 异步和同步执行的监听器, 分开执行
             List<Listener> asyncList = new LinkedList<>();
             List<Listener> other = new LinkedList<>();
-            for (Listener l : ls) {
-                if (l.async) asyncList.add(l);
-                else other.add(l);
+            if (ec.async == null) {
+                for (Listener l : ls) {
+                    if (l.async) asyncList.add(l);
+                    else other.add(l);
+                }
+            } else {
+                if (ec.async) asyncList.addAll(ls);
+                else other.addAll(ls);
             }
             if (completeFn == null) {
                 exec.execute(() -> asyncList.forEach(l -> l.invoke(ec)));
@@ -137,6 +142,18 @@ public class EP {
 
 
     /**
+     * TODO 添加临时事件回调?
+     * @param eName
+     * @param fn
+     * @return
+     */
+//    public EP when(String eName, Runnable fn) {
+//        List<Listener> ls = lsMap.computeIfAbsent(eName, s -> new LinkedList<>());
+//        return this;
+//    }
+
+
+    /**
      * 从一个对象中 解析出 所有带有 {@link EL}注解的方法 转换成监听器{@link Listener}
      * 如果带有注解 {@link EL}的方法被重写, 则用子类的方法
      * @param source
@@ -150,7 +167,8 @@ public class EP {
                     EL a = m.getDeclaredAnnotation(EL.class);
                     if (a == null) continue;
                     Listener listener = new Listener();
-                    listener.async = a.async(); listener.m = m; listener.source = source; listener.order = a.order();
+                    listener.async = a.async(); listener.source = source; listener.order = a.order();
+                    listener.m = m; m.setAccessible(true);
                     listener.name = parseName(a.name(), source);
                     List<Listener> ls = lsMap.computeIfAbsent(listener.name, s -> new LinkedList<>());
                     // 同一个对象源中, 不能有相同的事件监听名. 忽略并警告
@@ -218,14 +236,33 @@ public class EP {
      * 监听器包装类
      */
     class Listener {
-        Object source; Method  m; boolean async;
+        Object source; Method  m;
         String name; float order;
+        /**
+         * 是否异步
+         */
+        boolean async;
+        /**
+         * 监听器执行体
+         */
+        Runnable fn;
+        /**
+         * 临时监听器
+         */
+        boolean tmp;
 
         void invoke(EC ec) {
             try {
-                m.setAccessible(true);
-                if (m.getParameterCount() == 1) ec.result = m.invoke(source, ec);
-                else ec.result = m.invoke(source);
+                if (fn != null) fn.run();
+                else {
+                    if (m.getParameterCount() == 1) {
+                        if (Void.class.isAssignableFrom(m.getReturnType())) m.invoke(source, ec);
+                        else ec.result = m.invoke(source, ec);
+                    } else {
+                        if (Void.class.isAssignableFrom(m.getReturnType())) m.invoke(source, ec);
+                        else ec.result = m.invoke(source);
+                    }
+                }
                 ec.passed(this);
                 if (ec.track) log.info("执行事件完成. name: {}, id: {}, result: {}", name, ec.id(), ec.result);
             } catch (Throwable e) {

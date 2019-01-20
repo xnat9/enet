@@ -154,14 +154,14 @@ public class Utils {
 
     public static boolean isNotBlank(final CharSequence... cs) {
         if (cs == null || cs.length < 1) {
-            return true;
+            return false;
         }
         for (final CharSequence c : cs){
             if (isBlank(c)) {
-                return true;
+                return false;
             }
         }
-        return false;
+        return true;
     }
 
 

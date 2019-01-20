@@ -1,6 +1,4 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<!--
--->
 <project xmlns="http://maven.apache.org/POM/4.0.0"
         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/maven-v4_0_0.xsd">
@@ -31,7 +29,7 @@
     </developers>
     <contributors>
         <contributor>
-            <name>Adrian Ber</name>
+            <name>hubert</name>
         </contributor>
     </contributors>
 
@@ -45,7 +43,6 @@
     </properties>
 
 
-    <!-- Lang should depend on very little -->
     <dependencies>
         <dependency>
             <groupId>commons-beanutils</groupId>
@@ -76,16 +73,21 @@
         </dependency>
 
         <dependency>
-            <groupId>org.slf4j</groupId>
-            <artifactId>slf4j-api</artifactId>
-            <version>1.7.25</version>
+            <groupId>io.swagger.core.v3</groupId>
+            <artifactId>swagger-jaxrs2</artifactId>
+            <version>2.0.6</version>
+        </dependency>
+
+        <dependency>
+            <groupId>org.webjars</groupId>
+            <artifactId>swagger-ui</artifactId>
+            <version>3.20.5</version>
         </dependency>
 
         <dependency>
             <groupId>org.jboss.resteasy</groupId>
             <artifactId>resteasy-multipart-provider</artifactId>
             <version>${version.resteasy}</version>
-            <scope>provided</scope>
             <exclusions>
                 <exclusion>
                     <artifactId>resteasy-client</artifactId>
@@ -107,10 +109,6 @@
                     <artifactId>apache-mime4j</artifactId>
                     <groupId>org.apache.james</groupId>
                 </exclusion>
-                <!--<exclusion>
-                    <artifactId>reactive-streams</artifactId>
-                    <groupId>org.reactivestreams</groupId>
-                </exclusion>-->
                 <exclusion>
                     <artifactId>jcip-annotations</artifactId>
                     <groupId>net.jcip</groupId>
@@ -168,19 +166,13 @@
                     <artifactId>httpclient</artifactId>
                     <groupId>org.apache.httpcomponents</groupId>
                 </exclusion>
-                <exclusion>
-                    <artifactId>netty-all</artifactId>
-                    <groupId>io.netty</groupId>
-                </exclusion>
             </exclusions>
-            <scope>provided</scope>
         </dependency>
 
         <dependency>
             <groupId>ch.qos.logback</groupId>
             <artifactId>logback-classic</artifactId>
             <version>1.2.3</version>
-            <scope>provided</scope>
             <exclusions>
                 <exclusion>
                     <groupId>org.slf4j</groupId>
@@ -190,30 +182,21 @@
         </dependency>
 
         <dependency>
-            <groupId>io.netty</groupId>
-            <artifactId>netty-all</artifactId>
-            <version>4.1.16.Final</version>
-            <scope>provided</scope>
-        </dependency>
-
-        <dependency>
             <groupId>com.alibaba</groupId>
             <artifactId>fastjson</artifactId>
-            <version>1.2.42</version>
-            <scope>provided</scope>
+            <version>1.2.54</version>
         </dependency>
     </dependencies>
 
 
 
-
     <build>
-
         <resources>
             <resource>
                 <directory>src/main/java</directory>
                 <includes>
                     <include>**/*.properties</include>
+                    <include>**/*.xml</include>
                     <include>**/*.html</include>
                     <include>**/*.js</include>
                     <include>**/*.css</include>

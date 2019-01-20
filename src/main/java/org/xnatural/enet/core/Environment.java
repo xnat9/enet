@@ -151,14 +151,12 @@ public class Environment {
         locationSources.put(f, r);
         profileSources.computeIfAbsent(profile, s -> new LinkedHashMap<>()).putAll(r);
         if (r.containsKey(PROP_ACTIVE)) {
-            activeProfiles.clear();
             for (String p : r.get(PROP_ACTIVE).split(",")) {
                 if (Utils.isNotBlank(p)) activeProfiles.add(p.trim());
             }
             allProfiles.addAll(activeProfiles);
         }
         if (r.containsKey(PROP_INCLUDE)) {
-            includeProfiles.clear();
             for (String p : r.get(PROP_INCLUDE).split(",")) {
                 if (Utils.isNotBlank(p)) includeProfiles.add(p.trim());
             }
@@ -214,14 +212,12 @@ public class Environment {
         locationSources.put(f, r);
         profileSources.computeIfAbsent(profile, s -> new LinkedHashMap<>()).putAll(r);
         if (r.containsKey(PROP_ACTIVE)) {
-            activeProfiles.clear();
             for (String p : r.get(PROP_ACTIVE).split(",")) {
                 if (Utils.isNotBlank(p)) activeProfiles.add(p.trim());
             }
             allProfiles.addAll(activeProfiles);
         }
         if (r.containsKey(PROP_INCLUDE)) {
-            includeProfiles.clear();
             for (String p : r.get(PROP_INCLUDE).split(",")) {
                 if (Utils.isNotBlank(p)) includeProfiles.add(p.trim());
             }

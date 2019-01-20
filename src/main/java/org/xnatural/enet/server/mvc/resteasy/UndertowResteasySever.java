@@ -116,7 +116,10 @@ public class UndertowResteasySever extends ServerTpl {
             Object s = ((EC) o).getAttr("source");
             if (((EC) o).getAttr("path") != null) deployment.getRegistry().addSingletonResource(s, ((EC) o).getAttr("path", String.class));
             else deployment.getRegistry().addSingletonResource(s);
-        } else deployment.getResources().add(o);
+        } else {
+            if (deployment.getRegistry() == null) deployment.getResources().add(o);
+            else deployment.getRegistry().addSingletonResource(o);
+        }
         return this;
     }
 

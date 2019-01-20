@@ -35,6 +35,7 @@ public class Controller {
     @GET
     @Path("")
     public Response index() throws Exception {
+        log.info("xxxxxxxxxxxx");
         Map<String, Object> model = new HashMap<>();
         model.put("rootPath", server.getPath());
         ep.fire("sys.info", EC.of(this).sync(), ec -> {

@@ -119,7 +119,7 @@ public class AppContext {
     protected void initExecutor() {
         int capacity = 100000;
         exec = new ThreadPoolExecutor(
-                4, 4, 10, TimeUnit.MINUTES, new LinkedBlockingQueue<>(capacity),
+                8, 8, 10, TimeUnit.MINUTES, new LinkedBlockingQueue<>(capacity),
                 new ThreadFactory() {
                     final AtomicInteger count = new AtomicInteger(1);
                     @Override

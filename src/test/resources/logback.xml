@@ -4,9 +4,10 @@
 custom logback configuration
 -->
 <configuration>
+    <!-- 当配置文件 有 错误时, 打印 StatusPrinter.printInCaseOfErrorsOrWarnings(ch.qos.logback.core.Context, long) -->
     <!--<property name="CONSOLE_LOG_PATTERN" value="${CONSOLE_LOG_PATTERN:-%clr(%d{mm:ss.SSS}){faint} %clr(${LOG_LEVEL_PATTERN:-%5p}) %clr(${PID:- }){magenta} %clr(-&#45;&#45;){faint} %clr([%15.15t]){faint} %clr(%-40.40logger{39} %L){cyan} %clr(:){faint} %m%n${LOG_EXCEPTION_CONVERSION_WORD:-%wEx}}"/>-->
     <property name="CONSOLE_LOG_PATTERN" value="%d{HH:mm:ss.SSS} [%-10thread] [${PID:- }] [%-5level] [%-50C :%-3L] => %m%n"/>
-    <property name="FILE_LOG_PATTERN" value="%d{yyyy-MM-dd HH:mm:ss.SSS} [%-10thread] [${PID:- }] [%-5level] [%-50C :%-3L] => %m%n${LOG_EXCEPTION_CONVERSION_WORD:-}"/>
+    <property name="FILE_LOG_PATTERN" value="%d{yyyy-MM-dd HH:mm:ss.SSS} [%-10thread] [${PID:- }] [%-5level] [%-50C :%-3L] => %m%n"/>
     <property name="LOG_PATH" value="${LOG_PATH:-${LOG_PATH:-${LOG_TEMP:-${java.io.tmpdir:-/tmp}}}/sys.log}"/>
 
 
@@ -31,19 +32,11 @@ custom logback configuration
     </appender>
 
     <!-- logger area -->
-    <logger name="org.apache.catalina.startup.DigesterFactory" level="ERROR"/>
-    <logger name="org.apache.catalina.util.LifecycleBase" level="ERROR"/>
-    <logger name="org.apache.coyote.http11.Http11NioProtocol" level="WARN"/>
-    <logger name="org.apache.sshd.common.util.SecurityUtils" level="WARN"/>
-    <logger name="org.apache.tomcat.util.net.NioSelectorPool" level="WARN"/>
-    <logger name="org.eclipse.jetty.util.component.AbstractLifeCycle" level="ERROR"/>
-    <logger name="org.hibernate.validator.internal.util.Version" level="WARN"/>
     <logger name="ch.qos.logback" level="WARN"/>
-
     <logger name="org.xnatural.enet" level="debug" />
 
     <root level="info">
         <appender-ref ref="CONSOLE" />
-        <appender-ref ref="FILE" />
+        <!--<appender-ref ref="FILE" />-->
     </root>
 </configuration>

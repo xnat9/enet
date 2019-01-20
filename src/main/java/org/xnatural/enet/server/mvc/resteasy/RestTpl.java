@@ -8,11 +8,13 @@ import javax.ws.rs.PathParam;
 import javax.ws.rs.Produces;
 import javax.ws.rs.core.Response;
 import java.io.File;
+import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.CompletionStage;
 
 /**
  * @author xiangxb, 2019-01-13
  */
-@Path("")
+@Path("tpl")
 public class RestTpl {
 
     final Log log = Log.of(getClass());
@@ -23,6 +25,16 @@ public class RestTpl {
     public String get() {
         log.info("get1");
         return "ssssssssss";
+    }
+
+
+    @GET
+    @Path("async")
+    @Produces("text/plain")
+    public CompletionStage<String> async() {
+        CompletableFuture<String> f = new CompletableFuture();
+        f.complete("ssssssssssss");
+        return f;
     }
 
 

@@ -1,4 +1,4 @@
-package org.my.tpl;
+package org.xnatural.enet;
 
 import org.xnatural.enet.server.mvc.resteasy.RestTpl;
 import org.xnatural.enet.server.mvc.resteasy.UndertowResteasySever;

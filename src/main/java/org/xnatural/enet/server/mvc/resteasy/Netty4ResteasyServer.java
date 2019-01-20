@@ -1,12 +1,15 @@
 package org.xnatural.enet.server.mvc.resteasy;
 
 import io.netty.channel.ChannelPipeline;
+import io.netty.channel.nio.NioEventLoopGroup;
+import io.netty.util.concurrent.EventExecutorGroup;
 import org.jboss.resteasy.core.SynchronousDispatcher;
 import org.jboss.resteasy.plugins.server.netty.RequestDispatcher;
 import org.jboss.resteasy.plugins.server.netty.RequestHandler;
 import org.jboss.resteasy.plugins.server.netty.RestEasyHttpRequestDecoder;
 import org.jboss.resteasy.plugins.server.netty.RestEasyHttpResponseEncoder;
 import org.jboss.resteasy.spi.ResteasyDeployment;
+import org.xnatural.enet.common.Log;
 import org.xnatural.enet.core.ServerTpl;
 import org.xnatural.enet.event.EC;
 import org.xnatural.enet.event.EL;
@@ -62,7 +65,7 @@ public class Netty4ResteasyServer extends ServerTpl {
             }
             attrs.putAll(m);
         });
-        if (deployment.getRegistry() == null) deployment.start();
+        startDeployment();
         initDispatcher();
         log.info("创建({})服务. root: {}", getName(), getRoot());
         collect();
@@ -72,6 +75,7 @@ public class Netty4ResteasyServer extends ServerTpl {
     @EL(name = "server.http-netty4.addHandler")
     private void addHandler(EC ec) {
         initDispatcher();
+        // 参考 NettyJaxrsServer
         ChannelPipeline pipeline = ec.getAttr("pipeline", ChannelPipeline.class);
         pipeline.addLast(new RestEasyHttpRequestDecoder(dispatcher.getDispatcher(), root, RestEasyHttpRequestDecoder.Protocol.HTTP));
         pipeline.addLast(new RestEasyHttpResponseEncoder());
@@ -88,11 +92,14 @@ public class Netty4ResteasyServer extends ServerTpl {
     public Netty4ResteasyServer addResource(Object o) {
         if (o instanceof Class) return this;
         if (o instanceof EC) {
-            if (deployment.getRegistry() == null) deployment.start();
+            startDeployment();
             Object s = ((EC) o).getAttr("source");
             if (((EC) o).getAttr("path") != null) deployment.getRegistry().addSingletonResource(s, ((EC) o).getAttr("path", String.class));
             else deployment.getRegistry().addSingletonResource(s);
-        } else deployment.getResources().add(o);
+        } else {
+            if (deployment.getRegistry() == null) deployment.getResources().add(o);
+            else deployment.getRegistry().addSingletonResource(o);
+        }
         return this;
     }
 
@@ -104,6 +111,24 @@ public class Netty4ResteasyServer extends ServerTpl {
         if (dispatcher == null) {
             dispatcher = new RequestDispatcher((SynchronousDispatcher)deployment.getDispatcher(), deployment.getProviderFactory(), null);
         }
+    }
+
+
+    private synchronized void startDeployment() {
+        if (deployment.getRegistry() != null) return;
+        // deployment.setAsyncJobServiceEnabled(true);
+        deployment.start();
+    }
+
+
+    /**
+     * 服务启动后自动扫描此类所在包下的 Handler({@link Path} 注解的类)
+     * @param clz
+     */
+    public Netty4ResteasyServer scan(Class clz) {
+        if (running.get()) throw new IllegalArgumentException("服务正在运行不允许更改");
+        scan.add(clz);
+        return this;
     }
 
 

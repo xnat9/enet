@@ -131,8 +131,6 @@ public class Log {
     public static Log of(Class<?> clazz) {
         return new Log((LocationAwareLogger) LoggerFactory.getLogger(clazz));
     }
-
-
     /**
      *
      * @param name NOTE: 不要是个变化的String
@@ -146,7 +144,7 @@ public class Log {
     }
 
 
-    protected void doLog(final Level level, final String loggerClassName, final String message, final Object[] pArgs, final Throwable thrown) {
+    private void doLog(final Level level, final String loggerClassName, final String message, final Object[] pArgs, final Throwable thrown) {
         if (isEnabled(level)) {
             StringBuilder sb = new StringBuilder();
             if (prefixSupplier != null) sb.append(prefixSupplier.get()).append(message);
@@ -158,7 +156,7 @@ public class Log {
     }
 
 
-    protected void doLogf(final Level level, final String loggerClassName, final String format, final Object[] parameters, final Throwable thrown) {
+    private void doLogf(final Level level, final String loggerClassName, final String format, final Object[] parameters, final Throwable thrown) {
         if (isEnabled(level)) {
             final String text = String.format(format, parameters);
             doLog(logger, loggerClassName, translate(level), text, thrown);
@@ -206,10 +204,10 @@ public class Log {
         doLog(Level.ERROR, FQCN, pMsg, pArgs, null);
     }
 
+
     public void error(Throwable t) {
         doLog(Level.ERROR, FQCN, "", null, t);
     }
-
 
 
     public void error(Throwable t, String pMsg, Object... pArgs) {
@@ -231,6 +229,7 @@ public class Log {
         doLog(Level.INFO, FQCN, pMsg, pArgs, null);
     }
 
+
     public void info(Throwable t, String pMsg, Object... pArgs) {
         doLog(Level.INFO, FQCN, pMsg, pArgs, t);
     }
@@ -244,7 +243,6 @@ public class Log {
     public void debug(Throwable t, String pMsg, Object... pArgs) {
         doLog(Level.DEBUG, FQCN, pMsg, pArgs, t);
     }
-
 
 
     public void trace(String pMsg, Object... pArgs) {

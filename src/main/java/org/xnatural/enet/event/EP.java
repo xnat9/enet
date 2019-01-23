@@ -256,10 +256,10 @@ public class EP {
                 if (fn != null) fn.run();
                 else {
                     if (m.getParameterCount() == 1) {
-                        if (Void.class.isAssignableFrom(m.getReturnType())) m.invoke(source, ec);
+                        if (void.class.isAssignableFrom(m.getReturnType())) m.invoke(source, ec);
                         else ec.result = m.invoke(source, ec);
                     } else {
-                        if (Void.class.isAssignableFrom(m.getReturnType())) m.invoke(source, ec);
+                        if (void.class.isAssignableFrom(m.getReturnType())) m.invoke(source);
                         else ec.result = m.invoke(source);
                     }
                 }

@@ -1,6 +1,7 @@
 package org.xnatural.enet.server.mview;
 
 import com.alibaba.fastjson.JSON;
+import io.swagger.v3.oas.annotations.tags.Tag;
 import org.apache.commons.io.IOUtils;
 import org.xnatural.enet.common.Log;
 import org.xnatural.enet.event.EC;
@@ -17,7 +18,7 @@ import java.util.HashMap;
 import java.util.Map;
 import java.util.Objects;
 
-@Path("")
+@Path("/")
 public class Controller {
 
     final Log log = Log.of(getClass());
@@ -32,9 +33,18 @@ public class Controller {
     }
 
 
+//    @GET
+//    @Path("")
+//    public Response index() throws Exception {
+//        return Response.ok()
+//                .header("location", "/" + server.getPath() + "/index")
+//                .status(301).build();
+//    }
+
+
     @GET
-    @Path("")
-    public Response index() throws Exception {
+    @Path("/")
+    public Response index0() throws Exception {
         log.info("xxxxxxxxxxxx");
         Map<String, Object> model = new HashMap<>();
         model.put("rootPath", server.getPath());
@@ -105,7 +115,7 @@ public class Controller {
 
 
     private File findViewFile(String fPath) {
-        URL r = getClass().getClassLoader().getResource(getClass().getPackage().getName().replaceAll("\\.", "/") + "/view/" + fPath);
+        URL r = getClass().getClassLoader().getResource(getClass().getPackage().getName().replaceAll("\\.", "/") + "/ui/" + fPath);
         return r == null ? null : new File(r.getFile());
     }
 }

@@ -147,7 +147,7 @@ public class AppContext {
                     super.execute(command);
                 } catch (RejectedExecutionException ex) {
                     log.warn("executor池已不堪重负, " + toString());
-                } catch (Throwable t) {
+                } catch (Exception t) {
                     log.error("executor执行错误", t);
                 }
             }

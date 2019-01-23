@@ -122,6 +122,12 @@ public class EC {
     }
 
 
+    public EC setResult(Object result) {
+        this.result = result;
+        return this;
+    }
+
+
     public String id() { return id; }
 
 

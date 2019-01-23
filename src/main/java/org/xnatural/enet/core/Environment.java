@@ -12,6 +12,7 @@ import java.io.InputStream;
 import java.net.URL;
 import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.stream.Collectors;
 
 /**
  * 系统环境
@@ -113,7 +114,9 @@ public class Environment {
         for (String p : activeProfiles) {
             if (profileSources.containsKey(p)) finalAttrs.putAll(profileSources.get(p));
         }
-        log.info("环境已配置完. profile include: {}, active: {}", includeProfiles, activeProfiles);
+        finalAttrs.put(PROP_ACTIVE, activeProfiles.stream().collect(Collectors.joining(",")));
+        finalAttrs.put(PROP_INCLUDE, includeProfiles.stream().collect(Collectors.joining(",")));
+        log.info("环境已配置完. profile include: {}, ACTIVE: {}", includeProfiles, activeProfiles);
         ep.fire("sys.env.configured", EC.of(this));
     }
 
@@ -285,6 +288,8 @@ public class Environment {
      * @return
      */
     public Environment setAttr(String key, String value) {
+        if (PROP_ACTIVE.equals(key)) throw new IllegalArgumentException("不允许更改此属性值");
+        if (PROP_INCLUDE.equals(key)) throw new IllegalArgumentException("不允许更改此属性值");
         ep.fire(
                 "sys.env.updateAttr",
                 EC.of(this).attr("key", key).attr("value", value),
@@ -329,6 +334,17 @@ public class Environment {
     @EL(name = "sys.env.ns")
     private Map<String, String> ns(EC ec) {
         return getGroupAttr(ec.getAttr("ns", String.class));
+    }
+
+
+    /**
+     * 取属性值
+     * @param ec
+     * @return
+     */
+    @EL(name = "sys.env.attr")
+    private String attr(EC ec) {
+        return getAttr(ec.getAttr("name", String.class));
     }
 
 

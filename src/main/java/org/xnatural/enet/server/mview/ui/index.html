@@ -3,18 +3,18 @@
 <head>
     <meta charset="UTF-8">
     <title>MView</title>
-    <link rel="stylesheet" type="text/css" href="/${rootPath}/css/bootstrap.min.4.0.0.css"></link>
+    <link rel="stylesheet" type="text/css" href="css/bootstrap.min.4.0.0.css"></link>
 </head>
 <body>
 <div id="app" class="container-fluid">
     <ul>
         <template v-for="m in modules">
-            <li><a :href="rootPath + '/server/' + m">{{m}}</a></li>
+            <li><a :href="'server/' + m">{{m}}</a></li>
         </template>
     </ul>
 </div>
 </body>
-<script src="/${rootPath}/js/lib/vue.js"></script>
+<script src="js/lib/vue.js"></script>
 <script>
     var state = {
         rootPath: "${rootPath}",

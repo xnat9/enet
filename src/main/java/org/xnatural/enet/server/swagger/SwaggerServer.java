@@ -1,4 +1,4 @@
-package org.xnatural.enet.server.mview;
+package org.xnatural.enet.server.swagger;
 
 import io.swagger.v3.jaxrs2.integration.JaxrsApplicationAndAnnotationScanner;
 import io.swagger.v3.jaxrs2.integration.XmlWebOpenApiContext;
@@ -14,27 +14,20 @@ import org.xnatural.enet.event.EP;
 import java.util.*;
 import java.util.concurrent.ExecutorService;
 
-/**
- * mview web界面管理模块
- * 对系统中的所有模块管理
- */
-public class MViewServer extends ServerTpl {
+public class SwaggerServer extends ServerTpl {
 
-    /**
-     * mview http path前缀. 默认为: mview
-     */
-    private String path = "mview";
+    private String root;
     private Controller ctl;
 
-    public MViewServer() {
-        setName("mview");
+    public SwaggerServer() {
+        setName("swagger");
+        setRoot("api-doc");
     }
-
 
     @EL(name = "sys.starting")
     public void start() {
         if (!running.compareAndSet(false, true)) {
-            log.warn("服务({})正在运行", getName()); return;
+            log.warn("服务正在运行"); return;
         }
         if (coreExec == null) initExecutor();
         if (coreEp == null) coreEp = new EP(coreExec);
@@ -43,23 +36,20 @@ public class MViewServer extends ServerTpl {
         coreEp.fire("sys.env.ns", EC.of("ns", getNs()).sync(), (ec) -> {
             if (ec.result != null) {
                 Map<String, Object> m = (Map) ec.result;
-                if (m.containsKey("path")) path = m.get("path").toString();
+                root = (String) m.getOrDefault("root", getRoot());
                 attrs.putAll(m);
             }
-            ctl = new Controller(this);
-            log.info("创建({})服务.", getName());
-            coreEp.fire("server.netty4Resteasy.addResource", EC.of("source", ctl).attr("path", getPath()));
         });
+        ctl = new Controller(this);
+        log.info("创建({})服务.", getName());
+        coreEp.fire("server.netty4Resteasy.addResource", EC.of("source", ctl).attr("path", getRoot()));
     }
 
 
     @EL(name = "sys.stopping")
     public void stop() {
-        log.info("关闭({})服务.", getName());
         if (coreExec instanceof ExecutorService) ((ExecutorService) coreExec).shutdown();
-        // TODO
     }
-
 
 
     @EL(name = "server.swagger.openApi")
@@ -72,7 +62,7 @@ public class MViewServer extends ServerTpl {
                         .resourceClasses(rs).cacheTTL(0L)
         ).init().read();
         if (openApi == null) return;
-        Tag t = new Tag(); t.setName(getName()); t.setDescription("mview rest api");
+        Tag t = new Tag(); t.setName(getName()); t.setDescription("swagger rest api");
         openApi.addTagsItem(t);
         Map<String, PathItem> rPaths = new LinkedHashMap<>();
         for (Iterator<Map.Entry<String, PathItem>> it = openApi.getPaths().entrySet().iterator(); it.hasNext(); ) {
@@ -84,7 +74,7 @@ public class MViewServer extends ServerTpl {
             if (pi.getPost() != null && pi.getPost().getTags() == null) {
                 pi.getPost().setTags(Collections.singletonList(t.getName()));
             }
-            rPaths.put(("/" + getPath() + "/" + e.getKey()).replace("//", "/"), pi);
+            rPaths.put(("/" + getRoot() + "/" + e.getKey()).replace("//", "/"), pi);
             it.remove();
         }
         openApi.getPaths().putAll(rPaths);
@@ -92,7 +82,15 @@ public class MViewServer extends ServerTpl {
     }
 
 
-    public String getPath() {
-        return path;
+    public SwaggerServer setRoot(String root) {
+        if (running.get()) throw new RuntimeException("服务正在运行不能更改");
+        this.root = root;
+        attrs.put("root", root);
+        return this;
+    }
+
+
+    public String getRoot() {
+        return root;
     }
 }

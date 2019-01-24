@@ -127,7 +127,7 @@ public class Netty4HttpServer extends ServerTpl {
                 .childOption(ChannelOption.SO_KEEPALIVE, true);
         try {
             sb.bind(getHostname(), getPort()).sync();
-            log.info("创建({})服务. hostname: {}, port: {}", getName(), getHostname(), getPort());
+            log.info("Started {} Server. hostname: {}, port: {}", getName(), getHostname(), getPort());
         } catch (Exception ex) {
             log.error(ex);
         }

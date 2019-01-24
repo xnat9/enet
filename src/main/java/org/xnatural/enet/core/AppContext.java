@@ -7,6 +7,7 @@ import org.xnatural.enet.event.EC;
 import org.xnatural.enet.event.EL;
 import org.xnatural.enet.event.EP;
 
+import java.lang.management.ManagementFactory;
 import java.lang.reflect.Field;
 import java.util.*;
 import java.util.concurrent.*;
@@ -36,12 +37,17 @@ public class AppContext {
     protected EP                 ep;
     protected Environment        env;
     protected List<Object>  sources = new LinkedList<>();
+    /**
+     * 启动时间
+     */
+    private Date startup = new Date();
 
 
     /**
      * 系统启动
      */
     public void start() {
+        log.info("Starting Application on {} with PID {}", Utils.getHostname(), Utils.getPid());
         if (exec == null) initExecutor();
         // 1. 创建事件发布器
         ep = initEp();
@@ -50,7 +56,10 @@ public class AppContext {
         // 2. 设置系统环境
         env = new Environment(); env.setEp(ep); env.loadCfg();
         ep.fire("sys.starting", EC.of(this), (ce) -> {
-            log.info("系统启动完成");
+            log.info("Started Application in {} seconds (JVM running for {})",
+                    (System.currentTimeMillis() - startup.getTime()) / 1000.0,
+                    ManagementFactory.getRuntimeMXBean().getUptime() / 1000.0
+            );
             ep.fire("sys.started");
         });
     }

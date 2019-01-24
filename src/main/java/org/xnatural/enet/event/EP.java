@@ -89,7 +89,7 @@ public class EP {
             ec.id = UUID.randomUUID().toString();
             log.info("开始执行事件链. name: {}, id: {}", eName, ec.id);
         }
-        if (exec == null) { // 同步执行
+        if (exec == null) { // 只能同步执行
             for (Listener l : ls) l.invoke(ec);
             if (completeFn != null) {
                 completeFn.accept(ec);
@@ -97,32 +97,32 @@ public class EP {
             }
         } else {
             // 异步和同步执行的监听器, 分开执行
-            List<Listener> asyncList = new LinkedList<>();
-            List<Listener> other = new LinkedList<>();
+            List<Listener> asyncLs = new LinkedList<>(); // 异步执行的监听器
+            List<Listener> syncLs = new LinkedList<>(); // 同步执行的监听器
             if (ec.async == null) {
                 for (Listener l : ls) {
-                    if (l.async) asyncList.add(l);
-                    else other.add(l);
+                    if (l.async) asyncLs.add(l);
+                    else syncLs.add(l);
                 }
             } else {
-                if (ec.async) asyncList.addAll(ls);
-                else other.addAll(ls);
+                if (ec.async) asyncLs.addAll(ls);
+                else syncLs.addAll(ls);
             }
             if (completeFn == null) {
-                exec.execute(() -> asyncList.forEach(l -> l.invoke(ec)));
-                other.forEach(l -> l.invoke(ec));
+                asyncLs.forEach(l -> exec.execute(() -> l.invoke(ec)));
+                syncLs.forEach(l -> l.invoke(ec));
             } else {
                 AtomicInteger i = new AtomicInteger(ls.size());
                 Runnable fn = () -> { // 两个列表都执行完后才执行completeFn函数
                     if (i.get() == 0) {
                         completeFn.accept(ec);
-                        if (ec.track) log.info("结束执行事件链. name: {}, id: {}", eName, ec.id);
+                        if (ec.track) log.info("结束执行事件链. name: {}, id: {}, result: {}", eName, ec.id, ec.result);
                     }
                 };
-                asyncList.forEach(l -> exec.execute(() -> {
+                asyncLs.forEach(l -> exec.execute(() -> {
                     l.invoke(ec); i.decrementAndGet(); fn.run();
                 }));
-                other.forEach(l -> {
+                syncLs.forEach(l -> {
                     l.invoke(ec); i.decrementAndGet(); fn.run();
                 });
             }
@@ -136,7 +136,7 @@ public class EP {
      * @return
      */
     public EP addListenerSource(Object source) {
-        resolveListeners(source);
+        resolveListener(source);
         return this;
     }
 
@@ -158,7 +158,7 @@ public class EP {
      * 如果带有注解 {@link EL}的方法被重写, 则用子类的方法
      * @param source
      */
-    private void resolveListeners(Object source) {
+    private void resolveListener(Object source) {
         if (source == null) return;
         Class<? extends Object> c = source.getClass();
         do {

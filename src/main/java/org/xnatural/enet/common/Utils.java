@@ -1,7 +1,10 @@
 package org.xnatural.enet.common;
 
+import java.lang.management.ManagementFactory;
 import java.lang.reflect.Array;
 import java.math.BigDecimal;
+import java.net.InetAddress;
+import java.net.UnknownHostException;
 import java.util.Collection;
 import java.util.LinkedHashMap;
 import java.util.Map;
@@ -14,6 +17,23 @@ public class Utils {
 
     static final Log log = Log.of(Utils.class);
 
+
+    /**
+     * 得到当前运行的进程id
+     * @return
+     */
+    public static String getPid() {
+        return ManagementFactory.getRuntimeMXBean().getName().split("@")[0];
+    }
+
+
+    public static String getHostname() {
+        try {
+            return InetAddress.getLocalHost().getHostName();
+        } catch (UnknownHostException e) {
+            return "";
+        }
+    }
 
 
     /**

@@ -13,7 +13,7 @@ import org.xnatural.enet.server.swagger.SwaggerServer;
  */
 public class TestApp {
 
-    public static void main(String[] args) {
+    public static void main(String[] args) throws Exception {
         AppContext app = new AppContext();
 //        app.addSource(new MVCServer().scan(RestTpl.class));
         // app.addSource(new NettyServer().scan(RestTpl.class));

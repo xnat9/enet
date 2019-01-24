@@ -67,7 +67,7 @@ public class Netty4ResteasyServer extends ServerTpl {
         });
         startDeployment();
         initDispatcher();
-        log.info("创建({})服务. root: {}", getName(), getRoot());
+        log.info("Started {} Server. root: {}", getName(), getRoot());
         collect();
     }
 

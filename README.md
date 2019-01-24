@@ -34,6 +34,7 @@
 app.addSource(new Netty4HttpServer());
 app.addSource(new Netty4ResteasyServer());
 app.addSource(new MViewServer());
+app.addSource(new SwaggerServer());
 // TODO 加载自定义各个模块
 app.start();
 ```
@@ -41,8 +42,10 @@ app.start();
 #### 各模块说明
 
 * Netty4HttpServer: netty4 实现的 http服务
-* Netty4ResteasyServer: resteasy 实现的 mvc功能.(接收netty4 提供的http请求)
-* MViewServer: 一个界面管理系统
+* Netty4ResteasyServer: resteasy实现的mvc功能.(接收netty4提供的http请求)
+* UndertowResteasySever: resteasy实现的mvc功能.(接收Undertow提供的http请求)
+* MViewServer: 一个系统管理界面
+* SwaggerServer: swagger api 文档服务
 
 #### 参与贡献
 

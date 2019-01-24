@@ -2,6 +2,7 @@ package org.xnatural.enet.server.swagger;
 
 import io.swagger.v3.jaxrs2.integration.JaxrsApplicationAndAnnotationScanner;
 import io.swagger.v3.jaxrs2.integration.XmlWebOpenApiContext;
+import io.swagger.v3.oas.integration.OpenApiContextLocator;
 import io.swagger.v3.oas.integration.SwaggerConfiguration;
 import io.swagger.v3.oas.models.OpenAPI;
 import io.swagger.v3.oas.models.PathItem;
@@ -19,10 +20,12 @@ public class SwaggerServer extends ServerTpl {
     private String root;
     private Controller ctl;
 
+
     public SwaggerServer() {
         setName("swagger");
         setRoot("api-doc");
     }
+
 
     @EL(name = "sys.starting")
     public void start() {
@@ -41,13 +44,14 @@ public class SwaggerServer extends ServerTpl {
             }
         });
         ctl = new Controller(this);
-        log.info("创建({})服务.", getName());
+        log.info("Started {} Server. root: {}", getName(), getRoot());
         coreEp.fire("server.netty4Resteasy.addResource", EC.of("source", ctl).attr("path", getRoot()));
     }
 
 
     @EL(name = "sys.stopping")
-    public void stop() {
+    public void stop() throws Exception {
+        ((Map) OpenApiContextLocator.class.getField("map").get(OpenApiContextLocator.getInstance())).clear();
         if (coreExec instanceof ExecutorService) ((ExecutorService) coreExec).shutdown();
     }
 

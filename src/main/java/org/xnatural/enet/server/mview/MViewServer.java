@@ -47,7 +47,7 @@ public class MViewServer extends ServerTpl {
                 attrs.putAll(m);
             }
             ctl = new Controller(this);
-            log.info("创建({})服务.", getName());
+            log.info("Started {} Server. path: {}", getName(), getPath());
             coreEp.fire("server.netty4Resteasy.addResource", EC.of("source", ctl).attr("path", getPath()));
         });
     }

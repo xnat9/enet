@@ -18,7 +18,6 @@ import java.util.stream.Collectors;
  * 系统环境
  */
 public class Environment {
-    final static  String                           PROP_INCLUDE     = "enet.profiles.include";
     final static  String                           PROP_ACTIVE      = "enet.profiles.active";
     final         Log                              log              = Log.of(getClass());
     protected     EP                               ep;
@@ -51,10 +50,6 @@ public class Environment {
      */
     private final Set<String>                      allProfiles      = new HashSet<>();
     /**
-     * 公用配置
-     */
-    private final Set<String>                      includeProfiles  = new LinkedHashSet<>(5);
-    /**
      * 激活特定配置
      */
     private final Set<String>                      activeProfiles   = new LinkedHashSet<>(7);
@@ -84,7 +79,7 @@ public class Environment {
 
 
     void loadCfg() {
-        log.trace("开始加载配置");
+        log.trace("开始加载配置文件");
         // 先加载默认配置文件
         for (String l : cfgFileLocations) {
             if (l == null || l.isEmpty()) continue;
@@ -115,8 +110,7 @@ public class Environment {
             if (profileSources.containsKey(p)) finalAttrs.putAll(profileSources.get(p));
         }
         finalAttrs.put(PROP_ACTIVE, activeProfiles.stream().collect(Collectors.joining(",")));
-        finalAttrs.put(PROP_INCLUDE, includeProfiles.stream().collect(Collectors.joining(",")));
-        log.info("环境已配置完. profile include: {}, ACTIVE: {}", includeProfiles, activeProfiles);
+        log.info("The following profiles are active: {}", finalAttrs.get(PROP_ACTIVE));
         ep.fire("sys.env.configured", EC.of(this));
     }
 
@@ -158,12 +152,6 @@ public class Environment {
                 if (Utils.isNotBlank(p)) activeProfiles.add(p.trim());
             }
             allProfiles.addAll(activeProfiles);
-        }
-        if (r.containsKey(PROP_INCLUDE)) {
-            for (String p : r.get(PROP_INCLUDE).split(",")) {
-                if (Utils.isNotBlank(p)) includeProfiles.add(p.trim());
-            }
-            allProfiles.addAll(includeProfiles);
         }
     }
 
@@ -219,12 +207,6 @@ public class Environment {
                 if (Utils.isNotBlank(p)) activeProfiles.add(p.trim());
             }
             allProfiles.addAll(activeProfiles);
-        }
-        if (r.containsKey(PROP_INCLUDE)) {
-            for (String p : r.get(PROP_INCLUDE).split(",")) {
-                if (Utils.isNotBlank(p)) includeProfiles.add(p.trim());
-            }
-            allProfiles.addAll(includeProfiles);
         }
     }
 
@@ -289,7 +271,6 @@ public class Environment {
      */
     public Environment setAttr(String key, String value) {
         if (PROP_ACTIVE.equals(key)) throw new IllegalArgumentException("不允许更改此属性值");
-        if (PROP_INCLUDE.equals(key)) throw new IllegalArgumentException("不允许更改此属性值");
         ep.fire(
                 "sys.env.updateAttr",
                 EC.of(this).attr("key", key).attr("value", value),

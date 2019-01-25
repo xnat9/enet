@@ -1,6 +1,7 @@
 package org.xnatural.enet.common;
 
 import org.apache.commons.beanutils.BeanUtils;
+import org.slf4j.ILoggerFactory;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.slf4j.event.Level;
@@ -16,6 +17,9 @@ import java.util.List;
 import java.util.function.Supplier;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
+
+import static org.xnatural.enet.common.Utils.findMethod;
+import static org.xnatural.enet.common.Utils.invoke;
 
 /**
  * 通用 Log
@@ -48,6 +52,7 @@ public class Log {
     private static final boolean POST_1_6;
     private static final Method LOG_METHOD;
     private static final String FQCN = Log.class.getName();
+    private static Log    root;
 
     static {
         Method[] methods = LocationAwareLogger.class.getDeclaredMethods();
@@ -66,6 +71,13 @@ public class Log {
         }
         POST_1_6 = post16;
         LOG_METHOD = logMethod;
+        root = of(Logger.ROOT_LOGGER_NAME);
+        System.setProperty("PID", Utils.getPid());
+//        ILoggerFactory lf = LoggerFactory.getILoggerFactory();
+//        if ("ch.qos.logback.classic.LoggerContext".equals(lf.getClass().getName())) {
+//            Method m = findMethod(lf.getClass(), "putProperty", String.class, String.class);
+//            invoke(m, lf, "PID", Utils.getPid());
+//        }
     }
 
     /**
@@ -123,7 +135,6 @@ public class Log {
     }
 
 
-
     private Log(LocationAwareLogger logger) {
         this.logger = logger;
     }
@@ -140,7 +151,7 @@ public class Log {
         return new Log((LocationAwareLogger) LoggerFactory.getLogger(name));
     }
     public static Log root() {
-        return of(Logger.ROOT_LOGGER_NAME);
+        return root;
     }
 
 

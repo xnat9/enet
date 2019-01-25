@@ -1,0 +1,9 @@
+server.hibernate:
+  hibernate.hbm2ddl.auto: update
+  ds:
+    url: jdbc:h2:e:/tmp/h2/my-tpl;DB_CLOSE_DELAY=-1;DB_CLOSE_ON_EXIT=FALSE
+    username: root
+    password: root
+    testWhileIdle: false
+    minIdle: 2
+    maxActive: 5

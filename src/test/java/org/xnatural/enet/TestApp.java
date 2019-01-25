@@ -2,6 +2,7 @@ package org.xnatural.enet;
 
 
 import org.xnatural.enet.core.AppContext;
+import org.xnatural.enet.server.dao.hibernate.HibernateServer;
 import org.xnatural.enet.server.http.netty.Netty4HttpServer;
 import org.xnatural.enet.server.mvc.resteasy.Netty4ResteasyServer;
 import org.xnatural.enet.server.mvc.resteasy.RestTpl;
@@ -23,6 +24,7 @@ public class TestApp {
         app.addSource(new Netty4ResteasyServer().scan(RestTpl.class));
         app.addSource(new MViewServer());
         app.addSource(new SwaggerServer());
+        app.addSource(new HibernateServer().scan(TestEntity.class));
         app.start();
     }
 }

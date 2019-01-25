@@ -1,7 +1,6 @@
 package org.xnatural.enet.server.mview;
 
 import com.alibaba.fastjson.JSON;
-import io.swagger.v3.oas.annotations.tags.Tag;
 import org.apache.commons.io.IOUtils;
 import org.xnatural.enet.common.Log;
 import org.xnatural.enet.event.EC;
@@ -45,7 +44,6 @@ public class Controller {
     @GET
     @Path("/")
     public Response index0() throws Exception {
-        log.info("xxxxxxxxxxxx");
         Map<String, Object> model = new HashMap<>();
         model.put("rootPath", server.getPath());
         ep.fire("sys.info", EC.of(this).sync(), ec -> {

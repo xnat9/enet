@@ -1,16 +1,13 @@
 package org.xnatural.enet.server.mvc.resteasy;
 
 import io.netty.channel.ChannelPipeline;
-import io.netty.channel.nio.NioEventLoopGroup;
-import io.netty.util.concurrent.EventExecutorGroup;
 import org.jboss.resteasy.core.SynchronousDispatcher;
 import org.jboss.resteasy.plugins.server.netty.RequestDispatcher;
 import org.jboss.resteasy.plugins.server.netty.RequestHandler;
 import org.jboss.resteasy.plugins.server.netty.RestEasyHttpRequestDecoder;
 import org.jboss.resteasy.plugins.server.netty.RestEasyHttpResponseEncoder;
 import org.jboss.resteasy.spi.ResteasyDeployment;
-import org.xnatural.enet.common.Log;
-import org.xnatural.enet.core.ServerTpl;
+import org.xnatural.enet.server.ServerTpl;
 import org.xnatural.enet.event.EC;
 import org.xnatural.enet.event.EL;
 import org.xnatural.enet.event.EP;
@@ -20,6 +17,7 @@ import java.io.File;
 import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
+import java.util.concurrent.ExecutorService;
 
 /**
  * netty4 和 resteasy 结合
@@ -36,6 +34,7 @@ public class Netty4ResteasyServer extends ServerTpl {
     private ResteasyDeployment deployment = new ResteasyDeployment();
     private RequestDispatcher  dispatcher;
 
+
     public Netty4ResteasyServer() {
         setName("netty4Resteasy");
     }
@@ -44,7 +43,7 @@ public class Netty4ResteasyServer extends ServerTpl {
     @EL(name = "sys.starting")
     public void start() {
         if (!running.compareAndSet(false, true)) {
-            log.warn("服务({})正在运行", getName()); return;
+            log.warn("{} Server is running", getName()); return;
         }
         if (coreExec == null) initExecutor();
         if (coreEp == null) coreEp = new EP(coreExec);
@@ -69,6 +68,14 @@ public class Netty4ResteasyServer extends ServerTpl {
         initDispatcher();
         log.info("Started {} Server. root: {}", getName(), getRoot());
         collect();
+    }
+
+
+    @EL(name = "sys.stopping")
+    public void stop() {
+        dispatcher = null;
+        deployment.stop(); deployment = null;
+        if (coreExec instanceof ExecutorService) ((ExecutorService) coreExec).shutdown();
     }
 
 
@@ -115,6 +122,7 @@ public class Netty4ResteasyServer extends ServerTpl {
 
 
     private synchronized void startDeployment() {
+        if (deployment == null) deployment = new ResteasyDeployment();
         if (deployment.getRegistry() != null) return;
         // deployment.setAsyncJobServiceEnabled(true);
         deployment.start();

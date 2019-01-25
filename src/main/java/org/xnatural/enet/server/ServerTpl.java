@@ -1,4 +1,4 @@
-package org.xnatural.enet.core;
+package org.xnatural.enet.server;
 
 import org.xnatural.enet.common.Log;
 import org.xnatural.enet.common.Utils;

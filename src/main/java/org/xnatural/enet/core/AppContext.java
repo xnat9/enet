@@ -9,38 +9,39 @@ import org.xnatural.enet.event.EP;
 
 import java.lang.management.ManagementFactory;
 import java.lang.reflect.Field;
+import java.lang.reflect.Method;
 import java.util.*;
 import java.util.concurrent.*;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.function.Consumer;
-import java.util.stream.Collectors;
+
+import static org.xnatural.enet.common.Utils.findMethod;
+import static org.xnatural.enet.common.Utils.invoke;
 
 /**
- * 简单, 稳定, 灵活, 高效
- * 最大程度的解耦. 这样各个模块的界限清楚明了(简单), 各种模块独立运行测试(稳定), 随意组装模块(灵活), 事件网络到各个模块异步执行任务充分利用线程资源(高效)
- *
  * 系统运行上下文
- * 日志系统, 日志配置
- * 读配置文件. 配置app环境. 覆盖日志配置
- * 加载类路径下的组件
- * 所有的server只写执行规则，具体执行逻辑 由外部提供类
- * 接口层server,业务逻辑层server
- * dao层server
- * 保证所有线程都在运行
- * 尽量没有阻塞等待的线程
- * 把系统看成是各个执行节点
  */
 public class AppContext {
-    protected final Log log = Log.of(getClass());
-
-    protected ThreadPoolExecutor exec;
-    protected EP                 ep;
-    protected Environment        env;
-    protected List<Object>  sources = new LinkedList<>();
+    protected final Log                 log       = Log.of(getClass());
+    /**
+     * 系统名字. 用于多个系统启动区别
+     */
+    protected       String              name;
+    /**
+     * 系统运行线程池.
+     * {@link #wrapExecForSource(Object)}
+     */
+    protected       ThreadPoolExecutor  exec;
+    /**
+     * {@link #wrapEpForSource(Object)}
+     */
+    protected       EP                  ep;
+    protected       Environment         env;
+    protected       Map<String, Object> sourceMap = new HashMap<>();
     /**
      * 启动时间
      */
-    private Date startup = new Date();
+    private         Date                startup   = new Date();
 
 
     /**
@@ -52,9 +53,10 @@ public class AppContext {
         // 1. 创建事件发布器
         ep = initEp();
         ep.addListenerSource(this);
-        sources.forEach(s -> { ep.addListenerSource(s); setForSource(s); });
+        sourceMap.forEach((k, v) -> { ep.addListenerSource(v); setForSource(v); });
         // 2. 设置系统环境
         env = new Environment(); env.setEp(ep); env.loadCfg();
+        // 3. 通知所有服务启动
         ep.fire("sys.starting", EC.of(this), (ce) -> {
             log.info("Started Application in {} seconds (JVM running for {})",
                     (System.currentTimeMillis() - startup.getTime()) / 1000.0,
@@ -76,24 +78,30 @@ public class AppContext {
 
     /**
      * {@link #ep} 会找出source对象中所有其暴露的功能. 即: 用 @EL 标注的方法
+     * 注: 每个对象源都必须有一个 name 属性标识
      * @param source 不能是一个 Class
      * @return
      */
     public AppContext addSource(Object source) {
         if (source == null) return this;
         if (source instanceof Class) return this;
-        if (source instanceof ServerTpl) {
-            for (Object s : sources) {
-                if (s instanceof ServerTpl && Objects.equals(((ServerTpl) s).getName(), ((ServerTpl) source).getName())) {
-                    throw new IllegalArgumentException("ServerTpl 存在同相的名字. " + ((ServerTpl) s).getName());
-                }
-            }
+        Method m = findMethod(source.getClass(), "getName");
+        if (m == null) {
+            log.warn("Source object must have property 'name'"); return this;
         }
+        String name = (String) invoke(m, source);
+        if (Utils.isEmpty(name)) {
+            log.warn("name property is empty"); return this;
+        }
+        if (sourceMap.containsKey(name)) {
+            log.warn("name: {} already exist in Source: {}", name, sourceMap.get(name));
+            return this;
+        }
+        sourceMap.put(name, source);
         if (ep != null) {
             ep.addListenerSource(source);
             setForSource(source);
         }
-        sources.add(source);
         return this;
     }
 
@@ -144,7 +152,7 @@ public class AppContext {
                 super.beforeExecute(t, r);
                 if (idleStartTime != 0) {
                     if (System.currentTimeMillis() - idleStartTime > idleMinute) {
-                        log.info("executor池已空闲 " + ((System.currentTimeMillis() - idleStartTime) / 1000) + " 秒, 现在继续工作");
+                        log.info("executor pool idle " + ((System.currentTimeMillis() - idleStartTime) / 1000) + " seconds, now work beginning");
                     }
                     idleStartTime = 0;
                 }
@@ -208,7 +216,7 @@ public class AppContext {
     @EL(name = "sys.info")
     private Object info(EC ec) {
         Map<String, Object> info = new HashMap<>(2);
-        info.put("modules", sources.stream().filter(o -> o instanceof ServerTpl).map(o -> ((ServerTpl) o).getName()).collect(Collectors.toList()));
+        info.put("modules", sourceMap.keySet());
         return info;
     }
 
@@ -231,7 +239,7 @@ public class AppContext {
         } while (c != null);
 
         // 1. 为source设置公用 EP
-        EP ep = wrapEpForSource(s); //为了安全
+        EP ep = wrapEpForSource(s); // 为了安全
         if (epFs.size() == 1) {
             Field f = epFs.get(0);
             try {
@@ -308,5 +316,17 @@ public class AppContext {
                 return "wrappedCoreEp:" + source.getClass().getSimpleName();
             }
         };
+    }
+
+
+    public String getName() {
+        return name;
+    }
+
+
+    public AppContext setName(String name) {
+        if (exec != null) throw new RuntimeException("Application is running, not allow change");
+        this.name = name;
+        return this;
     }
 }

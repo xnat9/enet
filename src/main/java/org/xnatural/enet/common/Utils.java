@@ -2,20 +2,20 @@ package org.xnatural.enet.common;
 
 import java.lang.management.ManagementFactory;
 import java.lang.reflect.Array;
+import java.lang.reflect.InvocationTargetException;
+import java.lang.reflect.Method;
 import java.math.BigDecimal;
 import java.net.InetAddress;
 import java.net.UnknownHostException;
 import java.util.Collection;
-import java.util.LinkedHashMap;
 import java.util.Map;
-import java.util.function.Function;
 
 /**
  * 常用工具方法集
  */
 public class Utils {
 
-    static final Log log = Log.of(Utils.class);
+    static final Log log = Log.root();
 
 
     /**
@@ -27,12 +27,53 @@ public class Utils {
     }
 
 
+    /**
+     * 主机名
+     * @return
+     */
     public static String getHostname() {
         try {
             return InetAddress.getLocalHost().getHostName();
         } catch (UnknownHostException e) {
             return "";
         }
+    }
+
+
+    /**
+     * 查找方法
+     * @param clz
+     * @param mName
+     * @param parameterTypes
+     * @return
+     */
+    public static Method findMethod(final Class clz, String mName, Class<?>... parameterTypes) {
+        Class c = clz;
+        do {
+            Method m = null;
+            try {
+                m = c.getDeclaredMethod(mName, parameterTypes);
+            } catch (NoSuchMethodException e) { }
+            if (m != null) return m;
+            c = c.getSuperclass();
+        } while (c != null);
+        return null;
+    }
+
+
+    /**
+     * 方法调用
+     * @param m
+     * @param target
+     * @param args
+     * @return
+     */
+    public static Object invoke(Method m, Object target, Object...args) {
+        try {
+            m.setAccessible(true);
+            return m.invoke(target, args);
+        } catch (Exception e) {}
+        return null;
     }
 
 
@@ -50,46 +91,6 @@ public class Utils {
             if (o != null) sb.append(s).append("=").append(o).append("&");
         });
         return sb.toString();
-    }
-
-
-    /**
-     * 将List转为Map类型
-     *
-     * @param collection 要转换的collection
-     * @param keyFn    从collection中如何取得用在map的key的字段
-     * @param valueFn  从collection中如何取得用在map的value的字段
-     * @param <T>        collection中元素的类型
-     * @param <K>        map的key的类型
-     * @param <V>        map的value的类型
-     * @return 转换后的map
-     */
-    public static <T, K, V> Map<K, V> colToMap(Collection<T> collection, Function<T, K> keyFn, Function<T, V> valueFn) {
-        Map<K, V> map = new LinkedHashMap<>(); // 保证有序
-        if (collection == null) return map;
-        collection.forEach(t -> map.put(keyFn.apply(t), valueFn.apply(t)));
-        return map;
-    }
-
-
-    public static <T> String join(Collection<T> col, Function<T, String> toStringFn, String delimiter) {
-        return col.stream().map(toStringFn::apply).reduce((s, s2) -> s + delimiter + s2).orElse("");
-    }
-
-
-    public static <T> String join(Collection<T> col, String delimiter) {
-        return join(col, t -> t.toString(), delimiter);
-    }
-
-
-
-
-    public static String toAntPath(String pPath) {
-        if (!pPath.startsWith("/")) pPath += "/" + pPath;
-        if (pPath.endsWith("/")) return pPath + "**";
-        else if (pPath.endsWith("/*")) return pPath + "*";
-        else if (pPath.endsWith("/**")) return pPath;
-        return pPath + "/**";
     }
 
 

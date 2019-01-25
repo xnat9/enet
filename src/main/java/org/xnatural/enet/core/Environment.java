@@ -18,41 +18,41 @@ import java.util.stream.Collectors;
  * 系统环境
  */
 public class Environment {
-    final static  String                           PROP_ACTIVE      = "enet.profiles.active";
-    final         Log                              log              = Log.of(getClass());
-    protected     EP                               ep;
+    public final static String                           PROP_ACTIVE      = "enet.profiles.active";
+    final               Log                              log              = Log.of(getClass());
+    protected           EP                               ep;
     /**
      * 配置文件路径
      */
-    private final List<String>                     cfgFileLocations = new LinkedList<>();
+    private final       List<String>                     cfgFileLocations = new LinkedList<>();
     /**
      * 配置文件名字
      */
-    private       List<String>                     cfgFileNames     = new LinkedList<>();
+    private             List<String>                     cfgFileNames     = new LinkedList<>();
     /**
      * 最终汇总属性
      */
-    private final Map<String, String>              finalAttrs       = new ConcurrentHashMap<>();
+    private final       Map<String, String>              finalAttrs       = new ConcurrentHashMap<>();
     /**
      * 运行时改变的属性, 优先级高于 {@link #finalAttrs} see: {@link #getAttr(String)}
      */
-    private final Map<String, String>              runtimeAttrs     = new ConcurrentHashMap<>(7);
+    private final       Map<String, String>              runtimeAttrs     = new ConcurrentHashMap<>(7);
     /**
      * location 和 其对应的 所有属性
      */
-    private final Map<String, Map<String, String>> locationSources  = new LinkedHashMap<>();
+    private final       Map<String, Map<String, String>> locationSources  = new LinkedHashMap<>();
     /**
      * profile 和 其对应的 所有属性
      */
-    private final Map<String, Map<String, String>> profileSources   = new LinkedHashMap<>();
+    private final       Map<String, Map<String, String>> profileSources   = new LinkedHashMap<>();
     /**
      * 所有的profile
      */
-    private final Set<String>                      allProfiles      = new HashSet<>();
+    private final       Set<String>                      allProfiles      = new HashSet<>();
     /**
      * 激活特定配置
      */
-    private final Set<String>                      activeProfiles   = new LinkedHashSet<>(7);
+    private final       Set<String>                      activeProfiles   = new LinkedHashSet<>(7);
 
 
     Environment() {

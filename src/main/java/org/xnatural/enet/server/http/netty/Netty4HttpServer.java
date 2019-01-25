@@ -16,7 +16,7 @@ import io.netty.handler.stream.ChunkedFile;
 import io.netty.handler.stream.ChunkedWriteHandler;
 import io.netty.handler.timeout.IdleStateHandler;
 import org.xnatural.enet.common.Utils;
-import org.xnatural.enet.core.ServerTpl;
+import org.xnatural.enet.server.ServerTpl;
 import org.xnatural.enet.event.EC;
 import org.xnatural.enet.event.EL;
 import org.xnatural.enet.event.EP;
@@ -60,7 +60,7 @@ public class Netty4HttpServer extends ServerTpl {
     @EL(name = "sys.starting")
     public void start() {
         if (!running.compareAndSet(false, true)) {
-            log.warn("服务正在运行"); return;
+            log.warn("{} Server is running", getName()); return;
         }
         if (coreExec == null) initExecutor();
         if (coreEp == null) coreEp = new EP(coreExec);
@@ -81,7 +81,7 @@ public class Netty4HttpServer extends ServerTpl {
 
     @EL(name = "sys.stopping")
     public void stop() {
-        log.info("停止({})服务. name: {}, hostname: {}, port: {}", getName(), getHostname(), getPort());
+        log.info("shutdown {} Server. hostname: {}, port: {}", getName(), getHostname(), getPort());
         if (boosGroup != null) boosGroup.shutdownGracefully();
         if (workerGroup != null) workerGroup.shutdownGracefully();
         if (coreExec instanceof ExecutorService) ((ExecutorService) coreExec).shutdown();

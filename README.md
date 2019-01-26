@@ -46,6 +46,7 @@ app.start();
 * UndertowResteasySever: resteasy实现的mvc功能.(接收Undertow提供的http请求)
 * MViewServer: 一个系统管理界面
 * SwaggerServer: swagger api 文档服务
+* HibernateServer: dao 层 hibernate 实现
 
 #### 参与贡献
 

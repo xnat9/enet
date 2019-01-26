@@ -34,7 +34,7 @@ public class CusMVCServer extends ServerTpl {
         }
         if (coreExec == null) initExecutor();
         if (coreEp == null) coreEp = new EP(coreExec);
-        coreEp.fire("sys.env.ns", EC.of("ns", getNs()), (ec) -> {
+        coreEp.fire("env.ns", EC.of("ns", getNs()), (ec) -> {
             if (ec.result != null) {
                 attrs.putAll((Map) ec.result);
                 if (attrs.containsKey("scan")) {
@@ -119,7 +119,7 @@ public class CusMVCServer extends ServerTpl {
     }
 
 
-    @EL(name = "${ns}.addHandlerSource", async = false)
+    @EL(name = "${ns}.addHandlerSource")
     private void resolveHandler(EC ec) {
         dispatcher.resolveHandler(ec.getAttr("source"));
     }

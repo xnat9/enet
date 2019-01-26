@@ -18,7 +18,7 @@ import java.util.stream.Collectors;
  * 系统环境
  */
 public class Environment {
-    public final static String                           PROP_ACTIVE      = "enet.profiles.active";
+    public final static String                           PROP_ACTIVE      = "env.profiles.active";
     final               Log                              log              = Log.of(getClass());
     protected           EP                               ep;
     /**
@@ -48,11 +48,11 @@ public class Environment {
     /**
      * 所有的profile
      */
-    private final       Set<String>                      allProfiles      = new HashSet<>();
+    private final       Set<String>                      allProfiles      = new HashSet<>(7);
     /**
      * 激活特定配置
      */
-    private final       Set<String>                      activeProfiles   = new LinkedHashSet<>(7);
+    private final       Set<String>                      activeProfiles   = new LinkedHashSet<>(5);
 
 
     Environment() {
@@ -111,7 +111,7 @@ public class Environment {
         }
         finalAttrs.put(PROP_ACTIVE, activeProfiles.stream().collect(Collectors.joining(",")));
         log.info("The following profiles are active: {}", finalAttrs.get(PROP_ACTIVE));
-        ep.fire("sys.env.configured", EC.of(this));
+        ep.fire("env.configured", EC.of(this));
     }
 
 
@@ -272,7 +272,7 @@ public class Environment {
     public Environment setAttr(String key, String value) {
         if (PROP_ACTIVE.equals(key)) throw new IllegalArgumentException("不允许更改此属性值");
         ep.fire(
-                "sys.env.updateAttr",
+                "env.updateAttr",
                 EC.of(this).attr("key", key).attr("value", value),
                 ec -> {
                     if (ec.isSuccess()) runtimeAttrs.put(key, value);
@@ -312,7 +312,7 @@ public class Environment {
      * @param ec
      * @return
      */
-    @EL(name = "sys.env.ns")
+    @EL(name = "env.ns")
     private Map<String, String> ns(EC ec) {
         return getGroupAttr(ec.getAttr("ns", String.class));
     }
@@ -323,7 +323,7 @@ public class Environment {
      * @param ec
      * @return
      */
-    @EL(name = "sys.env.attr")
+    @EL(name = "env.attr")
     private String attr(EC ec) {
         return getAttr(ec.getAttr("name", String.class));
     }

@@ -52,7 +52,7 @@ public class HibernateServer extends ServerTpl {
         if (coreEp == null) coreEp = new EP(coreExec);
         coreEp.fire(getNs() + ".starting");
         // 先从核心取配置, 然后再启动
-        coreEp.fire("sys.env.ns", EC.of("ns", getNs()).sync(), (ec) -> {
+        coreEp.fire("env.ns", EC.of("ns", getNs()).sync(), (ec) -> {
             Map<String, String> m = (Map) ec.result;
             if (m.containsKey("entity-scan")) {
                 for (String s : m.get("entity-scan").split(",")) {
@@ -78,9 +78,8 @@ public class HibernateServer extends ServerTpl {
         em.close();
         try {
             Method m = ds.getClass().getDeclaredMethod("close");
-            m.invoke(ds);
+            if (m != null) m.invoke(ds);
         } catch (NoSuchMethodException e) {
-            //
         } catch (Exception e) {
             log.error(e, "close datasource error");
         }
@@ -220,7 +219,7 @@ public class HibernateServer extends ServerTpl {
      * @return
      */
     protected void initDataSource() {
-        coreEp.fire("sys.env.ns", EC.of("ns", getNs() + ".ds").sync(), ec -> {
+        coreEp.fire("env.ns", EC.of("ns", getNs() + ".ds").sync(), ec -> {
             boolean f = false;
             // druid 数据源
             try {

@@ -66,7 +66,7 @@ public class Netty4HttpServer extends ServerTpl {
         if (coreEp == null) coreEp = new EP(coreExec);
         coreEp.fire(getNs() + ".starting");
         // 先从核心取配置, 然后再启动
-        coreEp.fire("sys.env.ns", EC.of("ns", getNs()).sync(), (ec) -> {
+        coreEp.fire("env.ns", EC.of("ns", getNs()).sync(), (ec) -> {
             if (ec.result != null) {
                 Map<String, Object> m = (Map) ec.result;
                 port = Utils.toInteger(m.get("port"), getPort());

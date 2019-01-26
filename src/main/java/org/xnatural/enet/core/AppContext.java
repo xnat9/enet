@@ -15,8 +15,7 @@ import java.util.concurrent.*;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.function.Consumer;
 
-import static org.xnatural.enet.common.Utils.findMethod;
-import static org.xnatural.enet.common.Utils.invoke;
+import static org.xnatural.enet.common.Utils.*;
 
 /**
  * 系统运行上下文
@@ -93,6 +92,9 @@ public class AppContext {
         if (Utils.isEmpty(name)) {
             log.warn("name property is empty"); return this;
         }
+        if ("sys".equalsIgnoreCase(name) || "env".equalsIgnoreCase(name)) {
+            log.warn("name property cannot equal 'sys' or 'env'"); return this;
+        }
         if (sourceMap.containsKey(name)) {
             log.warn("name: {} already exist in Source: {}", name, sourceMap.get(name));
             return this;
@@ -117,7 +119,7 @@ public class AppContext {
                 if ("sys.starting".equals(eName) || "sys.stopping".equals(eName)) {
                     if (ec.source() != AppContext.this) throw new UnsupportedOperationException("不允许触发此事件");
                 }
-                if ("sys.env.updateAttr".equals(eName)) {
+                if ("env.updateAttr".equals(eName)) {
                     if (ec.source() != env) throw new UnsupportedOperationException("不允许触发此事件");
                 }
                 super.doPublish(eName, ec, completeFn);
@@ -178,7 +180,7 @@ public class AppContext {
     }
 
 
-    @EL(name = "sys.env.configured", async = false)
+    @EL(name = "env.configured")
     private void reAdjustExec() {
         Integer c = env.getInteger("sys.exec.corePoolSize", null);
         if (c != null) exec.setCorePoolSize(c);
@@ -191,21 +193,21 @@ public class AppContext {
     }
 
 
-    @EL(name = "sys.env.updateAttr", async = false)
+    @EL(name = "env.updateAttr")
     private void reAdjustExec(EC ec) {
         String k = ec.getAttr("key", String.class);
         String v = ec.getAttr("value", String.class);
         if (k.startsWith("sys.exec")) {
             if ("sys.exec.corePoolSize".equals(k)) {
-                Integer i = Utils.toInteger(v, null);
+                Integer i = toInteger(v, null);
                 if (i == null) throw new IllegalArgumentException("sys.exec.corePoolSize属性值只能是整数");
                 exec.setCorePoolSize(i);
             } else if ("sys.exec.maximumPoolSize".equals(k)) {
-                Integer i = Utils.toInteger(v, null);
+                Integer i = toInteger(v, null);
                 if (i == null) throw new IllegalArgumentException("sys.exec.maximumPoolSize属性值只能是整数");
                 exec.setCorePoolSize(i);
             } else if ("sys.exec.keepAliveTime".equals(k)) {
-                Long l = Utils.toLong(v, null);
+                Long l = toLong(v, null);
                 if (l == null) throw new IllegalArgumentException("sys.exec.keepAliveTime属性值只能是整数");
                 exec.setKeepAliveTime(l, TimeUnit.MILLISECONDS);
             } else log.warn("不允许更新属性: " + k);

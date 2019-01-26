@@ -14,13 +14,13 @@ import org.xnatural.enet.server.swagger.SwaggerServer;
  */
 public class TestApp {
 
-    public static void main(String[] args) throws Exception {
+    public static void main(String[] args) {
         AppContext app = new AppContext();
 //        app.addSource(new MVCServer().scan(RestTpl.class));
         // app.addSource(new NettyServer().scan(RestTpl.class));
         // app.addSource(new UndertowResteasySever().scan(RestTpl.class));
         // app.addSource(new UndertowResteasySever());
-        app.addSource(new Netty4HttpServer().setPort(8081));
+        app.addSource(new Netty4HttpServer().setPort(8080));
         app.addSource(new Netty4ResteasyServer().scan(RestTpl.class));
         app.addSource(new MViewServer());
         app.addSource(new SwaggerServer());

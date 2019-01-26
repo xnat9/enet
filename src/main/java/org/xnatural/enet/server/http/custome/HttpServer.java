@@ -62,7 +62,7 @@ public class HttpServer extends ServerTpl {
         if (coreEp == null) coreEp = new EP();
         coreEp.fire(getNs() + ".starting", EC.of(this));
         // 先从核心取配置, 然后再启动
-        coreEp.fire("sys.env.ns", EC.of(this).attr("ns", getNs()), (ec) -> {
+        coreEp.fire("env.ns", EC.of(this).attr("ns", getNs()), (ec) -> {
             attrs.putAll((Map) ec.result);
             try {
                 if (coreExec == null) initExecutor();
@@ -98,7 +98,7 @@ public class HttpServer extends ServerTpl {
     }
 
 
-    @EL(name = "sys.env.updateAttr")
+    @EL(name = "env.updateAttr")
     private void updateAttr(EC ec) {
         String k = ec.getAttr("key", String.class);
         if (!k.startsWith(getNs())) return;

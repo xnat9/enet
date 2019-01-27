@@ -36,7 +36,12 @@ public class AppContext {
      */
     protected       EP                  ep;
     protected       Environment         env;
-    protected       Map<String, Object> sourceMap = new HashMap<>();
+    protected       Map<String, Object> sourceMap = new HashMap() {
+        @Override
+        public Object remove(Object key) {
+            throw new UnsupportedOperationException("not allow remove operate");
+        }
+    };
     /**
      * 启动时间
      */
@@ -47,7 +52,7 @@ public class AppContext {
      * 系统启动
      */
     public void start() {
-        log.info("Starting Application on {} with PID {}", Utils.getHostname(), Utils.getPid());
+        log.info("Starting Application on {} with PID {}", getHostname(), getPid());
         if (exec == null) initExecutor();
         // 1. 创建事件发布器
         ep = initEp();

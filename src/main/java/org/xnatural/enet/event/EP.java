@@ -164,25 +164,27 @@ public class EP {
         do {
             try {
                 for (Method m : c.getDeclaredMethods()) {
-                    EL a = m.getDeclaredAnnotation(EL.class);
-                    if (a == null) continue;
-                    Listener listener = new Listener();
-                    listener.async = a.async(); listener.source = source; listener.order = a.order();
-                    listener.m = m; m.setAccessible(true);
-                    listener.name = parseName(a.name(), source);
-                    List<Listener> ls = lsMap.computeIfAbsent(listener.name, s -> new LinkedList<>());
-                    // 同一个对象源中, 不能有相同的事件监听名. 忽略并警告
-                    if (ls.stream().anyMatch(l -> l.source == source && Objects.equals(l.name, m.getName()))) {
-                        log.warn("同一个对象源中, 不能有相同的事件监听名. source: {}, originName: {}, name: {}", source, a.name(), listener.name);
-                        continue;
-                    }
-                    // 同一个对象源中, 不同的监听, 方法名不能相同.
-                    if (ls.stream().anyMatch(l -> l.source == source && Objects.equals(l.m.getName(), listener.m.getName()))) {
-                        log.warn("同一个对象源中, 不同的监听, 方法名不能相同. source: {}, methodName: {}", source, m.getName());
-                        continue;
-                    }
-                    if (listener.name != null) {
-                        ls.add(listener); ls.sort(Comparator.comparing(o -> o.order));
+                    EL el = m.getDeclaredAnnotation(EL.class);
+                    if (el == null) continue;
+                    for (String n : el.name()) {
+                        Listener listener = new Listener();
+                        listener.async = el.async(); listener.source = source; listener.order = el.order();
+                        listener.m = m; m.setAccessible(true); listener.name = parseName(n, source);
+
+                        List<Listener> ls = lsMap.computeIfAbsent(listener.name, s -> new LinkedList<>());
+                        // 同一个对象源中, 不能有相同的事件监听名. 忽略并警告
+                        if (ls.stream().anyMatch(l -> l.source == source && Objects.equals(l.name, listener.name))) {
+                            log.warn("同一个对象源中, 不能有相同的事件监听名. source: {}, originName: {}, name: {}", source, n, listener.name);
+                            continue;
+                        }
+                        // 同一个对象源中, 不同的监听, 方法名不能相同.
+                        if (ls.stream().anyMatch(l -> l.source == source && Objects.equals(l.m.getName(), listener.m.getName()))) {
+                            log.warn("同一个对象源中, 不同的监听, 方法名不能相同. source: {}, methodName: {}", source, m.getName());
+                            continue;
+                        }
+                        if (listener.name != null) {
+                            ls.add(listener); ls.sort(Comparator.comparing(o -> o.order));
+                        }
                     }
                 }
             } catch (Exception ex) {
@@ -203,32 +205,29 @@ public class EP {
      */
     private String parseName(String name, Object source) {
         Matcher ma = p.matcher(name);
-        if (ma.find()) {
-            String attr = ma.group("attr");
-            String getName = "get" + capitalize(attr);
-            Class<? extends Object> c = source.getClass();
-            do {
-                try {
-                    Method m = c.getDeclaredMethod(getName);
-                    Object v = m.invoke(source);
-                    if (v == null) {
-                        log.warn("解析事件名中的属性错误. name: {}, source:{} 属性: {} 值为空", name, source, attr);
-                        return null;
-                    }
-                    return ma.replaceAll(v.toString());
-                } catch (NoSuchMethodException ex) {
-                    continue;
-                } catch (Exception ex) {
-                    log.warn(ex, "解析事件名中的属性错误. name: {}", name);
-                    break;
-                } finally {
-                    c = c.getSuperclass();
+        if (!ma.find()) return name;
+        String attr = ma.group("attr");
+        String getName = "get" + capitalize(attr);
+        Class<? extends Object> c = source.getClass();
+        do {
+            try {
+                Method m = c.getDeclaredMethod(getName);
+                Object v = m.invoke(source);
+                if (v == null) {
+                    log.warn("解析事件名中的属性错误. name: {}, source:{} 属性: {} 值为空", name, source, attr);
+                    return null;
                 }
-            } while (c != null);
-            log.warn("解析事件名中的属性错误. name: {}, source:{} 没有此属性: {}", name, source, attr);
-            return null;
-        }
-        return name;
+                return ma.replaceAll(v.toString());
+            } catch (NoSuchMethodException ex) {
+            } catch (Exception ex) {
+                log.warn(ex, "解析事件名中的属性错误. name: {}", name);
+                break;
+            } finally {
+                c = c.getSuperclass();
+            }
+        } while (c != null);
+        log.warn("解析事件名中的属性错误. name: {}, source:{} 没有此属性: {}", name, source, attr);
+        return null;
     }
 
 
@@ -236,20 +235,30 @@ public class EP {
      * 监听器包装类
      */
     class Listener {
+        //  监听执行体. (一个方法).
         Object source; Method  m;
-        String name; float order;
+        /**
+         * 和 {@link #m} 只存在一个
+         * 监听器执行体. (一段执行逻辑)
+         */
+        Runnable fn;
+        /**
+         * 监听的事件名
+         */
+        String name;
+        /**
+         * 排序. 一个事件对应多个监听器时生效. {@link #doPublish(String, EC, Consumer)}
+         */
+        float order;
         /**
          * 是否异步
          */
         boolean async;
         /**
-         * 监听器执行体
-         */
-        Runnable fn;
-        /**
          * 临时监听器
          */
         boolean tmp;
+
 
         void invoke(EC ec) {
             try {

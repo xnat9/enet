@@ -80,20 +80,20 @@ public class EP {
     protected void doPublish(String eName, EC ec, Consumer<EC> completeFn) {
         List<Listener> ls = lsMap.get(eName);
         if (ls == null || ls.isEmpty()) {
-            log.trace("没有找到事件监听. name: {}", eName);
+            log.trace("not found listener for event name: {}", eName);
             if (completeFn != null) completeFn.accept(ec); return;
         }
         ec.willPass(ls).ep = this;
         if (trackEvents.contains(eName)) ec.track = true;
         if (ec.track) { // 是否要追踪此条事件链的执行
             ec.id = UUID.randomUUID().toString();
-            log.info("开始执行事件链. name: {}, id: {}", eName, ec.id);
+            log.info("starting executing listener chain for event name '{}'. id: {}", eName, ec.id);
         }
         if (exec == null) { // 只能同步执行
             for (Listener l : ls) l.invoke(ec);
             if (completeFn != null) {
                 completeFn.accept(ec);
-                if (ec.track) log.info("结束执行事件链. name: {}, id: {}", eName, ec.id);
+                if (ec.track) log.info("end executing listener chain for event name '{}'. id: {}, result: {}", eName, ec.id, ec.result);
             }
         } else {
             // 异步和同步执行的监听器, 分开执行
@@ -116,7 +116,7 @@ public class EP {
                 Runnable fn = () -> { // 两个列表都执行完后才执行completeFn函数
                     if (i.get() == 0) {
                         completeFn.accept(ec);
-                        if (ec.track) log.info("结束执行事件链. name: {}, id: {}, result: {}", eName, ec.id, ec.result);
+                        if (ec.track) log.info("end executing listener chain for event name '{}'. id: {}, result: {}", eName, ec.id, ec.result);
                     }
                 };
                 asyncLs.forEach(l -> exec.execute(() -> {
@@ -273,7 +273,10 @@ public class EP {
                     }
                 }
                 ec.passed(this);
-                if (ec.track) log.info("执行事件完成. name: {}, id: {}, result: {}", name, ec.id(), ec.result);
+                if (ec.track) log.info("passed listener for event name '{}'. method: {}, id: {}, result: {}",
+                        name, (m == null ? "" : source.getClass().getSimpleName() + "." + m.getName()),
+                        ec.id(), ec.result
+                );
             } catch (Throwable e) {
                 ec.ex = e;
                 log.error(e, "执行事件出错! name: {}, id: {}", name, ec.id());

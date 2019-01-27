@@ -1,7 +1,12 @@
-package org.xnatural.enet.server.mvc.resteasy;
+package org.xnatural.enet;
 
 import org.xnatural.enet.common.Log;
+import org.xnatural.enet.event.EC;
+import org.xnatural.enet.event.EL;
+import org.xnatural.enet.event.EP;
 
+import javax.annotation.PostConstruct;
+import javax.persistence.EntityManager;
 import javax.ws.rs.GET;
 import javax.ws.rs.Path;
 import javax.ws.rs.PathParam;
@@ -17,7 +22,35 @@ import java.util.concurrent.CompletionStage;
 @Path("tpl")
 public class RestTpl {
 
+    private EP ep;
     final Log log = Log.of(getClass());
+
+    private EntityManager em;
+
+
+    @EL(name = "sys.started")
+    public void init() {
+        ep.fire("bean.get", EC.of("type", EntityManager.class), ec -> em = (EntityManager) ec.result);
+    }
+
+
+    @GET
+    @Path("insert")
+    public void insert() {
+        TestEntity e = new TestEntity();
+        e.setName("aaaa");
+        e.setAge(111);
+        em.persist(e);
+    }
+
+
+    @GET
+    @Path("find")
+    @Produces("application/json")
+    public Object find() {
+        return em.createQuery("from TestEntity").getResultList();
+    }
+
 
     @GET
     @Path("get1")

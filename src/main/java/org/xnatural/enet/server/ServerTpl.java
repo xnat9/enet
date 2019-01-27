@@ -1,7 +1,9 @@
 package org.xnatural.enet.server;
 
+import org.xnatural.enet.common.Context;
 import org.xnatural.enet.common.Log;
 import org.xnatural.enet.common.Utils;
+import org.xnatural.enet.event.EC;
 import org.xnatural.enet.event.EL;
 import org.xnatural.enet.event.EP;
 
@@ -66,6 +68,53 @@ public class ServerTpl {
 //    public final void stop() {
 //        if (!sharedExecutor && exec instanceof ExecutorService) ((ExecutorService) exec).shutdown();
 //    }
+
+    /**
+     * bean 容器. {@link #beanSupply(EC)}
+     */
+    protected Context beanCtx;
+    @EL(name = {"bean.get", "${ns}.bean.get"})
+    protected Object beanSupply(EC ec) {
+        if (beanCtx == null) {
+            if (ec.result == null) return null;
+            else return ec.result;
+        }
+        Class type = ec.getAttr("type", Class.class);
+        Object bean = beanCtx.getValue(type);
+        if (bean != null) {
+            if (ec.result != null) log.warn("found same bean: {} from server '{}' with bean type: {}", ec.result, getName(), type.getName());
+            else {
+                log.debug("found bean: {} from server '{}' with bean type: {}", bean, getName(), type.getName());
+                return bean;
+            }
+        }
+        String n = ec.getAttr("name", String.class);
+        bean = beanCtx.getAttr(n);
+        if (bean != null) {
+            if (ec.result != null) log.warn("found same bean: {} from server '{}' with bean name: {}", ec.result, getName(), n);
+            else {
+                log.debug("found bean: {} from server '{}' with bean name: {}", bean, getName(), n);
+                return bean;
+            }
+        }
+        log.trace("not found bean from server '{}' with bean name {} and type {}", getName(), n, type.getName());
+        return null;
+    }
+
+
+    /**
+     * 注册 bean
+     * @param name bean 名字.
+     * @param bean
+     */
+    protected void registerBean(String name, Object bean) {
+        if (bean == null) {
+            log.warn("server '{}' register bean with null object.", getName()); return;
+        }
+        if (beanCtx == null) beanCtx = new Context();
+        if (name != null) beanCtx.attr(name, bean);
+        beanCtx.put(bean);
+    }
 
 
     @EL(name = "server.${name}.info")

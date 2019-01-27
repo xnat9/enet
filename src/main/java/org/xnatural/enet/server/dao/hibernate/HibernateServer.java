@@ -32,11 +32,15 @@ public class HibernateServer extends ServerTpl {
     /**
      * 实体扫描
      */
-    private List<Class>         scan     = new LinkedList<>();
+    private List<Class>         entityScan = new LinkedList<>();
+    /**
+     * repo 扫描
+     */
+    private List<Class>         repoScan = new LinkedList<>();
     /**
      * 被管理的实体类名
      */
-    private List<String>        entities = new LinkedList<>();
+    private List<String>        entities   = new LinkedList<>();
 
     public HibernateServer() {
         setName("hibernate");
@@ -58,7 +62,7 @@ public class HibernateServer extends ServerTpl {
                 for (String s : m.get("entity-scan").split(",")) {
                     if (s == null || s.trim().isEmpty()) continue;
                     try {
-                        scan.add(Class.forName(s.trim()));
+                        entityScan.add(Class.forName(s.trim()));
                     } catch (ClassNotFoundException e) {
                         log.error("not found class: " + s);
                     }
@@ -69,6 +73,7 @@ public class HibernateServer extends ServerTpl {
         initPersistenceUnit();
         EntityManagerFactory emf = new HibernatePersistenceProvider().createContainerEntityManagerFactory(pu, attrs);
         em = emf.createEntityManager();
+        registerBean(null, em);
         log.info("Started {} Server", getName());
     }
 
@@ -181,15 +186,15 @@ public class HibernateServer extends ServerTpl {
 
     public HibernateServer scan(Class clz) {
         if (running.get()) throw new IllegalArgumentException("Server is running, not allow change");
-        scan.add(clz);
+        entityScan.add(clz);
         return this;
     }
 
 
     private void collect() {
-        if (scan == null || scan.isEmpty()) return;
+        if (entityScan == null || entityScan.isEmpty()) return;
         try {
-            for (Class clz : scan) {
+            for (Class clz : entityScan) {
                 String pkg = clz.getPackage().getName();
                 File pkgDir = new File(getClass().getClassLoader().getResource(pkg.replaceAll("\\.", "/")).getFile());
                 for (File f : pkgDir.listFiles(f -> f.getName().endsWith(".class"))) {

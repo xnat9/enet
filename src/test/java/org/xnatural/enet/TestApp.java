@@ -5,7 +5,6 @@ import org.xnatural.enet.core.AppContext;
 import org.xnatural.enet.server.dao.hibernate.HibernateServer;
 import org.xnatural.enet.server.http.netty.Netty4HttpServer;
 import org.xnatural.enet.server.mvc.resteasy.Netty4ResteasyServer;
-import org.xnatural.enet.server.mvc.resteasy.RestTpl;
 import org.xnatural.enet.server.mview.MViewServer;
 import org.xnatural.enet.server.swagger.SwaggerServer;
 
@@ -20,6 +19,7 @@ public class TestApp {
         // app.addSource(new NettyServer().scan(RestTpl.class));
         // app.addSource(new UndertowResteasySever().scan(RestTpl.class));
         // app.addSource(new UndertowResteasySever());
+
         app.addSource(new Netty4HttpServer().setPort(8080));
         app.addSource(new Netty4ResteasyServer().scan(RestTpl.class));
         app.addSource(new MViewServer());

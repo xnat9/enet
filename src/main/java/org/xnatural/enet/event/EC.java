@@ -109,6 +109,9 @@ public class EC {
     public EC sync() { async = false; return this; }
 
 
+    public EC debug() { track = true; return this; }
+
+
     public EP ep() { return ep; }
 
 

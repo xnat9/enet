@@ -7,13 +7,17 @@ import org.jboss.resteasy.plugins.server.netty.RequestHandler;
 import org.jboss.resteasy.plugins.server.netty.RestEasyHttpRequestDecoder;
 import org.jboss.resteasy.plugins.server.netty.RestEasyHttpResponseEncoder;
 import org.jboss.resteasy.spi.ResteasyDeployment;
-import org.xnatural.enet.server.ServerTpl;
+import org.xnatural.enet.common.Utils;
 import org.xnatural.enet.event.EC;
 import org.xnatural.enet.event.EL;
 import org.xnatural.enet.event.EP;
+import org.xnatural.enet.server.ServerTpl;
 
+import javax.annotation.PostConstruct;
 import javax.ws.rs.Path;
 import java.io.File;
+import java.lang.reflect.Field;
+import java.lang.reflect.Method;
 import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
@@ -166,8 +170,39 @@ public class Netty4ResteasyServer extends ServerTpl {
             }
         } else if (f.isFile() && f.getName().endsWith(".class")) {
             Class<?> clz = getClass().getClassLoader().loadClass(pkg + "." + f.getName().replace(".class", ""));
-            if (clz.getAnnotation(Path.class) != null) addResource(clz.newInstance());
+            if (clz.getAnnotation(Path.class) != null) addResource(createAndInitSource(clz));
         }
+    }
+
+
+    private Object createAndInitSource(Class clz) throws Exception {
+        Object o = clz.newInstance();
+        Class<? extends Object> c = o.getClass();
+        loop: do {
+            for (Field f : c.getDeclaredFields()) {
+                if (EP.class.isAssignableFrom(f.getType())) {
+                    try {
+                        f.setAccessible(true); f.set(o, coreEp);
+                        break loop;
+                    } catch (IllegalAccessException e) {
+                        log.error(e);
+                    }
+                }
+            }
+            c = c.getSuperclass();
+        } while (c != null);
+
+        c = o.getClass();
+        loop: do {
+            for (Method m : c.getDeclaredMethods()) {
+                PostConstruct an = m.getAnnotation(PostConstruct.class);
+                if (an == null) continue;
+                Utils.invoke(m, o); break loop;
+            }
+            c = c.getSuperclass();
+        } while (c != null);
+        coreEp.addListenerSource(o);
+        return o;
     }
 
 

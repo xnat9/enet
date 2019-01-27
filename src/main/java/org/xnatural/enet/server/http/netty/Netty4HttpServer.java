@@ -83,7 +83,7 @@ public class Netty4HttpServer extends ServerTpl {
     public void stop() {
         log.info("shutdown {} Server. hostname: {}, port: {}", getName(), getHostname(), getPort());
         if (boosGroup != null) boosGroup.shutdownGracefully();
-        if (workerGroup != null) workerGroup.shutdownGracefully();
+        if (workerGroup != null && workerGroup != boosGroup) workerGroup.shutdownGracefully();
         if (coreExec instanceof ExecutorService) ((ExecutorService) coreExec).shutdown();
     }
 

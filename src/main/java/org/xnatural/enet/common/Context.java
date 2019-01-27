@@ -33,6 +33,7 @@ public class Context {
 
 
     public Object getAttr(Object pKey) {
+        if (pKey == null) return null;
         return attrs.get(pKey);
     }
 
@@ -49,10 +50,11 @@ public class Context {
 
 
     public <T> T getValue(Class<T> type) {
+        if (type == null) return null;
         Object r = values.get(type);
         if (r != null) type.cast(r);
         for (Map.Entry<Class, Object> e : values.entrySet()) {
-            if (e.getKey().isAssignableFrom(type)) return type.cast(e.getValue());
+            if (type.isAssignableFrom(e.getKey())) return type.cast(e.getValue());
         }
         return null;
     }

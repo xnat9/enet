@@ -39,7 +39,7 @@ public class AppContext {
     protected       Map<String, Object> sourceMap = new HashMap() {
         @Override
         public Object remove(Object key) {
-            throw new UnsupportedOperationException("not allow remove operate");
+            throw new UnsupportedOperationException("Not allow remove operate");
         }
     };
     /**

@@ -44,7 +44,7 @@ public class SwaggerServer extends ServerTpl {
             }
         });
         ctl = new Controller(this);
-        log.info("Started {} Server. root: {}", getName(), getRoot());
+        log.info("Started {} Server. pathPrefix: {}", getName(), ("/" + getRoot() + "/").replace("//", "/"));
         coreEp.fire("server.netty4Resteasy.addResource", EC.of("source", ctl).attr("path", getRoot()));
     }
 

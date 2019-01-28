@@ -7,6 +7,7 @@ import org.xnatural.enet.event.EP;
 
 import javax.annotation.PostConstruct;
 import javax.persistence.EntityManager;
+import javax.persistence.EntityManagerFactory;
 import javax.ws.rs.GET;
 import javax.ws.rs.Path;
 import javax.ws.rs.PathParam;
@@ -25,22 +26,28 @@ public class RestTpl {
     private EP ep;
     final Log log = Log.of(getClass());
 
-    private EntityManager em;
+    private EntityManagerFactory emf;
 
 
     @EL(name = "sys.started")
     public void init() {
-        ep.fire("bean.get", EC.of("type", EntityManager.class), ec -> em = (EntityManager) ec.result);
+        ep.fire("bean.get", EC.of("type", EntityManagerFactory.class), ec -> emf = (EntityManagerFactory) ec.result);
     }
 
 
     @GET
     @Path("insert")
     public void insert() {
+        EntityManager em = emf.createEntityManager();
+        em.getTransaction().begin();
+
         TestEntity e = new TestEntity();
         e.setName("aaaa");
         e.setAge(111);
         em.persist(e);
+
+        em.getTransaction().commit();
+        em.close();
     }
 
 
@@ -48,7 +55,7 @@ public class RestTpl {
     @Path("find")
     @Produces("application/json")
     public Object find() {
-        return em.createQuery("from TestEntity").getResultList();
+        return emf.createEntityManager().createQuery("from TestEntity").getResultList();
     }
 
 

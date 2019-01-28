@@ -1,30 +1,16 @@
 package org.xnatural.enet;
 
+import org.xnatural.enet.server.dao.hibernate.LongIdEntity;
+
 import javax.persistence.Entity;
-import javax.persistence.GeneratedValue;
-import javax.persistence.GenerationType;
-import javax.persistence.Id;
 
 @Entity
-public class TestEntity {
-    @Id
-    @GeneratedValue(strategy = GenerationType.IDENTITY)
-    private Long id;
+public class TestEntity extends LongIdEntity {
 
     private String name;
     private Integer age;
 
 
-
-    public Long getId() {
-        return id;
-    }
-
-
-    public TestEntity setId(Long id) {
-        this.id = id;
-        return this;
-    }
     public String getName() {
         return name;
     }

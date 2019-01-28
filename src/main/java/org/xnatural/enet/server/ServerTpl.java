@@ -1,5 +1,6 @@
 package org.xnatural.enet.server;
 
+import org.hibernate.jpa.HibernatePersistenceProvider;
 import org.xnatural.enet.common.Context;
 import org.xnatural.enet.common.Log;
 import org.xnatural.enet.common.Utils;
@@ -53,17 +54,24 @@ public class ServerTpl {
     protected       AtomicBoolean       running = new AtomicBoolean(false);
 
 
-
 //    @EL(name = "sys.starting")
-//    public final void start() {
+//    public void start() {
 //        if (!running.compareAndSet(false, true)) {
-//            log.warn("服务({})正在运行", getName()); return;
+//            log.warn("{} Server is running", getName()); return;
 //        }
-//        if (exec == null) initExecutor();
-//        if (coreEp == null) coreEp = new EP(exec);
+//        if (coreExec == null) initExecutor();
+//        if (coreEp == null) coreEp = new EP(coreExec);
+//        coreEp.fire(getNs() + ".starting");
+//        // 先从核心取配置, 然后再启动
+//        coreEp.fire("env.ns", EC.of("ns", getNs()).sync(), (ec) -> {
+//            Map<String, String> m = (Map) ec.result;
+//            attrs.putAll(m);
+//        });
+//        coreEp.fire(getNs() + ".started");
+//        log.info("Started {} Server", getName());
 //    }
-//
-//
+
+
 //    @EL(name = "sys.stopping")
 //    public final void stop() {
 //        if (!sharedExecutor && exec instanceof ExecutorService) ((ExecutorService) exec).shutdown();
@@ -73,32 +81,24 @@ public class ServerTpl {
      * bean 容器. {@link #beanSupply(EC)}
      */
     protected Context beanCtx;
-    @EL(name = {"bean.get", "${ns}.bean.get"})
+    @EL(name = {"bean.get", "${ns}.bean.get"}, async = false)
     protected Object beanSupply(EC ec) {
-        if (beanCtx == null) {
-            if (ec.result == null) return null;
-            else return ec.result;
+        if (beanCtx == null) return ec.result;
+        if (ec.result != null) return ec.result; // 已经找到结果了, 就直接返回
+
+        Class beanType = ec.getAttr("type", Class.class);
+        String beanName = ec.getAttr("name", String.class);
+        Object bean = null;
+
+        if (beanName != null && beanType != null) {
+            bean = beanCtx.getAttr(beanName);
+            if (bean != null && !beanType.isAssignableFrom(bean.getClass())) bean = null;
+        } else if (beanName != null && beanType == null) {
+            bean = beanCtx.getAttr(beanName);
+        } else if (beanName == null && beanType != null) {
+            bean = beanCtx.getValue(beanType);
         }
-        Class type = ec.getAttr("type", Class.class);
-        Object bean = beanCtx.getValue(type);
-        if (bean != null) {
-            if (ec.result != null) log.warn("found same bean: {} from server '{}' with bean type: {}", ec.result, getName(), type.getName());
-            else {
-                log.debug("found bean: {} from server '{}' with bean type: {}", bean, getName(), type.getName());
-                return bean;
-            }
-        }
-        String n = ec.getAttr("name", String.class);
-        bean = beanCtx.getAttr(n);
-        if (bean != null) {
-            if (ec.result != null) log.warn("found same bean: {} from server '{}' with bean name: {}", ec.result, getName(), n);
-            else {
-                log.debug("found bean: {} from server '{}' with bean name: {}", bean, getName(), n);
-                return bean;
-            }
-        }
-        log.trace("not found bean from server '{}' with bean name {} and type {}", getName(), n, type.getName());
-        return null;
+        return bean;
     }
 
 
@@ -111,6 +111,7 @@ public class ServerTpl {
         if (bean == null) {
             log.warn("server '{}' register bean with null object.", getName()); return;
         }
+        // TODO 验证(相同的bean名字和类型)?
         if (beanCtx == null) beanCtx = new Context();
         if (name != null) beanCtx.attr(name, bean);
         beanCtx.put(bean);

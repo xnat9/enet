@@ -6,7 +6,10 @@ import org.xnatural.enet.event.EL;
 import org.xnatural.enet.event.EP;
 import org.xnatural.enet.server.ServerTpl;
 
-import javax.persistence.*;
+import javax.persistence.Entity;
+import javax.persistence.EntityManagerFactory;
+import javax.persistence.SharedCacheMode;
+import javax.persistence.ValidationMode;
 import javax.persistence.spi.ClassTransformer;
 import javax.persistence.spi.PersistenceUnitInfo;
 import javax.persistence.spi.PersistenceUnitTransactionType;
@@ -24,19 +27,16 @@ import static javax.persistence.SharedCacheMode.UNSPECIFIED;
 
 /**
  * hibernate 服务
+ * 暴露出 {@link EntityManagerFactory} 实例(所有的数据库操作入口)
  */
 public class HibernateServer extends ServerTpl {
     private DataSource          ds;
     private PersistenceUnitInfo pu;
-    private EntityManager       em;
+    private EntityManagerFactory       emf;
     /**
      * 实体扫描
      */
     private List<Class>         entityScan = new LinkedList<>();
-    /**
-     * repo 扫描
-     */
-    private List<Class>         repoScan = new LinkedList<>();
     /**
      * 被管理的实体类名
      */
@@ -48,7 +48,7 @@ public class HibernateServer extends ServerTpl {
 
 
     @EL(name = "sys.starting")
-    public void start() {
+    protected void start() {
         if (!running.compareAndSet(false, true)) {
             log.warn("{} Server is running", getName()); return;
         }
@@ -71,16 +71,16 @@ public class HibernateServer extends ServerTpl {
             attrs.putAll(m);
         });
         initPersistenceUnit();
-        EntityManagerFactory emf = new HibernatePersistenceProvider().createContainerEntityManagerFactory(pu, attrs);
-        em = emf.createEntityManager();
-        registerBean(null, em);
+        emf = new HibernatePersistenceProvider().createContainerEntityManagerFactory(pu, attrs);
+        registerBean(null, emf);
+        coreEp.fire(getNs() + ".started");
         log.info("Started {} Server", getName());
     }
 
 
     @EL(name = "sys.stopping")
     public void stop() {
-        em.close();
+        emf.close();
         try {
             Method m = ds.getClass().getDeclaredMethod("close");
             if (m != null) m.invoke(ds);
@@ -235,7 +235,7 @@ public class HibernateServer extends ServerTpl {
                 // log.error(e, "datasource create error! properties: {}", ec.result);
                 f = true;
             } catch (Exception e) {
-                log.error(e, "datasource create error! properties: {}", ec.result);
+                throw new RuntimeException(e);
             }
             // dbcp2 数据源
             if (f) {
@@ -249,11 +249,11 @@ public class HibernateServer extends ServerTpl {
                     // log.error(e, "datasource create error! properties: {}", ec.result);
                     f = true;
                 } catch (Exception e) {
-                    log.error(e, "datasource create error! properties: {}", ec.result);
+                    throw new RuntimeException(e);
                 }
             }
-            if (f) throw new RuntimeException("Not found dataSource implement class");
-            if (ds != null) log.info("Created datasource for Server {}. type: {}", getName(), ds.getClass().getName());
+            if (f) throw new RuntimeException("Not found DataSource implement class");
+            log.debug("Created datasource for {} Server. {}", getName(), ds);
         });
     }
 

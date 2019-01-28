@@ -15,8 +15,7 @@ public class TestApp {
 
     public static void main(String[] args) {
         AppContext app = new AppContext();
-//        app.addSource(new MVCServer().scan(RestTpl.class));
-        // app.addSource(new NettyServer().scan(RestTpl.class));
+        // app.addSource(new MVCServer().scan(RestTpl.class));
         // app.addSource(new UndertowResteasySever().scan(RestTpl.class));
         // app.addSource(new UndertowResteasySever());
 

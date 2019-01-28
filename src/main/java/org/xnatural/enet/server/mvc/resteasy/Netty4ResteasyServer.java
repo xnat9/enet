@@ -30,7 +30,7 @@ public class Netty4ResteasyServer extends ServerTpl {
     /**
      * 根 path 前缀
      */
-    private String             root;
+    private String             rootPath;
     /**
      * see: {@link #collect()}
      */
@@ -56,7 +56,7 @@ public class Netty4ResteasyServer extends ServerTpl {
         coreEp.fire("env.ns", EC.of("ns", getNs()).sync(), (ec) -> {
             if (ec.result == null) return;
             Map<String, Object> m = (Map) ec.result;
-            root = (String) m.getOrDefault("root", "");
+            rootPath = (String) m.getOrDefault("rootPath", "/");
             if (attrs.containsKey("scan")) {
                 try {
                     for (String c : ((String) attrs.get("scan")).split(",")) {
@@ -70,7 +70,7 @@ public class Netty4ResteasyServer extends ServerTpl {
         });
         startDeployment();
         initDispatcher();
-        log.info("Started {} Server. root: {}", getName(), getRoot());
+        log.info("Started {} Server. rootPath: {}", getName(), getRootPath());
         collect();
     }
 
@@ -88,7 +88,7 @@ public class Netty4ResteasyServer extends ServerTpl {
         initDispatcher();
         // 参考 NettyJaxrsServer
         ChannelPipeline pipeline = ec.getAttr("pipeline", ChannelPipeline.class);
-        pipeline.addLast(new RestEasyHttpRequestDecoder(dispatcher.getDispatcher(), root, RestEasyHttpRequestDecoder.Protocol.HTTP));
+        pipeline.addLast(new RestEasyHttpRequestDecoder(dispatcher.getDispatcher(), rootPath, RestEasyHttpRequestDecoder.Protocol.HTTP));
         pipeline.addLast(new RestEasyHttpResponseEncoder());
         pipeline.addLast(new RequestHandler(dispatcher));
     }
@@ -206,14 +206,14 @@ public class Netty4ResteasyServer extends ServerTpl {
     }
 
 
-    public String getRoot() {
-        return root;
+    public String getRootPath() {
+        return rootPath;
     }
 
 
-    public Netty4ResteasyServer setRoot(String root) {
+    public Netty4ResteasyServer setRootPath(String rootPath) {
         if (running.get()) throw new RuntimeException("服务正在运行, 不充许更改");
-        this.root = root;
+        this.rootPath = rootPath;
         return this;
     }
 }

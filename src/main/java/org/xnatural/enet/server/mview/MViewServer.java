@@ -6,10 +6,10 @@ import io.swagger.v3.oas.integration.SwaggerConfiguration;
 import io.swagger.v3.oas.models.OpenAPI;
 import io.swagger.v3.oas.models.PathItem;
 import io.swagger.v3.oas.models.tags.Tag;
-import org.xnatural.enet.server.ServerTpl;
 import org.xnatural.enet.event.EC;
 import org.xnatural.enet.event.EL;
 import org.xnatural.enet.event.EP;
+import org.xnatural.enet.server.ServerTpl;
 
 import java.util.*;
 import java.util.concurrent.ExecutorService;
@@ -47,7 +47,7 @@ public class MViewServer extends ServerTpl {
                 attrs.putAll(m);
             }
             ctl = new Controller(this);
-            log.info("Started {} Server. path: {}", getName(), getPath());
+            log.info("Started {} Server. pathPrefix: {}", getName(), ("/" + getPath() + "/").replace("//", "/"));
             coreEp.fire("server.netty4Resteasy.addResource", EC.of("source", ctl).attr("path", getPath()));
         });
     }

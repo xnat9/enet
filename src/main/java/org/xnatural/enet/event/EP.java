@@ -172,9 +172,8 @@ public class EP {
                         listener.m = m; m.setAccessible(true); listener.name = parseName(n, source);
 
                         List<Listener> ls = lsMap.computeIfAbsent(listener.name, s -> new LinkedList<>());
-                        // 同一个对象源中, 不能有相同的事件监听名. 忽略并警告
+                        // 同一个对象源中, 不能有相同的事件监听名. 忽略
                         if (ls.stream().anyMatch(l -> l.source == source && Objects.equals(l.name, listener.name))) {
-                            log.warn("同一个对象源中, 不能有相同的事件监听名. source: {}, originName: {}, name: {}", source, n, listener.name);
                             continue;
                         }
                         // 同一个对象源中, 不同的监听, 方法名不能相同.

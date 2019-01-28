@@ -10,8 +10,8 @@
  * 灵活: 可自定义模块, 可随意按需加入到系统中
  * 高效: 事件网络到各个模块异步执行任务充分利用线程资源. 把系统分为两种角色, 执行器(线程池)和执行体.
     ##### 系统运行上下文 AppContext
-        1. 环境系统. 为系统本身和各模块提供环境配置
-        2. EP 事件中心
+        1. 环境系统(Environment). 为系统本身和各模块提供环境配置
+        2. 事件中心(EP)
             * 事件中心包含了整个系统中的所有监听器, 每个监听器代表一个功能点.
             * 每个模块被加入到系统中时, 系统会自动搜索模块所提供的监听器(即: 有注解@EL的方法)
             * 各模块的功能调用, 只需要触发事件(@EL提供的)就行. coreEp.fire方法
@@ -25,16 +25,17 @@
 <dependency>
     <groupId>org.xnatural</groupId>
     <artifactId>enet-all</artifactId>
-    <version>0.0.1</version>
+    <version>0.1.0</version>
 </dependency>
 ```
 
 #### 使用说明
 ```
-app.addSource(new Netty4HttpServer());
-app.addSource(new Netty4ResteasyServer());
+app.addSource(new Netty4HttpServer().setPort(8080));
+app.addSource(new Netty4ResteasyServer().scan(RestTpl.class));
 app.addSource(new MViewServer());
 app.addSource(new SwaggerServer());
+app.addSource(new HibernateServer().scan(TestEntity.class));
 // TODO 加载自定义各个模块
 app.start();
 ```
@@ -47,6 +48,7 @@ app.start();
 * MViewServer: 一个系统管理界面
 * SwaggerServer: swagger api 文档服务
 * HibernateServer: dao 层 hibernate 实现
+* ... TODO 待完善其它模块
 
 #### 参与贡献
 

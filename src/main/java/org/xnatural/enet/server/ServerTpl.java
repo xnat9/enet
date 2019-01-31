@@ -1,6 +1,5 @@
 package org.xnatural.enet.server;
 
-import org.hibernate.jpa.HibernatePersistenceProvider;
 import org.xnatural.enet.common.Context;
 import org.xnatural.enet.common.Log;
 import org.xnatural.enet.common.Utils;
@@ -54,35 +53,43 @@ public class ServerTpl {
     protected       AtomicBoolean       running = new AtomicBoolean(false);
 
 
-//    @EL(name = "sys.starting")
-//    public void start() {
-//        if (!running.compareAndSet(false, true)) {
-//            log.warn("{} Server is running", getName()); return;
-//        }
-//        if (coreExec == null) initExecutor();
-//        if (coreEp == null) coreEp = new EP(coreExec);
-//        coreEp.fire(getNs() + ".starting");
-//        // 先从核心取配置, 然后再启动
-//        coreEp.fire("env.ns", EC.of("ns", getNs()).sync(), (ec) -> {
-//            Map<String, String> m = (Map) ec.result;
-//            attrs.putAll(m);
-//        });
-//        coreEp.fire(getNs() + ".started");
-//        log.info("Started {} Server", getName());
-//    }
+    /**
+     * Server start
+     */
+    @EL(name = "sys.starting")
+    public void start() {
+        if (!running.compareAndSet(false, true)) {
+            log.warn("{} Server is running", getName()); return;
+        }
+        if (coreExec == null) initExecutor();
+        if (coreEp == null) coreEp = new EP(coreExec);
+        coreEp.fire(getNs() + ".starting");
+        // 先从核心取配置, 然后再启动
+        coreEp.fire("env.ns", EC.of("ns", getNs()).sync(), (ec) -> {
+            Map<String, String> m = (Map) ec.result;
+            attrs.putAll(m);
+        });
+        coreEp.fire(getNs() + ".started");
+        log.info("Started {} Server", getName());
+    }
 
-
-//    @EL(name = "sys.stopping")
-//    public final void stop() {
-//        if (!sharedExecutor && exec instanceof ExecutorService) ((ExecutorService) exec).shutdown();
-//    }
 
     /**
-     * bean 容器. {@link #beanSupply(EC)}
+     * Server stop
+     */
+    @EL(name = "sys.stopping")
+    public void stop() {
+        log.info("Shutdown '{}' Server", getName());
+        if (coreExec instanceof ExecutorService) ((ExecutorService) coreExec).shutdown();
+    }
+
+
+    /**
+     * bean 容器. {@link #findBean(EC)}
      */
     protected Context beanCtx;
     @EL(name = {"bean.get", "${ns}.bean.get"}, async = false)
-    protected Object beanSupply(EC ec) {
+    protected Object findBean(EC ec) {
         if (beanCtx == null) return ec.result;
         if (ec.result != null) return ec.result; // 已经找到结果了, 就直接返回
 
@@ -103,18 +110,21 @@ public class ServerTpl {
 
 
     /**
-     * 注册 bean
-     * @param name bean 名字.
+     * 暴露 bean 给其它模块用. {@link #findBean(EC)}
+     * @param names bean 名字.
      * @param bean
      */
-    protected void registerBean(String name, Object bean) {
+    protected ServerTpl exposeBean(Object bean, String... names) {
         if (bean == null) {
-            log.warn("server '{}' register bean with null object.", getName()); return;
+            log.warn("server '{}' expose bean with null object.", getName()); return this;
         }
         // TODO 验证(相同的bean名字和类型)?
         if (beanCtx == null) beanCtx = new Context();
-        if (name != null) beanCtx.attr(name, bean);
+        if (names != null) {
+            for (String n : names) beanCtx.attr(n, bean);
+        }
         beanCtx.put(bean);
+        return this;
     }
 
 

@@ -2,7 +2,6 @@ package org.xnatural.enet.server.dao.hibernate;
 
 import org.hibernate.jpa.HibernatePersistenceProvider;
 import org.xnatural.enet.event.EC;
-import org.xnatural.enet.event.EL;
 import org.xnatural.enet.event.EP;
 import org.xnatural.enet.server.ServerTpl;
 
@@ -30,25 +29,24 @@ import static javax.persistence.SharedCacheMode.UNSPECIFIED;
  * 暴露出 {@link EntityManagerFactory} 实例(所有的数据库操作入口)
  */
 public class HibernateServer extends ServerTpl {
-    private DataSource          ds;
-    private PersistenceUnitInfo pu;
-    private EntityManagerFactory       emf;
+    private DataSource           ds;
+    private EntityManagerFactory emf;
     /**
      * 实体扫描
      */
-    private List<Class>         entityScan = new LinkedList<>();
+    private List<Class>          entityScan = new LinkedList<>();
     /**
      * 被管理的实体类名
      */
-    private List<String>        entities   = new LinkedList<>();
+    private List<String>         entities   = new LinkedList<>();
 
     public HibernateServer() {
         setName("hibernate");
     }
 
 
-    @EL(name = "sys.starting")
-    protected void start() {
+    @Override
+    public void start() {
         if (!running.compareAndSet(false, true)) {
             log.warn("{} Server is running", getName()); return;
         }
@@ -70,15 +68,14 @@ public class HibernateServer extends ServerTpl {
             }
             attrs.putAll(m);
         });
-        initPersistenceUnit();
-        emf = new HibernatePersistenceProvider().createContainerEntityManagerFactory(pu, attrs);
-        registerBean(null, emf);
+        emf = new HibernatePersistenceProvider().createContainerEntityManagerFactory(createPersistenceUnit(), attrs);
+        exposeBean(emf, "entityManagerFactory", "sessionFactory");
         coreEp.fire(getNs() + ".started");
         log.info("Started {} Server", getName());
     }
 
 
-    @EL(name = "sys.stopping")
+    @Override
     public void stop() {
         emf.close();
         try {
@@ -92,10 +89,10 @@ public class HibernateServer extends ServerTpl {
     }
 
 
-    protected void initPersistenceUnit() {
+    protected PersistenceUnitInfo createPersistenceUnit() {
         initDataSource();
         collect();
-        pu = new PersistenceUnitInfo() {
+        return new PersistenceUnitInfo() {
             @Override
             public String getPersistenceUnitName() {
                 return getAttr("persistenceUnitName", getName()).toString();

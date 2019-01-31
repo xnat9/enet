@@ -45,8 +45,8 @@ public class EP {
      * @param eName 事件名
      * @param completeFn 所有事件执行完后回调
      */
-    public void fire(String eName, Consumer<EC> completeFn) {
-        fire(eName, new EC(), completeFn);
+    public Object fire(String eName, Consumer<EC> completeFn) {
+        return fire(eName, new EC(), completeFn);
     }
 
 
@@ -55,8 +55,8 @@ public class EP {
      * @param eName 事件名
      * @param ec 事件执行上下文(包括参数传递)
      */
-    public void fire(String eName, EC ec) {
-        fire(eName, ec, null);
+    public Object fire(String eName, EC ec) {
+        return fire(eName, ec, null);
     }
 
 
@@ -66,8 +66,8 @@ public class EP {
      * @param ec 事件执行上下文(包括参数传递)
      * @param completeFn 所有事件执行完后回调
      */
-    public void fire(String eName, EC ec, Consumer<EC> completeFn) {
-        doPublish(eName, (ec == null ? new EC() : ec), completeFn);
+    public Object fire(String eName, EC ec, Consumer<EC> completeFn) {
+        return doPublish(eName, (ec == null ? new EC() : ec), completeFn);
     }
 
 
@@ -76,12 +76,13 @@ public class EP {
      * @param eName
      * @param ec
      * @param completeFn
+     * @return Note: 取返回值时, 要注意是同步执行还是异步执行
      */
-    protected void doPublish(String eName, EC ec, Consumer<EC> completeFn) {
+    protected Object doPublish(String eName, EC ec, Consumer<EC> completeFn) {
         List<Listener> ls = lsMap.get(eName);
         if (ls == null || ls.isEmpty()) {
             log.trace("not found listener for event name: {}", eName);
-            if (completeFn != null) completeFn.accept(ec); return;
+            if (completeFn != null) completeFn.accept(ec); return ec.result;
         }
         ec.willPass(ls).ep = this;
         if (trackEvents.contains(eName)) ec.track = true;
@@ -127,6 +128,7 @@ public class EP {
                 });
             }
         }
+        return ec.result;
     }
 
 

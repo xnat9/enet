@@ -12,6 +12,7 @@ import org.xnatural.enet.event.EC;
 import org.xnatural.enet.event.EL;
 import org.xnatural.enet.event.EP;
 
+import java.lang.reflect.Field;
 import java.util.*;
 import java.util.concurrent.ExecutorService;
 
@@ -50,8 +51,14 @@ public class SwaggerServer extends ServerTpl {
 
 
     @EL(name = "sys.stopping")
-    public void stop() throws Exception {
-        ((Map) OpenApiContextLocator.class.getField("map").get(OpenApiContextLocator.getInstance())).clear();
+    public void stop() {
+        try {
+            Field f = OpenApiContextLocator.class.getField("map");
+            f.setAccessible(true);
+            ((Map) f.get(OpenApiContextLocator.getInstance())).clear();
+        } catch (Exception e) {
+            log.warn(e.getMessage());
+        }
         if (coreExec instanceof ExecutorService) ((ExecutorService) coreExec).shutdown();
     }
 

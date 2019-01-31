@@ -120,14 +120,14 @@ public class AppContext {
     protected EP initEp() {
         return new EP(exec) {
             @Override
-            protected void doPublish(String eName, EC ec, Consumer<EC> completeFn) {
+            protected Object doPublish(String eName, EC ec, Consumer<EC> completeFn) {
                 if ("sys.starting".equals(eName) || "sys.stopping".equals(eName)) {
                     if (ec.source() != AppContext.this) throw new UnsupportedOperationException("不允许触发此事件");
                 }
                 if ("env.updateAttr".equals(eName)) {
                     if (ec.source() != env) throw new UnsupportedOperationException("不允许触发此事件");
                 }
-                super.doPublish(eName, ec, completeFn);
+                return super.doPublish(eName, ec, completeFn);
             }
             @Override
             public String toString() { return "coreEp"; }
@@ -143,7 +143,7 @@ public class AppContext {
     protected void initExecutor() {
         int capacity = 100000;
         exec = new ThreadPoolExecutor(
-                8, 8, 10, TimeUnit.MINUTES, new LinkedBlockingQueue<>(capacity),
+                8, 10, 30, TimeUnit.MINUTES, new LinkedBlockingQueue<>(capacity),
                 new ThreadFactory() {
                     final AtomicInteger count = new AtomicInteger(1);
                     @Override
@@ -153,7 +153,7 @@ public class AppContext {
                 }
         ) {
             long idleStartTime;
-            long idleMinute = TimeUnit.MINUTES.toMillis(5);
+            long idleMinute = TimeUnit.MINUTES.toMillis(10);
             @Override
             protected void beforeExecute(Thread t, Runnable r) {
                 super.beforeExecute(t, r);
@@ -309,9 +309,9 @@ public class AppContext {
     private EP wrapEpForSource(Object source) {
         return new EP() {
             @Override
-            public void fire(String eName, EC ec, Consumer<EC> completeFn) {
+            public Object fire(String eName, EC ec, Consumer<EC> completeFn) {
                 if (ec.source() == null) ec.setSource(source);
-                ep.fire(eName, ec, completeFn);
+                return ep.fire(eName, ec, completeFn);
             }
             @Override
             public EP addListenerSource(Object source) {

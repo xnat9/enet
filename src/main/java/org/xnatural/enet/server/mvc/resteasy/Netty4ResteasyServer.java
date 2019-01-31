@@ -99,7 +99,7 @@ public class Netty4ResteasyServer extends ServerTpl {
      * @param o
      * @return
      */
-    @EL(name = "${ns}.addResource")
+    @EL(name = {"${ns}.addResource", "resteasy.addResource"})
     public Netty4ResteasyServer addResource(Object o) {
         if (o instanceof Class) return this;
         if (o instanceof EC) {

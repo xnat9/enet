@@ -5,7 +5,6 @@ import org.xnatural.enet.event.EC;
 import org.xnatural.enet.event.EL;
 import org.xnatural.enet.event.EP;
 
-import javax.annotation.PostConstruct;
 import javax.persistence.EntityManager;
 import javax.persistence.EntityManagerFactory;
 import javax.ws.rs.GET;
@@ -67,6 +66,17 @@ public class RestTpl {
         return "ssssssssss";
     }
 
+
+    @GET
+    @Path("cache")
+    @Produces("application/json")
+    public Object cache() {
+        Object r = ep.fire("cache.get", EC.of("name", "test").attr("key", "key1"));
+        if (r == null) {
+            ep.fire("cache.add", EC.of("name", "test").attr("key", "key1").attr("value", "xxxxxxxxxxxx"));
+        }
+        return r;
+    }
 
     @GET
     @Path("async")

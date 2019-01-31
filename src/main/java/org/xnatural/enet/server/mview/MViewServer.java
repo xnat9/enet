@@ -34,7 +34,7 @@ public class MViewServer extends ServerTpl {
     @EL(name = "sys.starting")
     public void start() {
         if (!running.compareAndSet(false, true)) {
-            log.warn("服务({})正在运行", getName()); return;
+            log.warn("{} Server is running", getName()); return;
         }
         if (coreExec == null) initExecutor();
         if (coreEp == null) coreEp = new EP(coreExec);
@@ -46,16 +46,16 @@ public class MViewServer extends ServerTpl {
                 if (m.containsKey("path")) path = m.get("path").toString();
                 attrs.putAll(m);
             }
-            ctl = new Controller(this);
-            log.info("Started {} Server. pathPrefix: {}", getName(), ("/" + getPath() + "/").replace("//", "/"));
-            coreEp.fire("server.netty4Resteasy.addResource", EC.of("source", ctl).attr("path", getPath()));
         });
+        ctl = new Controller(this);
+        log.info("Started {} Server. pathPrefix: {}", getName(), ("/" + getPath() + "/").replace("//", "/"));
+        coreEp.fire("resteasy.addResource", EC.of("source", ctl).attr("path", getPath()));
     }
 
 
     @EL(name = "sys.stopping")
     public void stop() {
-        log.info("关闭({})服务.", getName());
+        log.info("Shutdown '{}' Server", getName());
         if (coreExec instanceof ExecutorService) ((ExecutorService) coreExec).shutdown();
         // TODO
     }

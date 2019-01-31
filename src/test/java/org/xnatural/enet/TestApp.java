@@ -2,6 +2,7 @@ package org.xnatural.enet;
 
 
 import org.xnatural.enet.core.AppContext;
+import org.xnatural.enet.server.cache.ehcache.EhcacheServer;
 import org.xnatural.enet.server.dao.hibernate.HibernateServer;
 import org.xnatural.enet.server.http.netty.Netty4HttpServer;
 import org.xnatural.enet.server.mvc.resteasy.Netty4ResteasyServer;
@@ -19,11 +20,12 @@ public class TestApp {
         // app.addSource(new UndertowResteasySever().scan(RestTpl.class));
         // app.addSource(new UndertowResteasySever());
 
-        app.addSource(new Netty4HttpServer().setPort(8080));
+        app.addSource(new Netty4HttpServer().setPort(8081));
         app.addSource(new Netty4ResteasyServer().scan(RestTpl.class));
         app.addSource(new MViewServer());
         app.addSource(new SwaggerServer());
         app.addSource(new HibernateServer().scan(TestEntity.class));
+        app.addSource(new EhcacheServer());
         app.start();
     }
 }

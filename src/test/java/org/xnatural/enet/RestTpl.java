@@ -1,7 +1,6 @@
 package org.xnatural.enet;
 
 import org.xnatural.enet.common.Log;
-import org.xnatural.enet.event.EC;
 import org.xnatural.enet.event.EL;
 import org.xnatural.enet.event.EP;
 
@@ -13,6 +12,7 @@ import javax.ws.rs.PathParam;
 import javax.ws.rs.Produces;
 import javax.ws.rs.core.Response;
 import java.io.File;
+import java.time.Duration;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CompletionStage;
 
@@ -30,7 +30,7 @@ public class RestTpl {
 
     @EL(name = "sys.started")
     public void init() {
-        ep.fire("bean.get", EC.of("type", EntityManagerFactory.class), ec -> emf = (EntityManagerFactory) ec.result);
+        emf = (EntityManagerFactory) ep.fire("bean.get", EntityManagerFactory.class);
     }
 
 
@@ -71,12 +71,11 @@ public class RestTpl {
     @Path("cache")
     @Produces("application/json")
     public Object cache() {
-        Object r = ep.fire("cache.get", EC.of("name", "test").attr("key", "key1"));
-        if (r == null) {
-            ep.fire("cache.add", EC.of("name", "test").attr("key", "key1").attr("value", "xxxxxxxxxxxx"));
-        }
+        Object r = ep.fire("cache.get", "test", "key1");
+        if (r == null) ep.fire("cache.add", "test", "key1", "qqqqqqqqqq");
         return r;
     }
+
 
     @GET
     @Path("async")

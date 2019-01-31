@@ -62,18 +62,16 @@ public class HttpServer extends ServerTpl {
         if (coreEp == null) coreEp = new EP();
         coreEp.fire(getNs() + ".starting", EC.of(this));
         // 先从核心取配置, 然后再启动
-        coreEp.fire("env.ns", EC.of(this).attr("ns", getNs()), (ec) -> {
-            attrs.putAll((Map) ec.result);
-            try {
-                if (coreExec == null) initExecutor();
-                ioReactor = new IOReactor(this, coreExec);
-                ioReactor.start();
-                log.info("http服务启动完成. hostname: {}, port: {}, attrNs: {}", getHostname(), getPort());
-                coreEp.fire(getNs() + ".started", EC.of(this));
-            } catch (Exception ex) {
-                log.error(ex, "创建http服务错误");
-            }
-        });
+        attrs.putAll((Map) coreEp.fire("env.ns", getNs()));
+        try {
+            if (coreExec == null) initExecutor();
+            ioReactor = new IOReactor(this, coreExec);
+            ioReactor.start();
+            log.info("http服务启动完成. hostname: {}, port: {}, attrNs: {}", getHostname(), getPort());
+            coreEp.fire(getNs() + ".started", EC.of(this));
+        } catch (Exception ex) {
+            log.error(ex, "创建http服务错误");
+        }
     }
 
 

@@ -53,21 +53,19 @@ public class Netty4ResteasyServer extends ServerTpl {
         if (coreEp == null) coreEp = new EP(coreExec);
         coreEp.fire(getNs() + ".starting");
         // 先从核心取配置, 然后再启动
-        coreEp.fire("env.ns", EC.of("ns", getNs()).sync(), (ec) -> {
-            if (ec.result == null) return;
-            Map<String, Object> m = (Map) ec.result;
-            rootPath = (String) m.getOrDefault("rootPath", "/");
-            if (attrs.containsKey("scan")) {
-                try {
-                    for (String c : ((String) attrs.get("scan")).split(",")) {
-                        if (c != null && !c.trim().isEmpty()) scan.add(Class.forName(c.trim()));
-                    }
-                } catch (ClassNotFoundException e) {
-                    log.error(e);
+        Map<String, String> r = (Map) coreEp.fire("env.ns", getNs());
+        rootPath = (String) r.getOrDefault("rootPath", "/");
+        if (attrs.containsKey("scan")) {
+            try {
+                for (String c : ((String) attrs.get("scan")).split(",")) {
+                    if (c != null && !c.trim().isEmpty()) scan.add(Class.forName(c.trim()));
                 }
+            } catch (ClassNotFoundException e) {
+                log.error(e);
             }
-            attrs.putAll(m);
-        });
+        }
+        attrs.putAll(r);
+
         startDeployment();
         initDispatcher();
         log.info("Started {} Server. rootPath: {}", getName(), getRootPath());
@@ -83,7 +81,7 @@ public class Netty4ResteasyServer extends ServerTpl {
     }
 
 
-    @EL(name = "server.http-netty4.addHandler")
+    @EL(name = "server.http-netty.addHandler")
     private void addHandler(EC ec) {
         initDispatcher();
         // 参考 NettyJaxrsServer

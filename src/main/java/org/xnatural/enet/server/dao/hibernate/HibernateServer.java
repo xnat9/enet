@@ -54,20 +54,19 @@ public class HibernateServer extends ServerTpl {
         if (coreEp == null) coreEp = new EP(coreExec);
         coreEp.fire(getNs() + ".starting");
         // 先从核心取配置, 然后再启动
-        coreEp.fire("env.ns", EC.of("ns", getNs()).sync(), (ec) -> {
-            Map<String, String> m = (Map) ec.result;
-            if (m.containsKey("entity-scan")) {
-                for (String s : m.get("entity-scan").split(",")) {
-                    if (s == null || s.trim().isEmpty()) continue;
-                    try {
-                        entityScan.add(Class.forName(s.trim()));
-                    } catch (ClassNotFoundException e) {
-                        log.error("not found class: " + s);
-                    }
+        Map<String, String> r = (Map) coreEp.fire("env.ns", getNs());
+        if (r.containsKey("entity-scan")) {
+            for (String s : r.get("entity-scan").split(",")) {
+                if (s == null || s.trim().isEmpty()) continue;
+                try {
+                    entityScan.add(Class.forName(s.trim()));
+                } catch (ClassNotFoundException e) {
+                    log.error("not found class: " + s);
                 }
             }
-            attrs.putAll(m);
-        });
+        }
+        attrs.putAll(r);
+
         emf = new HibernatePersistenceProvider().createContainerEntityManagerFactory(createPersistenceUnit(), attrs);
         exposeBean(emf, "entityManagerFactory", "sessionFactory");
         coreEp.fire(getNs() + ".started");
@@ -221,37 +220,36 @@ public class HibernateServer extends ServerTpl {
      * @return
      */
     protected void initDataSource() {
-        coreEp.fire("env.ns", EC.of("ns", getNs() + ".ds").sync(), ec -> {
-            boolean f = false;
-            // druid 数据源
+        Map<String, String> r = (Map) coreEp.fire("env.ns", getNs() + ".ds");
+        boolean f = false;
+        // druid 数据源
+        try {
+            Class<?> c = Class.forName("com.alibaba.druid.pool.DruidDataSourceFactory");
+            Method m = c.getDeclaredMethod("createDataSource", Map.class);
+            ds = (DataSource) m.invoke(null, r);
+        } catch (ClassNotFoundException e) {
+            // log.error(e, "datasource create error! properties: {}", ec.result);
+            f = true;
+        } catch (Exception e) {
+            throw new RuntimeException(e);
+        }
+        // dbcp2 数据源
+        if (f) {
+            f = false;
             try {
-                Class<?> c = Class.forName("com.alibaba.druid.pool.DruidDataSourceFactory");
-                Method m = c.getDeclaredMethod("createDataSource", Map.class);
-                ds = (DataSource) m.invoke(null, (Map) ec.result);
+                Class<?> c = Class.forName("org.apache.commons.dbcp2.BasicDataSourceFactory");
+                Method m = c.getDeclaredMethod("createDataSource", Properties.class);
+                Properties p = new Properties(); p.putAll(r);
+                ds = (DataSource) m.invoke(null, p);
             } catch (ClassNotFoundException e) {
                 // log.error(e, "datasource create error! properties: {}", ec.result);
                 f = true;
             } catch (Exception e) {
                 throw new RuntimeException(e);
             }
-            // dbcp2 数据源
-            if (f) {
-                f = false;
-                try {
-                    Class<?> c = Class.forName("org.apache.commons.dbcp2.BasicDataSourceFactory");
-                    Method m = c.getDeclaredMethod("createDataSource", Properties.class);
-                    Properties p = new Properties(); p.putAll((Map) ec.result);
-                    ds = (DataSource) m.invoke(null, p);
-                } catch (ClassNotFoundException e) {
-                    // log.error(e, "datasource create error! properties: {}", ec.result);
-                    f = true;
-                } catch (Exception e) {
-                    throw new RuntimeException(e);
-                }
-            }
-            if (f) throw new RuntimeException("Not found DataSource implement class");
-            log.debug("Created datasource for {} Server. {}", getName(), ds);
-        });
+        }
+        if (f) throw new RuntimeException("Not found DataSource implement class");
+        log.debug("Created datasource for {} Server. {}", getName(), ds);
     }
 
 

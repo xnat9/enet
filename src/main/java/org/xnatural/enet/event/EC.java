@@ -23,6 +23,10 @@ public class EC {
      * 强制异步. 如果设置了就会忽略 @EL中的设置
      */
     Boolean async;
+    /**
+     * 目标方法的参数
+     */
+    Object[] args;
     EP ep;
     /**
      * 事件源
@@ -110,6 +114,9 @@ public class EC {
 
 
     public EC debug() { track = true; return this; }
+
+
+    public EC args(Object... args) { this.args = args; return this; }
 
 
     public EP ep() { return ep; }

@@ -40,13 +40,10 @@ public class MViewServer extends ServerTpl {
         if (coreEp == null) coreEp = new EP(coreExec);
         coreEp.fire(getNs() + ".starting");
         // 先从核心取配置, 然后再启动
-        coreEp.fire("env.ns", EC.of("ns", getNs()).sync(), (ec) -> {
-            if (ec.result != null) {
-                Map<String, Object> m = (Map) ec.result;
-                if (m.containsKey("path")) path = m.get("path").toString();
-                attrs.putAll(m);
-            }
-        });
+        Map<String, String> r = (Map) coreEp.fire("env.ns", getNs());
+        if (r.containsKey("path")) path = r.get("path");
+        attrs.putAll(r);
+
         ctl = new Controller(this);
         log.info("Started {} Server. pathPrefix: {}", getName(), ("/" + getPath() + "/").replace("//", "/"));
         coreEp.fire("resteasy.addResource", EC.of("source", ctl).attr("path", getPath()));

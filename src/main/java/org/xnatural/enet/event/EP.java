@@ -18,13 +18,13 @@ import java.util.regex.Pattern;
  * TODO 动态事件名, 动态事件监听
  */
 public class EP {
-    final   Log                         log         = Log.of(getClass());
-    private Executor                    exec;
-    private Map<String, List<Listener>> lsMap       = new ConcurrentHashMap<>(7);
+    protected final Log                         log         = Log.of(getClass());
+    protected       Executor                    exec;
+    protected       Map<String, List<Listener>> lsMap       = new ConcurrentHashMap<>(7);
     /**
      * 需要追踪的事件名字
      */
-    private Set<String>                 trackEvents = new HashSet<>();
+    protected final Set<String>                 trackEvents = new HashSet<>();
 
 
     public EP() {}
@@ -35,8 +35,19 @@ public class EP {
      * 触发事件
      * @param eName 事件名
      */
-    public void fire(String eName) {
-        fire(eName, new EC(), null);
+    public Object fire(String eName) {
+        return fire(eName, new EC(), null);
+    }
+
+
+    /**
+     *
+     * @param eName
+     * @param args 监听器方法的参数列表
+     * @return
+     */
+    public Object fire(String eName, Object...args) {
+        return fire(eName, new EC().args(args), null);
     }
 
 
@@ -47,6 +58,18 @@ public class EP {
      */
     public Object fire(String eName, Consumer<EC> completeFn) {
         return fire(eName, new EC(), completeFn);
+    }
+
+
+    /**
+     *
+     * @param eName
+     * @param completeFn
+     * @param args 监听器方法的参数列表
+     * @return
+     */
+    public Object fire(String eName, Consumer<EC> completeFn, Object...args) {
+        return fire(eName, new EC().args(args), completeFn);
     }
 
 
@@ -93,8 +116,8 @@ public class EP {
         if (exec == null) { // 只能同步执行
             for (Listener l : ls) l.invoke(ec);
             if (completeFn != null) {
-                completeFn.accept(ec);
                 if (ec.track) log.info("end executing listener chain for event name '{}'. id: {}, result: {}", eName, ec.id, ec.result);
+                completeFn.accept(ec);
             }
         } else {
             // 异步和同步执行的监听器, 分开执行
@@ -116,8 +139,8 @@ public class EP {
                 AtomicInteger i = new AtomicInteger(ls.size());
                 Runnable fn = () -> { // 两个列表都执行完后才执行completeFn函数
                     if (i.get() == 0) {
-                        completeFn.accept(ec);
                         if (ec.track) log.info("end executing listener chain for event name '{}'. id: {}, result: {}", eName, ec.id, ec.result);
+                        completeFn.accept(ec);
                     }
                 };
                 asyncLs.forEach(l -> exec.execute(() -> {
@@ -139,6 +162,30 @@ public class EP {
      */
     public EP addListenerSource(Object source) {
         resolveListener(source);
+        return this;
+    }
+
+
+    /**
+     * 设置某个事件需要追踪执行
+     * @param eNames
+     * @return
+     */
+    public EP addTrackEvent(String... eNames) {
+        if (eNames == null) return this;
+        for (String n : eNames) trackEvents.add(n);
+        return this;
+    }
+
+
+    /**
+     * 删除事件追踪
+     * @param eNames
+     * @return
+     */
+    public EP delTrackEvent(String... eNames) {
+        if (eNames == null) return this;
+        for (String n : eNames) trackEvents.remove(n);
         return this;
     }
 
@@ -215,7 +262,7 @@ public class EP {
                 Method m = c.getDeclaredMethod(getName);
                 Object v = m.invoke(source);
                 if (v == null) {
-                    log.warn("解析事件名中的属性错误. name: {}, source:{} 属性: {} 值为空", name, source, attr);
+                    log.warn("解析事件名中的属性错误. name: {}, source: {} 属性: {} 值为空", name, source, attr);
                     return null;
                 }
                 return ma.replaceAll(v.toString());
@@ -265,16 +312,27 @@ public class EP {
             try {
                 if (fn != null) fn.run();
                 else {
-                    if (m.getParameterCount() == 1) {
-                        if (void.class.isAssignableFrom(m.getReturnType())) m.invoke(source, ec);
-                        else ec.result = m.invoke(source, ec);
-                    } else {
-                        if (void.class.isAssignableFrom(m.getReturnType())) m.invoke(source);
-                        else ec.result = m.invoke(source);
+                    Object r;
+                    if (m.getParameterCount() == 0) r = m.invoke(source);
+                    else if (m.getParameterCount() == 1) {
+                        if (m.getParameterTypes()[0].isAssignableFrom(EC.class)) r = m.invoke(source, ec);
+                        else r = m.invoke(source, ec.args);
+                    } else { // m.getParameterCount() > 1 的情况
+                        Object[] args = new Object[m.getParameterCount()]; // 参数传少了, 补null
+                        if (m.getParameterTypes()[0].isAssignableFrom(EC.class)) {
+                            args[0] = ec;
+                            if (ec.args != null) {
+                                for (int i = 1; i <= ec.args.length; i++) args[i] = ec.args[i-1];
+                            }
+                        } else if (ec.args != null) {
+                            for (int i = 0; i < ec.args.length; i++) args[i] = ec.args[i];
+                        }
+                        r = m.invoke(source, args);
                     }
+                    if (!void.class.isAssignableFrom(m.getReturnType())) ec.result = r;
                 }
                 ec.passed(this);
-                if (ec.track) log.info("passed listener for event name '{}'. method: {}, id: {}, result: {}",
+                if (ec.track) log.info("passed listener of event '{}'. method: {}, id: {}, result: {}",
                         name, (m == null ? "" : source.getClass().getSimpleName() + "." + m.getName()),
                         ec.id(), ec.result
                 );

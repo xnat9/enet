@@ -65,10 +65,8 @@ public class ServerTpl {
         if (coreEp == null) coreEp = new EP(coreExec);
         coreEp.fire(getNs() + ".starting");
         // 先从核心取配置, 然后再启动
-        coreEp.fire("env.ns", EC.of("ns", getNs()).sync(), (ec) -> {
-            Map<String, String> m = (Map) ec.result;
-            attrs.putAll(m);
-        });
+        Map<String, String> r = (Map) coreEp.fire("env.ns", getNs());
+        attrs.putAll(r);
         coreEp.fire(getNs() + ".started");
         log.info("Started {} Server", getName());
     }
@@ -85,16 +83,14 @@ public class ServerTpl {
 
 
     /**
-     * bean 容器. {@link #findBean(EC)}
+     * bean 容器. {@link #findBean}
      */
     protected Context beanCtx;
     @EL(name = {"bean.get", "${ns}.bean.get"}, async = false)
-    protected Object findBean(EC ec) {
+    protected Object findBean(EC ec, Class beanType, String beanName) {
         if (beanCtx == null) return ec.result;
         if (ec.result != null) return ec.result; // 已经找到结果了, 就直接返回
 
-        Class beanType = ec.getAttr("type", Class.class);
-        String beanName = ec.getAttr("name", String.class);
         Object bean = null;
 
         if (beanName != null && beanType != null) {
@@ -110,7 +106,7 @@ public class ServerTpl {
 
 
     /**
-     * 暴露 bean 给其它模块用. {@link #findBean(EC)}
+     * 暴露 bean 给其它模块用. {@link #findBean}
      * @param names bean 名字.
      * @param bean
      */

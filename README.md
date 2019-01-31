@@ -48,6 +48,7 @@ app.start();
 * MViewServer: 一个系统管理界面
 * SwaggerServer: swagger api 文档服务
 * HibernateServer: dao 层 hibernate 实现
+* EhcacheServer: ehcache 缓存服务
 * ... TODO 待完善其它模块
 
 #### 参与贡献

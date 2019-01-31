@@ -37,13 +37,10 @@ public class SwaggerServer extends ServerTpl {
         if (coreEp == null) coreEp = new EP(coreExec);
         coreEp.fire(getNs() + ".starting");
         // 先从核心取配置, 然后再启动
-        coreEp.fire("env.ns", EC.of("ns", getNs()).sync(), (ec) -> {
-            if (ec.result != null) {
-                Map<String, Object> m = (Map) ec.result;
-                root = (String) m.getOrDefault("root", getRoot());
-                attrs.putAll(m);
-            }
-        });
+        Map<String, String> r = (Map) coreEp.fire("env.ns", getNs());
+        root = r.getOrDefault("root", getRoot());
+        attrs.putAll(r);
+
         ctl = new Controller(this);
         log.info("Started {} Server. pathPrefix: {}", getName(), ("/" + getRoot() + "/").replace("//", "/"));
         coreEp.fire("server.netty4Resteasy.addResource", EC.of("source", ctl).attr("path", getRoot()));

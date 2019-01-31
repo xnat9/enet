@@ -34,22 +34,19 @@ public class CusMVCServer extends ServerTpl {
         }
         if (coreExec == null) initExecutor();
         if (coreEp == null) coreEp = new EP(coreExec);
-        coreEp.fire("env.ns", EC.of("ns", getNs()), (ec) -> {
-            if (ec.result != null) {
-                attrs.putAll((Map) ec.result);
-                if (attrs.containsKey("scan")) {
-                    try {
-                        scan = Class.forName((String) attrs.get("scan"));
-                    } catch (ClassNotFoundException e) {
-                        log.error(e);
-                    }
-                }
+        Map<String, String> r = (Map) coreEp.fire("env.ns", getNs());
+        attrs.putAll(r);
+        if (attrs.containsKey("scan")) {
+            try {
+                scan = Class.forName((String) attrs.get("scan"));
+            } catch (ClassNotFoundException e) {
+                log.error(e);
             }
-            dispatcher = new Dispatcher(coreExec);
-            log.info("创建 {} 服务", getName());
-            collect();
-            coreEp.fire(getNs() + ".started");
-        });
+        }
+        dispatcher = new Dispatcher(coreExec);
+        log.info("创建 {} 服务", getName());
+        collect();
+        coreEp.fire(getNs() + ".started");
     }
 
 

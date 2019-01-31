@@ -256,6 +256,7 @@ public class Environment {
     }
 
 
+    @EL(name = "env.getAttr", async = false)
     private String getAttr(String key) {
         String v = runtimeAttrs.get(key);
         if (v == null) v = finalAttrs.get(key);
@@ -309,23 +310,12 @@ public class Environment {
 
     /**
      * 取一个命令空间下的所有属性集合
-     * @param ec
+     * @param ns
      * @return
      */
-    @EL(name = "env.ns")
-    private Map<String, String> ns(EC ec) {
-        return getGroupAttr(ec.getAttr("ns", String.class));
-    }
-
-
-    /**
-     * 取属性值
-     * @param ec
-     * @return
-     */
-    @EL(name = "env.attr")
-    private String attr(EC ec) {
-        return getAttr(ec.getAttr("name", String.class));
+    @EL(name = "env.ns", async = false)
+    private Map<String, String> ns(String ns) {
+        return getGroupAttr(ns);
     }
 
 

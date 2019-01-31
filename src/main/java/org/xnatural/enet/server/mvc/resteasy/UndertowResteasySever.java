@@ -4,10 +4,10 @@ import io.undertow.Undertow;
 import org.jboss.resteasy.plugins.server.undertow.UndertowJaxrsServer;
 import org.jboss.resteasy.spi.ResteasyDeployment;
 import org.xnatural.enet.common.Utils;
-import org.xnatural.enet.server.ServerTpl;
 import org.xnatural.enet.event.EC;
 import org.xnatural.enet.event.EL;
 import org.xnatural.enet.event.EP;
+import org.xnatural.enet.server.ServerTpl;
 
 import javax.ws.rs.Path;
 import javax.ws.rs.core.Application;
@@ -53,22 +53,19 @@ public class UndertowResteasySever extends ServerTpl {
         if (coreEp == null) coreEp = new EP(coreExec);
         coreEp.fire(getNs() + ".starting");
         // 先从核心取配置, 然后再启动
-        coreEp.fire("env.ns", EC.of("ns", getNs()).sync(), (ec) -> {
-            if (ec.result == null) return;
-            Map<String, Object> m = (Map) ec.result;
-            port = Utils.toInteger(m.get("port"), getPort());
-            hostname = (String) m.getOrDefault("hostname", getHostname());
-            if (attrs.containsKey("scan")) {
-                try {
-                    for (String c : ((String) attrs.get("scan")).split(",")) {
-                        if (c != null && !c.trim().isEmpty()) scan.add(Class.forName(c.trim()));
-                    }
-                } catch (ClassNotFoundException e) {
-                    log.error(e);
+        Map<String, String> r = (Map) coreEp.fire("env.ns", getNs());
+        port = Utils.toInteger(r.get("port"), getPort());
+        hostname = r.getOrDefault("hostname", getHostname());
+        if (attrs.containsKey("scan")) {
+            try {
+                for (String c : ((String) attrs.get("scan")).split(",")) {
+                    if (c != null && !c.trim().isEmpty()) scan.add(Class.forName(c.trim()));
                 }
+            } catch (ClassNotFoundException e) {
+                log.error(e);
             }
-            attrs.putAll(m);
-        });
+        }
+        attrs.putAll(r);
         if (server == null) initServer();
         server.start(
                 Undertow.builder().setIoThreads(getInteger("ioThreads", 1))

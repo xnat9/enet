@@ -96,12 +96,10 @@ public class HttpServer extends ServerTpl {
     }
 
 
-    @EL(name = "env.updateAttr")
-    private void updateAttr(EC ec) {
-        String k = ec.getAttr("key", String.class);
+    @Override
+    protected void updateAttr(String k, String v) {
         if (!k.startsWith(getNs())) return;
 
-        String v = ec.getAttr("value", String.class);
         if (Objects.equals(getNs() + ".port",  k)) setPort(Utils.toInteger(v, getPort()));
         else if (Objects.equals(getNs() + ".hostname",  k)) setHostname(v);
             // TODO 添加其它可在运行时更新的属性

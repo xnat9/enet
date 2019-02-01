@@ -29,16 +29,16 @@ import static javax.persistence.SharedCacheMode.UNSPECIFIED;
  * 暴露出 {@link EntityManagerFactory} 实例(所有的数据库操作入口)
  */
 public class HibernateServer extends ServerTpl {
-    private DataSource           ds;
-    private EntityManagerFactory emf;
+    protected DataSource           ds;
+    protected EntityManagerFactory emf;
     /**
      * 实体扫描
      */
-    private List<Class>          entityScan = new LinkedList<>();
+    protected List<Class>          entityScan = new LinkedList<>();
     /**
      * 被管理的实体类名
      */
-    private List<String>         entities   = new LinkedList<>();
+    protected List<String>         entities   = new LinkedList<>();
 
     public HibernateServer() {
         setName("hibernate");
@@ -76,14 +76,8 @@ public class HibernateServer extends ServerTpl {
 
     @Override
     public void stop() {
-        emf.close();
-        try {
-            Method m = ds.getClass().getDeclaredMethod("close");
-            if (m != null) m.invoke(ds);
-        } catch (NoSuchMethodException e) {
-        } catch (Exception e) {
-            log.error(e, "close datasource error");
-        }
+        log.info("Shutdown '{}' Server", getName());
+        emf.close(); closeDs();
         if (coreExec instanceof ExecutorService) ((ExecutorService) coreExec).shutdown();
     }
 
@@ -187,7 +181,7 @@ public class HibernateServer extends ServerTpl {
     }
 
 
-    private void collect() {
+    protected void collect() {
         if (entityScan == null || entityScan.isEmpty()) return;
         try {
             for (Class clz : entityScan) {
@@ -203,7 +197,7 @@ public class HibernateServer extends ServerTpl {
     }
 
 
-    private void load(String pkg, File f) throws Exception {
+    protected void load(String pkg, File f) throws Exception {
         if (f.isDirectory()) {
             for (File ff : f.listFiles(ff -> ff.getName().endsWith(".class"))) {
                 load(pkg + "." + f.getName(), ff);
@@ -220,6 +214,10 @@ public class HibernateServer extends ServerTpl {
      * @return
      */
     protected void initDataSource() {
+        if (ds != null) {
+            log.warn("New Datasource and close old Datasource");
+            closeDs();
+        }
         Map<String, String> r = (Map) coreEp.fire("env.ns", getNs() + ".ds");
         boolean f = false;
         // druid 数据源
@@ -250,6 +248,20 @@ public class HibernateServer extends ServerTpl {
         }
         if (f) throw new RuntimeException("Not found DataSource implement class");
         log.debug("Created datasource for {} Server. {}", getName(), ds);
+    }
+
+
+    /**
+     * 关闭 数据源
+     */
+    protected void closeDs() {
+        try {
+            Method m = ds.getClass().getDeclaredMethod("close");
+            if (m != null) m.invoke(ds);
+        } catch (NoSuchMethodException e) {
+        } catch (Exception e) {
+            log.error(e, "close datasource error");
+        }
     }
 
 

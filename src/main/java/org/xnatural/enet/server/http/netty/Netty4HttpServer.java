@@ -13,8 +13,6 @@ import io.netty.handler.codec.http.HttpServerKeepAliveHandler;
 import io.netty.handler.stream.ChunkedWriteHandler;
 import io.netty.handler.timeout.IdleStateHandler;
 import org.xnatural.enet.common.Utils;
-import org.xnatural.enet.event.EC;
-import org.xnatural.enet.event.EL;
 import org.xnatural.enet.event.EP;
 import org.xnatural.enet.server.ServerTpl;
 
@@ -30,13 +28,13 @@ public class Netty4HttpServer extends ServerTpl {
     /**
      * http 服务监听端口
      */
-    private int               port;
+    protected int               port;
     /**
      * http 服务绑定地址
      */
-    private String            hostname;
-    private NioEventLoopGroup boosGroup;
-    private NioEventLoopGroup workerGroup;
+    protected String            hostname;
+    protected NioEventLoopGroup boosGroup;
+    protected NioEventLoopGroup workerGroup;
 
 
     public Netty4HttpServer() {
@@ -46,7 +44,7 @@ public class Netty4HttpServer extends ServerTpl {
     }
 
 
-    @EL(name = "sys.starting")
+    @Override
     public void start() {
         if (!running.compareAndSet(false, true)) {
             log.warn("{} Server is running", getName()); return;
@@ -64,9 +62,9 @@ public class Netty4HttpServer extends ServerTpl {
     }
 
 
-    @EL(name = "sys.stopping")
+    @Override
     public void stop() {
-        log.info("shutdown {} Server. hostname: {}, port: {}", getName(), getHostname(), getPort());
+        log.info("Shutdown '{}' Server. hostname: {}, port: {}", getName(), getHostname(), getPort());
         if (boosGroup != null) boosGroup.shutdownGracefully();
         if (workerGroup != null && workerGroup != boosGroup) workerGroup.shutdownGracefully();
         if (coreExec instanceof ExecutorService) ((ExecutorService) coreExec).shutdown();
@@ -76,7 +74,7 @@ public class Netty4HttpServer extends ServerTpl {
     /**
      * 创建服务
      */
-    private void createServer() {
+    protected void createServer() {
         boolean isLinux = isLinux();
         Boolean shareLoop = getBoolean("shareLoop", true);
         boosGroup = new NioEventLoopGroup(getInteger("threads-boos", 1), coreExec);
@@ -92,7 +90,7 @@ public class Netty4HttpServer extends ServerTpl {
                         ch.pipeline().addLast(new HttpServerKeepAliveHandler());
                         ch.pipeline().addLast(new HttpObjectAggregator(getInteger("maxContentLength", 65536)));
                         ch.pipeline().addLast(new ChunkedWriteHandler());
-                        coreEp.fire(getNs() + ".addHandler", EC.of("pipeline", ch.pipeline()).sync());
+                        coreEp.fire(getNs() + ".addHandler", ch.pipeline());
                     }
                 })
                 .option(ChannelOption.SO_BACKLOG, getInteger("backlog", 500))
@@ -110,7 +108,7 @@ public class Netty4HttpServer extends ServerTpl {
      * 判断系统是否为 linux 系统
      * @return
      */
-    private boolean isLinux() {
+    protected boolean isLinux() {
         return (System.getProperty("os.name").toLowerCase(Locale.UK).trim().startsWith("linux"));
     }
 

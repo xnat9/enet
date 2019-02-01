@@ -8,7 +8,6 @@ import org.jboss.resteasy.plugins.server.netty.RestEasyHttpRequestDecoder;
 import org.jboss.resteasy.plugins.server.netty.RestEasyHttpResponseEncoder;
 import org.jboss.resteasy.spi.ResteasyDeployment;
 import org.xnatural.enet.common.Utils;
-import org.xnatural.enet.event.EC;
 import org.xnatural.enet.event.EL;
 import org.xnatural.enet.event.EP;
 import org.xnatural.enet.server.ServerTpl;
@@ -30,13 +29,13 @@ public class Netty4ResteasyServer extends ServerTpl {
     /**
      * 根 path 前缀
      */
-    private String             rootPath;
+    protected String             rootPath;
     /**
      * see: {@link #collect()}
      */
-    private List<Class>        scan       = new LinkedList<>();
-    private ResteasyDeployment deployment = new ResteasyDeployment();
-    private RequestDispatcher  dispatcher;
+    protected List<Class>        scan       = new LinkedList<>();
+    protected ResteasyDeployment deployment = new ResteasyDeployment();
+    protected RequestDispatcher  dispatcher;
 
 
     public Netty4ResteasyServer() {
@@ -54,7 +53,7 @@ public class Netty4ResteasyServer extends ServerTpl {
         coreEp.fire(getNs() + ".starting");
         // 先从核心取配置, 然后再启动
         Map<String, String> r = (Map) coreEp.fire("env.ns", getNs());
-        rootPath = (String) r.getOrDefault("rootPath", "/");
+        rootPath = r.getOrDefault("rootPath", "/");
         if (attrs.containsKey("scan")) {
             try {
                 for (String c : ((String) attrs.get("scan")).split(",")) {
@@ -66,26 +65,25 @@ public class Netty4ResteasyServer extends ServerTpl {
         }
         attrs.putAll(r);
 
-        startDeployment();
-        initDispatcher();
+        startDeployment(); initDispatcher(); collect();
+        coreEp.fire(getNs() + ".started");
         log.info("Started {} Server. rootPath: {}", getName(), getRootPath());
-        collect();
     }
 
 
     @EL(name = "sys.stopping")
     public void stop() {
+        log.info("Shutdown '{}' Server", getName());
         dispatcher = null;
         deployment.stop(); deployment = null;
         if (coreExec instanceof ExecutorService) ((ExecutorService) coreExec).shutdown();
     }
 
 
-    @EL(name = "server.http-netty.addHandler")
-    private void addHandler(EC ec) {
+    @EL(name = "server.http-netty.addHandler", async = false)
+    protected void addHandler(ChannelPipeline pipeline) {
         initDispatcher();
         // 参考 NettyJaxrsServer
-        ChannelPipeline pipeline = ec.getAttr("pipeline", ChannelPipeline.class);
         pipeline.addLast(new RestEasyHttpRequestDecoder(dispatcher.getDispatcher(), rootPath, RestEasyHttpRequestDecoder.Protocol.HTTP));
         pipeline.addLast(new RestEasyHttpResponseEncoder());
         pipeline.addLast(new RequestHandler(dispatcher));
@@ -94,21 +92,15 @@ public class Netty4ResteasyServer extends ServerTpl {
 
     /**
      * 添加 接口 资源
-     * @param o
+     * @param source
      * @return
      */
     @EL(name = {"${ns}.addResource", "resteasy.addResource"})
-    public Netty4ResteasyServer addResource(Object o) {
-        if (o instanceof Class) return this;
-        if (o instanceof EC) {
-            startDeployment();
-            Object s = ((EC) o).getAttr("source");
-            if (((EC) o).getAttr("path") != null) deployment.getRegistry().addSingletonResource(s, ((EC) o).getAttr("path", String.class));
-            else deployment.getRegistry().addSingletonResource(s);
-        } else {
-            if (deployment.getRegistry() == null) deployment.getResources().add(o);
-            else deployment.getRegistry().addSingletonResource(o);
-        }
+    public Netty4ResteasyServer addResource(Object source, String path) {
+        if (source instanceof Class) return this;
+        startDeployment();
+        if (path != null) deployment.getRegistry().addSingletonResource(source, path);
+        else deployment.getRegistry().addSingletonResource(source);
         return this;
     }
 
@@ -116,18 +108,20 @@ public class Netty4ResteasyServer extends ServerTpl {
     /**
      * 创建 RequestDispatcher
      */
-    private void initDispatcher() {
+    protected void initDispatcher() {
         if (dispatcher == null) {
             dispatcher = new RequestDispatcher((SynchronousDispatcher)deployment.getDispatcher(), deployment.getProviderFactory(), null);
         }
     }
 
 
-    private synchronized void startDeployment() {
+    protected void startDeployment() {
         if (deployment == null) deployment = new ResteasyDeployment();
         if (deployment.getRegistry() != null) return;
-        // deployment.setAsyncJobServiceEnabled(true);
-        deployment.start();
+        synchronized(this) {
+            if (deployment.getRegistry() != null) return;
+            deployment.start();
+        }
     }
 
 
@@ -145,7 +139,7 @@ public class Netty4ResteasyServer extends ServerTpl {
     /**
      * 收集 {@link #scan} 类对的包下边所有的 有注解{@link Path}的类
      */
-    private void collect() {
+    protected void collect() {
         if (scan == null || scan.isEmpty()) return;
         try {
             for (Class clz : scan) {
@@ -161,19 +155,19 @@ public class Netty4ResteasyServer extends ServerTpl {
     }
 
 
-    private void load(String pkg, File f) throws Exception {
+    protected void load(String pkg, File f) throws Exception {
         if (f.isDirectory()) {
             for (File ff : f.listFiles(ff -> ff.getName().endsWith(".class"))) {
                 load(pkg + "." + f.getName(), ff);
             }
         } else if (f.isFile() && f.getName().endsWith(".class")) {
             Class<?> clz = getClass().getClassLoader().loadClass(pkg + "." + f.getName().replace(".class", ""));
-            if (clz.getAnnotation(Path.class) != null) addResource(createAndInitSource(clz));
+            if (clz.getAnnotation(Path.class) != null) addResource(createAndInitSource(clz), null);
         }
     }
 
 
-    private Object createAndInitSource(Class clz) throws Exception {
+    protected Object createAndInitSource(Class clz) throws Exception {
         Object o = clz.newInstance();
         Class<? extends Object> c = o.getClass();
         loop: do {

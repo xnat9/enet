@@ -15,7 +15,6 @@ import java.util.regex.Pattern;
 /**
  * event publisher 事件发布器.事件分发中心
  * TODO 事件死锁. 事件执行链
- * TODO 动态事件名, 动态事件监听
  */
 public class EP {
     protected final Log                         log         = Log.of(getClass());
@@ -319,7 +318,7 @@ public class EP {
                         else r = m.invoke(source, ec.args);
                     } else { // m.getParameterCount() > 1 的情况
                         Object[] args = new Object[m.getParameterCount()]; // 参数传少了, 补null
-                        if (m.getParameterTypes()[0].isAssignableFrom(EC.class)) {
+                        if (EC.class.isAssignableFrom(m.getParameterTypes()[0])) {
                             args[0] = ec;
                             if (ec.args != null) {
                                 for (int i = 1; i <= ec.args.length; i++) args[i] = ec.args[i-1];
@@ -338,7 +337,10 @@ public class EP {
                 );
             } catch (Throwable e) {
                 ec.ex = e;
-                log.error(e, "执行事件出错! name: {}, id: {}", name, ec.id());
+                log.error(e, "Listener execute error! name: {}, id: {}, method: {}, event source: {}",
+                        name, ec.id(), (m == null ? "" : source.getClass().getSimpleName() + "." + m.getName()),
+                        ec.source().getClass().getSimpleName()
+                );
             }
         }
     }

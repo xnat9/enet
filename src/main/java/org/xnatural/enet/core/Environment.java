@@ -19,40 +19,40 @@ import java.util.stream.Collectors;
  */
 public class Environment {
     public final static String                           PROP_ACTIVE      = "env.profiles.active";
-    final               Log                              log              = Log.of(getClass());
+    protected final     Log                              log              = Log.of(getClass());
     protected           EP                               ep;
     /**
      * 配置文件路径
      */
-    private final       List<String>                     cfgFileLocations = new LinkedList<>();
+    protected final     List<String>                     cfgFileLocations = new LinkedList<>();
     /**
      * 配置文件名字
      */
-    private             List<String>                     cfgFileNames     = new LinkedList<>();
+    protected           List<String>                     cfgFileNames     = new LinkedList<>();
     /**
      * 最终汇总属性
      */
-    private final       Map<String, String>              finalAttrs       = new ConcurrentHashMap<>();
+    protected final     Map<String, String>              finalAttrs       = new ConcurrentHashMap<>();
     /**
      * 运行时改变的属性, 优先级高于 {@link #finalAttrs} see: {@link #getAttr(String)}
      */
-    private final       Map<String, String>              runtimeAttrs     = new ConcurrentHashMap<>(7);
+    protected final     Map<String, String>              runtimeAttrs     = new ConcurrentHashMap<>(7);
     /**
      * location 和 其对应的 所有属性
      */
-    private final       Map<String, Map<String, String>> locationSources  = new LinkedHashMap<>();
+    protected final     Map<String, Map<String, String>> locationSources  = new LinkedHashMap<>();
     /**
      * profile 和 其对应的 所有属性
      */
-    private final       Map<String, Map<String, String>> profileSources   = new LinkedHashMap<>();
+    protected final     Map<String, Map<String, String>> profileSources   = new LinkedHashMap<>();
     /**
      * 所有的profile
      */
-    private final       Set<String>                      allProfiles      = new HashSet<>(7);
+    protected final     Set<String>                      allProfiles      = new HashSet<>(7);
     /**
      * 激活特定配置
      */
-    private final       Set<String>                      activeProfiles   = new LinkedHashSet<>(5);
+    protected final     Set<String>                      activeProfiles   = new LinkedHashSet<>(5);
 
 
     Environment() {
@@ -78,8 +78,8 @@ public class Environment {
     }
 
 
-    void loadCfg() {
-        log.trace("开始加载配置文件");
+    protected void loadCfg() {
+        log.trace("start loading cgf file");
         // 先加载默认配置文件
         for (String l : cfgFileLocations) {
             if (l == null || l.isEmpty()) continue;
@@ -121,7 +121,7 @@ public class Environment {
      * @param cfgFileLocation
      * @param cfgFileName
      */
-    private void loadPropertiesFile(String profile, String cfgFileLocation, String cfgFileName) {
+    protected void loadPropertiesFile(String profile, String cfgFileLocation, String cfgFileName) {
         String f = cfgFileLocation + cfgFileName + (profile == null ? "" : "-" + profile) + ".properties";
         Map<String, String> r = null;
         if (cfgFileLocation.startsWith("classpath:")) {
@@ -162,13 +162,13 @@ public class Environment {
      * @param cfgFileLocation
      * @param cfgFileName
      */
-    private void loadYamlFile(String profile, String cfgFileLocation, String cfgFileName) {
+    protected void loadYamlFile(String profile, String cfgFileLocation, String cfgFileName) {
         loadYamlFile(profile, cfgFileLocation, cfgFileName, "yaml");
         loadYamlFile(profile, cfgFileLocation, cfgFileName, "yml");
     }
 
 
-    private void loadYamlFile(String profile, String cfgFileLocation, String cfgFileName, String suffix) {
+    protected void loadYamlFile(String profile, String cfgFileLocation, String cfgFileName, String suffix) {
         String f = cfgFileLocation + cfgFileName + (profile == null ? "" : "-" + profile) + "." + suffix;
         Map<String, String> r = null;
         if (cfgFileLocation.startsWith("classpath:")) {
@@ -217,7 +217,7 @@ public class Environment {
      * @param pKey
      * @return
      */
-    private Map<String, String> flattenMap(Map<String, Object> m, String pKey) {
+    protected Map<String, String> flattenMap(Map<String, Object> m, String pKey) {
         if (m == null) return null;
         Map<String, String> r = new LinkedHashMap<>();
         m.forEach((k, v) -> {
@@ -257,10 +257,21 @@ public class Environment {
 
 
     @EL(name = "env.getAttr", async = false)
-    private String getAttr(String key) {
+    protected String getAttr(String key) {
         String v = runtimeAttrs.get(key);
         if (v == null) v = finalAttrs.get(key);
         return v;
+    }
+
+
+    /**
+     * 取一个命令空间下的所有属性集合
+     * @param ns
+     * @return
+     */
+    @EL(name = "env.ns", async = false)
+    protected Map<String, String> ns(String ns) {
+        return getGroupAttr(ns);
     }
 
 
@@ -271,15 +282,12 @@ public class Environment {
      * @return
      */
     public Environment setAttr(String key, String value) {
-        if (PROP_ACTIVE.equals(key)) throw new IllegalArgumentException("不允许更改此属性值");
+        if (PROP_ACTIVE.equals(key)) throw new IllegalArgumentException("not allow change this property '" + PROP_ACTIVE + "'");
         ep.fire(
                 "env.updateAttr",
-                EC.of(this).attr("key", key).attr("value", value),
+                EC.of(this).args(key, value),
                 ec -> {
                     if (ec.isSuccess()) runtimeAttrs.put(key, value);
-                    else {
-                        log.warn("属性更新出错. key: {}, value: {}, errorMsg: {}", key, value, ec.ex.getMessage());
-                    }
                 }
         );
         return this;
@@ -304,18 +312,6 @@ public class Environment {
             else group.put(k.substring(key.length() + 1), v);
         });
         return group;
-    }
-
-
-
-    /**
-     * 取一个命令空间下的所有属性集合
-     * @param ns
-     * @return
-     */
-    @EL(name = "env.ns", async = false)
-    private Map<String, String> ns(String ns) {
-        return getGroupAttr(ns);
     }
 
 

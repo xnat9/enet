@@ -117,7 +117,10 @@ public class ServerTpl {
         // TODO 验证(相同的bean名字和类型)?
         if (beanCtx == null) beanCtx = new Context();
         if (names != null) {
-            for (String n : names) beanCtx.attr(n, bean);
+            for (String n : names) {
+                if (beanCtx.getAttr(n) != null) log.warn("override exist bean name '{}'", n);
+                beanCtx.attr(n, bean);
+            }
         }
         beanCtx.put(bean);
         return this;
@@ -159,6 +162,15 @@ public class ServerTpl {
         } while (c != null);
         return r;
     }
+
+
+    /**
+     * 属性更新触发器
+     * @param k
+     * @param v
+     */
+    @EL(name = "env.updateAttr")
+    protected void updateAttr(String k, String v) {}
 
 
     /**

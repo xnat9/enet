@@ -45,7 +45,7 @@ public class AppContext {
     /**
      * 启动时间
      */
-    private         Date                startup   = new Date();
+    protected final Date                startup   = new Date();
 
 
     /**
@@ -66,7 +66,7 @@ public class AppContext {
                     (System.currentTimeMillis() - startup.getTime()) / 1000.0,
                     ManagementFactory.getRuntimeMXBean().getUptime() / 1000.0
             );
-            ep.fire("sys.started");
+            ep.fire("sys.started", EC.of(this));
         });
     }
 
@@ -121,11 +121,11 @@ public class AppContext {
         return new EP(exec) {
             @Override
             protected Object doPublish(String eName, EC ec, Consumer<EC> completeFn) {
-                if ("sys.starting".equals(eName) || "sys.stopping".equals(eName)) {
-                    if (ec.source() != AppContext.this) throw new UnsupportedOperationException("不允许触发此事件");
+                if ("sys.starting".equals(eName) || "sys.stopping".equals(eName) || "sys.started".equals(eName)) {
+                    if (ec.source() != AppContext.this) throw new UnsupportedOperationException("not allow fire event '" + eName + "'");
                 }
                 if ("env.updateAttr".equals(eName)) {
-                    if (ec.source() != env) throw new UnsupportedOperationException("不允许触发此事件");
+                    if (ec.source() != env) throw new UnsupportedOperationException("not allow fire event '" + eName + "'");
                 }
                 return super.doPublish(eName, ec, completeFn);
             }
@@ -143,7 +143,7 @@ public class AppContext {
     protected void initExecutor() {
         int capacity = 100000;
         exec = new ThreadPoolExecutor(
-                8, 10, 30, TimeUnit.MINUTES, new LinkedBlockingQueue<>(capacity),
+                4, 8, 30, TimeUnit.MINUTES, new LinkedBlockingQueue<>(capacity),
                 new ThreadFactory() {
                     final AtomicInteger count = new AtomicInteger(1);
                     @Override
@@ -186,7 +186,7 @@ public class AppContext {
 
 
     @EL(name = "env.configured")
-    private void reAdjustExec() {
+    protected void reAdjustExec() {
         Integer c = env.getInteger("sys.exec.corePoolSize", null);
         if (c != null) exec.setCorePoolSize(c);
         Integer m = env.getInteger("sys.exec.maximumPoolSize", null);
@@ -199,9 +199,7 @@ public class AppContext {
 
 
     @EL(name = "env.updateAttr")
-    private void reAdjustExec(EC ec) {
-        String k = ec.getAttr("key", String.class);
-        String v = ec.getAttr("value", String.class);
+    protected void reAdjustExec(String k, String v) {
         if (k.startsWith("sys.exec")) {
             if ("sys.exec.corePoolSize".equals(k)) {
                 Integer i = toInteger(v, null);
@@ -221,7 +219,7 @@ public class AppContext {
 
 
     @EL(name = "sys.info")
-    private Object info(EC ec) {
+    protected Object info(EC ec) {
         Map<String, Object> info = new HashMap<>(2);
         info.put("modules", sourceMap.keySet());
         return info;
@@ -233,7 +231,7 @@ public class AppContext {
      * 为source 设置 coreExec.
      * @param s
      */
-    private void setForSource(Object s) {
+    protected void setForSource(Object s) {
         List<Field> epFs = new LinkedList<>();
         List<Field> execFs = new LinkedList<>();
         Class<? extends Object> c = s.getClass();
@@ -296,7 +294,7 @@ public class AppContext {
      * @param source
      * @return
      */
-    private Executor wrapExecForSource(Object source) {
+    protected Executor wrapExecForSource(Object source) {
         return fn -> exec.execute(fn);
     }
 
@@ -306,7 +304,7 @@ public class AppContext {
      * @param source
      * @return
      */
-    private EP wrapEpForSource(Object source) {
+    protected EP wrapEpForSource(Object source) {
         return new EP() {
             @Override
             public Object fire(String eName, EC ec, Consumer<EC> completeFn) {
@@ -323,6 +321,11 @@ public class AppContext {
                 return "wrappedCoreEp:" + source.getClass().getSimpleName();
             }
         };
+    }
+
+
+    public Environment env() {
+        return env;
     }
 
 

@@ -23,8 +23,8 @@ public class MViewServer extends ServerTpl {
     /**
      * mview http path前缀. 默认为: mview
      */
-    private String path = "mview";
-    private Controller ctl;
+    protected String path = "mview";
+    protected Controller ctl;
 
     public MViewServer() {
         setName("mview");
@@ -46,21 +46,21 @@ public class MViewServer extends ServerTpl {
 
         ctl = new Controller(this);
         log.info("Started {} Server. pathPrefix: {}", getName(), ("/" + getPath() + "/").replace("//", "/"));
-        coreEp.fire("resteasy.addResource", EC.of("source", ctl).attr("path", getPath()));
+        coreEp.fire("resteasy.addResource", ctl, getPath());
     }
 
 
     @EL(name = "sys.stopping")
     public void stop() {
-        log.info("Shutdown '{}' Server", getName());
+        log.debug("Shutdown '{}' Server", getName());
         if (coreExec instanceof ExecutorService) ((ExecutorService) coreExec).shutdown();
         // TODO
     }
 
 
 
-    @EL(name = "server.swagger.openApi")
-    private void openApi(EC ec) throws Exception {
+    @EL(name = "swagger.openApi")
+    protected void openApi(EC ec) throws Exception {
         // 参照: SwaggerLoader
         HashSet<String> rs = new HashSet<>(1); rs.add(ctl.getClass().getName());
         OpenAPI openApi = new XmlWebOpenApiContext().id(getName()).cacheTTL(0L).resourceClasses(rs).openApiConfiguration(

@@ -10,13 +10,13 @@ import javax.ws.rs.GET;
 import javax.ws.rs.Path;
 import javax.ws.rs.PathParam;
 import javax.ws.rs.Produces;
+import javax.ws.rs.container.AsyncResponse;
+import javax.ws.rs.container.Suspended;
 import javax.ws.rs.core.Response;
 import java.io.File;
 import java.net.URL;
 import java.util.LinkedList;
 import java.util.List;
-import java.util.concurrent.CompletableFuture;
-import java.util.concurrent.CompletionStage;
 
 @Path("/")
 public class Controller {
@@ -31,46 +31,21 @@ public class Controller {
         this.ep = server.getCoreEp();
     }
 
-    //    @GET
-//    @Path("js/{fName:.*}")
-//    public Response js(@PathParam("fName") String fName) {
-//        File f = findViewFile("js/" + fName);
-//        if (f == null) return Response.status(404).build();
-//        return Response.ok(f)
-//                .type("application/javascript; charset=utf-8")
-//                .header("Cache-Control", "max-age=60")
-//                .build();
-//    }
-//
-//
-//    @GET
-//    @Path("css/{fName:.*}")
-//    public Response css(@PathParam("fName") String fName) {
-//        File f = findViewFile("css/" + fName);
-//        if (f == null) return Response.status(404).build();
-//        return Response.ok(f)
-//                .type("text/css; charset=utf-8")
-//                .header("Cache-Control", "max-age=60")
-//                .build();
-//    }
-
 
     @GET
     @Path("data")
     @Produces("application/json; charset=utf-8")
-    public CompletionStage<OpenAPI> data() {
-        CompletableFuture f = new CompletableFuture();
+    public void data(@Suspended final AsyncResponse response) {
         OpenAPI openApi = new OpenAPI();
         openApi.setPaths(new Paths()); openApi.setTags(new LinkedList<>());
-        ep.fire("server.swagger.openApi", EC.of(this).setResult(new LinkedList<OpenAPI>()),
+        ep.fire("swagger.openApi", EC.of(this).setResult(new LinkedList<OpenAPI>()),
                 ec -> {
                     ((List<OpenAPI>) ec.result).forEach(o -> {
                         openApi.getPaths().putAll(o.getPaths());
                         openApi.getTags().addAll(o.getTags());
                     });
-                    f.complete(openApi);
+                    response.resume(openApi);
                 });
-        return f;
     }
 
 

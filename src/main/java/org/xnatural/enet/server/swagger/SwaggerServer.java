@@ -7,10 +7,10 @@ import io.swagger.v3.oas.integration.SwaggerConfiguration;
 import io.swagger.v3.oas.models.OpenAPI;
 import io.swagger.v3.oas.models.PathItem;
 import io.swagger.v3.oas.models.tags.Tag;
-import org.xnatural.enet.server.ServerTpl;
 import org.xnatural.enet.event.EC;
 import org.xnatural.enet.event.EL;
 import org.xnatural.enet.event.EP;
+import org.xnatural.enet.server.ServerTpl;
 
 import java.lang.reflect.Field;
 import java.util.*;
@@ -18,8 +18,8 @@ import java.util.concurrent.ExecutorService;
 
 public class SwaggerServer extends ServerTpl {
 
-    private String root;
-    private Controller ctl;
+    protected String root;
+    protected Controller ctl;
 
 
     public SwaggerServer() {
@@ -42,26 +42,27 @@ public class SwaggerServer extends ServerTpl {
         attrs.putAll(r);
 
         ctl = new Controller(this);
+        coreEp.fire("resteasy.addResource", ctl, getRoot());
         log.info("Started {} Server. pathPrefix: {}", getName(), ("/" + getRoot() + "/").replace("//", "/"));
-        coreEp.fire("server.netty4Resteasy.addResource", EC.of("source", ctl).attr("path", getRoot()));
     }
 
 
     @EL(name = "sys.stopping")
     public void stop() {
+        log.debug("Shutdown '{}' Server", getName());
         try {
-            Field f = OpenApiContextLocator.class.getField("map");
+            Field f = OpenApiContextLocator.class.getDeclaredField("map");
             f.setAccessible(true);
             ((Map) f.get(OpenApiContextLocator.getInstance())).clear();
         } catch (Exception e) {
-            log.warn(e.getMessage());
+            log.warn(e, "");
         }
         if (coreExec instanceof ExecutorService) ((ExecutorService) coreExec).shutdown();
     }
 
 
-    @EL(name = "server.swagger.openApi")
-    private void openApi(EC ec) throws Exception {
+    @EL(name = "swagger.openApi")
+    protected void openApi(EC ec) throws Exception {
         // 参照: SwaggerLoader
         HashSet<String> rs = new HashSet<>(1); rs.add(ctl.getClass().getName());
         OpenAPI openApi = new XmlWebOpenApiContext().id(getName()).cacheTTL(0L).resourceClasses(rs).openApiConfiguration(

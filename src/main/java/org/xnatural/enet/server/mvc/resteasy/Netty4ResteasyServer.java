@@ -55,12 +55,12 @@ public class Netty4ResteasyServer extends ServerTpl {
         Map<String, String> r = (Map) coreEp.fire("env.ns", getNs());
         rootPath = r.getOrDefault("rootPath", "/");
         if (attrs.containsKey("scan")) {
-            try {
-                for (String c : ((String) attrs.get("scan")).split(",")) {
+            for (String c : ((String) attrs.get("scan")).split(",")) {
+                try {
                     if (c != null && !c.trim().isEmpty()) scan.add(Class.forName(c.trim()));
+                } catch (ClassNotFoundException e) {
+                    log.error(e);
                 }
-            } catch (ClassNotFoundException e) {
-                log.error(e);
             }
         }
         attrs.putAll(r);
@@ -81,12 +81,12 @@ public class Netty4ResteasyServer extends ServerTpl {
 
 
     @EL(name = "server.http-netty.addHandler", async = false)
-    protected void addHandler(ChannelPipeline pipeline) {
+    protected void addHandler(ChannelPipeline cp) {
         initDispatcher();
         // 参考 NettyJaxrsServer
-        pipeline.addLast(new RestEasyHttpRequestDecoder(dispatcher.getDispatcher(), rootPath, RestEasyHttpRequestDecoder.Protocol.HTTP));
-        pipeline.addLast(new RestEasyHttpResponseEncoder());
-        pipeline.addLast(new RequestHandler(dispatcher));
+        cp.addLast(new RestEasyHttpRequestDecoder(dispatcher.getDispatcher(), rootPath, RestEasyHttpRequestDecoder.Protocol.HTTP));
+        cp.addLast(new RestEasyHttpResponseEncoder());
+        cp.addLast(new RequestHandler(dispatcher));
     }
 
 

@@ -2,7 +2,6 @@ package org.xnatural.enet;
 
 
 import org.xnatural.enet.core.AppContext;
-import org.xnatural.enet.core.Environment;
 import org.xnatural.enet.event.EC;
 import org.xnatural.enet.event.EL;
 import org.xnatural.enet.server.cache.ehcache.EhcacheServer;
@@ -10,6 +9,7 @@ import org.xnatural.enet.server.dao.hibernate.HibernateServer;
 import org.xnatural.enet.server.http.netty.Netty4HttpServer;
 import org.xnatural.enet.server.mvc.resteasy.Netty4ResteasyServer;
 import org.xnatural.enet.server.mview.MViewServer;
+import org.xnatural.enet.server.session.MemSessionManager;
 import org.xnatural.enet.server.swagger.SwaggerServer;
 
 /**
@@ -29,6 +29,7 @@ public class TestApp {
         app.addSource(new SwaggerServer());
         app.addSource(new HibernateServer().scan(TestEntity.class));
         app.addSource(new EhcacheServer());
+        app.addSource(new MemSessionManager());
         app.addSource(new TestApp());
         app.start();
     }

@@ -43,7 +43,7 @@ public class Netty4ResteasyServer extends ServerTpl {
     }
 
 
-    @EL(name = "sys.starting")
+    @Override
     public void start() {
         if (!running.compareAndSet(false, true)) {
             log.warn("{} Server is running", getName()); return;
@@ -71,7 +71,7 @@ public class Netty4ResteasyServer extends ServerTpl {
     }
 
 
-    @EL(name = "sys.stopping")
+    @Override
     public void stop() {
         log.info("Shutdown '{}' Server", getName());
         dispatcher = null;

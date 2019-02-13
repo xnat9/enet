@@ -35,16 +35,16 @@ public class Controller {
     @GET
     @Path("data")
     @Produces("application/json; charset=utf-8")
-    public void data(@Suspended final AsyncResponse response) {
+    public void data(@Suspended final AsyncResponse resp) {
         OpenAPI openApi = new OpenAPI();
         openApi.setPaths(new Paths()); openApi.setTags(new LinkedList<>());
-        ep.fire("swagger.openApi", EC.of(this).setResult(new LinkedList<OpenAPI>()),
+        ep.fire("swagger.openApi", EC.of(this).result(new LinkedList<OpenAPI>()),
                 ec -> {
                     ((List<OpenAPI>) ec.result).forEach(o -> {
                         openApi.getPaths().putAll(o.getPaths());
                         openApi.getTags().addAll(o.getTags());
                     });
-                    response.resume(openApi);
+                    resp.resume(openApi);
                 });
     }
 

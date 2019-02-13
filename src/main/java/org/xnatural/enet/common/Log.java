@@ -189,8 +189,8 @@ public class Log {
                 throw ex;
             } catch (Error er) {
                 throw er;
-            } catch (Throwable throwable) {
-                throw new UndeclaredThrowableException(throwable);
+            } catch (Throwable t) {
+                throw new UndeclaredThrowableException(t);
             }
         } catch (IllegalAccessException e) {
             throw new IllegalAccessError(e.getMessage());

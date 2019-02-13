@@ -8,48 +8,51 @@ import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 
 /**
- * 事件执行的上下文
+ * event context: 事件执行的上下文
  */
 public class EC {
     /**
      * 一次事件执行的id. 用于追踪执行的是哪次事件
      */
-    String id;
+    String   id;
     /**
      * 是否追踪执行.用于调试
      */
-    boolean track;
+    boolean  track;
     /**
      * 强制异步. 如果设置了就会忽略 @EL中的设置
      */
-    Boolean async;
+    Boolean  async;
     /**
      * 目标方法的参数
      */
     Object[] args;
-    EP ep;
+    /**
+     * 是由哪个事件发布器发布的
+     */
+    EP       ep;
     /**
      * 事件源
      */
-    private Object              source;
+    private   Object              source;
     /**
      * 用于临时存放, 上一个Listener的执行结果.
      * 更灵活的数据存储请用 {@link #attr(Object, Object)}
      */
-    public  Object              result;
+    public    Object              result;
     /**
      * 用于临时存放, 上一个Listener的执行异常
      */
-    public  Throwable           ex;
+    public    Throwable           ex;
     /**
      * 要执行的事件链
      */
-    private List<Listener>      willPass;
+    protected List<Listener>      willPass;
     /**
      * 执行过的事件链
      */
-    private List<Listener>      passed = new LinkedList<>();
-    private Map<Object, Object> attrs  = new ConcurrentHashMap<>(7);
+    protected List<Listener>      passed = new LinkedList<>();
+    protected Map<Object, Object> attrs  = new ConcurrentHashMap<>(7);
 
 
     public static EC of(Object source) {
@@ -78,7 +81,7 @@ public class EC {
 
 
     /**
-     * passed一个Listener 代表执行成功一个Listerner. 即: 执行成功后调用
+     * passed一个Listener 代表执行成功一个Listener. 即: 执行成功后调用
      * @param l
      * @return
      */
@@ -101,7 +104,7 @@ public class EC {
      * 是否没有监听器
      * @return
      */
-    public boolean noListener() {
+    public boolean isNoListener() {
         return willPass == null;
     }
 
@@ -119,26 +122,23 @@ public class EC {
     public EC args(Object... args) { this.args = args; return this; }
 
 
-    public EP ep() { return ep; }
-
-
     public Object source() { return source; }
 
 
-    public EC setSource(Object s) {
+    public EC source(Object s) {
         if (willPass != null) throw new RuntimeException("事件源不允许更改");
         this.source = s;
         return this;
     }
 
 
-    public EC setResult(Object result) {
+    public EC result(Object result) {
         this.result = result;
         return this;
     }
 
 
-    public String id() { return id; }
+    public EP ep() { return ep; }
 
 
     public EC attr(Object key, Object value) {

@@ -35,12 +35,16 @@ public class TestApp {
     }
 
 
-    @EL(name = "sys.started")
+    @EL(name = {"sys.started", "${ns}.sys.started"})
     protected void staredListen(EC ec) {
         // ((AppContext) ec.source()).stop();
         // ((AppContext) ec.source()).env().setAttr("server.http-netty.port", "8080");
     }
 
+
+//    public String getNs() {
+//        return null;
+//    }
 
 
     public String getName() {

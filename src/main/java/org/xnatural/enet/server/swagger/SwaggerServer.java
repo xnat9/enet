@@ -28,7 +28,7 @@ public class SwaggerServer extends ServerTpl {
     }
 
 
-    @EL(name = "sys.starting")
+    @Override
     public void start() {
         if (!running.compareAndSet(false, true)) {
             log.warn("服务正在运行"); return;
@@ -47,7 +47,7 @@ public class SwaggerServer extends ServerTpl {
     }
 
 
-    @EL(name = "sys.stopping")
+    @Override
     public void stop() {
         log.debug("Shutdown '{}' Server", getName());
         try {

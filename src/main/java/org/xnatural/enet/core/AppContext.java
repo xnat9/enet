@@ -21,7 +21,7 @@ import static org.xnatural.enet.common.Utils.*;
  * 系统运行上下文
  */
 public class AppContext {
-    protected final Log                 log       = Log.of(getClass());
+    protected final Log                 log       = Log.of(AppContext.class);
     /**
      * 系统名字. 用于多个系统启动区别
      */
@@ -86,6 +86,7 @@ public class AppContext {
      * @param source 不能是一个 Class
      * @return
      */
+    @EL(name = "sys.addSource")
     public AppContext addSource(Object source) {
         if (source == null) return this;
         if (source instanceof Class) return this;
@@ -95,13 +96,13 @@ public class AppContext {
         }
         String name = (String) invoke(m, source);
         if (Utils.isEmpty(name)) {
-            log.warn("name property is empty"); return this;
+            log.warn("Get name property is empty from '{}'", source); return this;
         }
         if ("sys".equalsIgnoreCase(name) || "env".equalsIgnoreCase(name)) {
-            log.warn("name property cannot equal 'sys' or 'env'"); return this;
+            log.warn("name property cannot equal 'sys' or 'env'. source: {}", source); return this;
         }
         if (sourceMap.containsKey(name)) {
-            log.warn("name: {} already exist in Source: {}", name, sourceMap.get(name));
+            log.warn("name property '{}' already exist in source: {}", name, sourceMap.get(name));
             return this;
         }
         sourceMap.put(name, source);
@@ -187,6 +188,7 @@ public class AppContext {
 
     @EL(name = "env.configured")
     protected void reAdjustExec() {
+        // 重置 exec 相关属性
         Integer c = env.getInteger("sys.exec.corePoolSize", null);
         if (c != null) exec.setCorePoolSize(c);
         Integer m = env.getInteger("sys.exec.maximumPoolSize", null);
@@ -195,6 +197,9 @@ public class AppContext {
         if (exec.getCorePoolSize() > exec.getMaximumPoolSize()) exec.setMaximumPoolSize(exec.getCorePoolSize());
         Long k = env.getLong("sys.exec.keepAliveTime", null);
         if (k != null) exec.setKeepAliveTime(k, TimeUnit.MILLISECONDS);
+
+        // 添加 ep 跟踪事件
+        ep.addTrackEvent(env.getString("ep.track", "").split(","));
     }
 
 
@@ -308,7 +313,7 @@ public class AppContext {
         return new EP() {
             @Override
             public Object fire(String eName, EC ec, Consumer<EC> completeFn) {
-                if (ec.source() == null) ec.setSource(source);
+                if (ec.source() == null) ec.source(source);
                 return ep.fire(eName, ec, completeFn);
             }
             @Override

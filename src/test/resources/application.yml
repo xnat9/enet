@@ -1,3 +1,5 @@
+# 要跟踪的事件名
+#ep.track: sys.starting,sys.started
 server.hibernate:
   hibernate.hbm2ddl.auto: update
   ds:

@@ -36,6 +36,7 @@ app.addSource(new Netty4ResteasyServer().scan(RestTpl.class));
 app.addSource(new MViewServer());
 app.addSource(new SwaggerServer());
 app.addSource(new HibernateServer().scan(TestEntity.class));
+app.addSource(new EhcacheServer());
 // TODO 加载自定义各个模块
 app.start();
 ```

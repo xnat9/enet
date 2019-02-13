@@ -19,7 +19,7 @@ import java.util.stream.Collectors;
  */
 public class Environment {
     public final static String                           PROP_ACTIVE      = "env.profiles.active";
-    protected final     Log                              log              = Log.of(getClass());
+    protected final     Log                              log              = Log.of(Environment.class);
     protected           EP                               ep;
     /**
      * 配置文件路径

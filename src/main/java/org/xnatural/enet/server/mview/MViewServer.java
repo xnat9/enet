@@ -31,7 +31,7 @@ public class MViewServer extends ServerTpl {
     }
 
 
-    @EL(name = "sys.starting")
+    @Override
     public void start() {
         if (!running.compareAndSet(false, true)) {
             log.warn("{} Server is running", getName()); return;
@@ -49,14 +49,12 @@ public class MViewServer extends ServerTpl {
         coreEp.fire("resteasy.addResource", ctl, getPath());
     }
 
-
-    @EL(name = "sys.stopping")
+    @Override
     public void stop() {
         log.debug("Shutdown '{}' Server", getName());
         if (coreExec instanceof ExecutorService) ((ExecutorService) coreExec).shutdown();
         // TODO
     }
-
 
 
     @EL(name = "swagger.openApi")

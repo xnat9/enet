@@ -10,22 +10,28 @@ import java.util.concurrent.Executor;
  * {@link Devourer} 管理器
  */
 public class DevourerManager {
-    protected final Log                   log         = Log.of(getClass());
-    protected final Map<Object, Devourer> devourerMap = new ConcurrentHashMap<>();
-    protected       Executor              executor;
+    protected final Log                   log  = Log.of(DevourerManager.class);
+    protected final Map<Object, Devourer> dMap = new ConcurrentHashMap<>(7);
+    protected       Executor              exec;
+
+
+    public DevourerManager() {}
+    public DevourerManager(Executor exec) {
+        this.exec = exec;
+    }
 
 
     public Devourer of(Object devourerKey) {
-        return devourerMap.computeIfAbsent(devourerKey, o -> new Devourer(devourerKey, executor, this));
+        return dMap.computeIfAbsent(devourerKey, o -> new Devourer(devourerKey, exec, this));
     }
 
 
     public Devourer offer(Object devourerKey, Runnable fn) {
-        return devourerMap.computeIfAbsent(devourerKey, o -> new Devourer(devourerKey, executor, this)).offer(fn);
+        return dMap.computeIfAbsent(devourerKey, o -> new Devourer(devourerKey, exec, this)).offer(fn);
     }
 
 
     public void remove(Object devourerKey) {
-        devourerMap.remove(devourerKey);
+        dMap.remove(devourerKey);
     }
 }

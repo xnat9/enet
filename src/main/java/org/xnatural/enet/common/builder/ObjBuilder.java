@@ -98,7 +98,7 @@ public class ObjBuilder<T> extends AbstractBuilder<T> {
     /**
      * create instance for DTOClass.
      *
-     * @param ctx GeneratorContext
+     * @param ctx {@link Context}
      * @return target instance.
      */
     @SuppressWarnings("unchecked")

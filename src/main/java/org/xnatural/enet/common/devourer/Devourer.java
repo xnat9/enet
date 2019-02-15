@@ -9,32 +9,31 @@ import java.util.concurrent.atomic.AtomicBoolean;
 
 /**
  * 自消化器, 同一时刻只会有一个 执行体被执行
- * 是一个类似于 Actor 结构
  * 核心方法: {@link #trigger()}
  */
 public class Devourer {
     protected final Log             log     = Log.of(getClass());
-    protected final Executor        executor;
+    protected final Executor        exec;
     protected final AtomicBoolean   running = new AtomicBoolean(false);
     protected final Queue<Runnable> waiting = new ConcurrentLinkedQueue<>();
     protected final Object          key;
     /**
      * 如果为空则认为是游离的 {@link Devourer}
      */
-    protected       DevourerManager devourerManager;
+    protected       DevourerManager dm;
 
 
-    public Devourer(Object key, Executor executor) {
-        this(key, executor, null);
+    public Devourer(Object key, Executor exec) {
+        this(key, exec, null);
     }
 
 
-    public Devourer(Object key, Executor executor, DevourerManager devourerManager) {
+    public Devourer(Object key, Executor exec, DevourerManager dm) {
         if (key == null) throw new NullPointerException("devourer key is null");
-        if (executor == null) throw new NullPointerException("executor is null");
+        if (exec == null) throw new NullPointerException("executor is null");
         this.key = key;
-        this.executor = executor;
-        this.devourerManager = devourerManager;
+        this.exec = exec;
+        this.dm = dm;
     }
 
 
@@ -56,7 +55,7 @@ public class Devourer {
         if (!running.compareAndSet(false, true)) return;
         // 1.必须保证这里只有一个线程被执行
         // 2.必须保证不能出现情况: waiting 对列中有值, 但没有被执行
-        executor.execute(() -> {
+        exec.execute(() -> {
             try {
                 waiting.poll().run();
             } catch (Throwable t) {
@@ -70,7 +69,7 @@ public class Devourer {
 
 
     public DevourerManager getDevourerManager() {
-        return devourerManager;
+        return dm;
     }
 
 

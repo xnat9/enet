@@ -125,7 +125,7 @@ public class UndertowResteasySever extends ServerTpl {
      * 创建 netty http 服务
      * @return
      */
-    private void initServer() {
+    protected void initServer() {
         deployment = new ResteasyDeployment();
         deployment.setApplicationClass(Application.class.getName());
         if (deployment.getRegistry() == null) deployment.start();
@@ -136,15 +136,14 @@ public class UndertowResteasySever extends ServerTpl {
     /**
      * 收集 {@link #scan} 类对的包下边所有的 有注解{@link Path}的类
      */
-    private void collect() {
+    protected void collect() {
         if (scan == null || scan.isEmpty()) return;
         try {
             for (Class clz : scan) {
                 String pkg = clz.getPackage().getName();
                 File pkgDir = new File(getClass().getClassLoader().getResource(pkg.replaceAll("\\.", "/")).getFile());
-                for (File f : pkgDir.listFiles(f -> f.getName().endsWith(".class"))) {
-                    load(pkg, f);
-                }
+                File[] arr = pkgDir.listFiles(f -> f.getName().endsWith(".class"));
+                if (arr != null) for (File f : arr) load(pkg, f);
             }
         } catch (Exception e) {
             log.error(e, "扫描Handler类出错!");
@@ -152,7 +151,7 @@ public class UndertowResteasySever extends ServerTpl {
     }
 
 
-    private void load(String pkg, File f) throws Exception {
+    protected void load(String pkg, File f) throws Exception {
         if (f.isDirectory()) {
             for (File ff : f.listFiles(ff -> ff.getName().endsWith(".class"))) {
                 load(pkg + "." + f.getName(), ff);

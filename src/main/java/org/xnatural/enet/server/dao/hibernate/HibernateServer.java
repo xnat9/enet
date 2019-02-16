@@ -187,9 +187,8 @@ public class HibernateServer extends ServerTpl {
             for (Class clz : entityScan) {
                 String pkg = clz.getPackage().getName();
                 File pkgDir = new File(getClass().getClassLoader().getResource(pkg.replaceAll("\\.", "/")).getFile());
-                for (File f : pkgDir.listFiles(f -> f.getName().endsWith(".class"))) {
-                    load(pkg, f);
-                }
+                File[] arr = pkgDir.listFiles(f -> f.getName().endsWith(".class"));
+                if (arr != null) for (File f : arr) load(pkg, f);
             }
         } catch (Exception e) {
             log.error(e, "扫描Entity类出错!");

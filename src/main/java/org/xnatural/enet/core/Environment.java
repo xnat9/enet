@@ -55,7 +55,7 @@ public class Environment {
     protected final     Set<String>                      activeProfiles   = new LinkedHashSet<>(5);
 
 
-    Environment() {
+    public Environment() {
         // 按优先级添加. 先添加优先级最低, 越后边越高
         cfgFileLocations.add("classpath:/");
         cfgFileLocations.add("classpath:/config/");
@@ -78,6 +78,9 @@ public class Environment {
     }
 
 
+    /**
+     * 加载配置
+     */
     protected void loadCfg() {
         log.trace("start loading cgf file");
         // 先加载默认配置文件

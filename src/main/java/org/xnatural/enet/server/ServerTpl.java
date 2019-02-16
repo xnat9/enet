@@ -22,35 +22,41 @@ import java.util.stream.Collectors;
  * 自定义模块时, 可参考此类代码按需copy
  */
 public class ServerTpl {
-    protected final Log                 log   = Log.of(getClass());
+    protected Log                 log;
     /**
      * 服务名字标识
      */
-    private         String              name;
+    private   String              name;
     /**
      * 服务命令空间. 一般系统中有多个服务, 用于区别各个服务的配置空间
-     * 约定以server.为前缀: 例: server.http1, server.http2, server.mvc, server.ws, server.bls, server.mview, server.sched, server.session.jdbc, server.session.redis, server.dao
+     * 约定以server.为前缀: 例: server.http1, server.http2, server.mvc, server.ws, server.bls, server.mview, server.sched,
+     * server.session.jdbc, server.session.redis, server.dao
      * 1. 用于属性配置前缀
      * 2. 用于事件名字前缀
      */
-    private         String              ns;
+    private   String              ns;
     /**
      * 可配置属性集.
      */
-    protected       Map<String, Object> attrs = new HashMap<>();
+    protected Map<String, Object> attrs   = new HashMap<>();
     /**
      * 此服务执行器
      */
-    protected       Executor            coreExec;
+    protected Executor            coreExec;
     /**
      * 1. 当此服务被加入核心时, 此值会自动设置为核心的EP.
      * 2. 如果要服务独立运行时, 请手动设置
      */
-    protected       EP                  coreEp;
+    protected EP                  coreEp;
     /**
      * 是否正在运行标志
      */
-    protected       AtomicBoolean       running = new AtomicBoolean(false);
+    protected AtomicBoolean       running = new AtomicBoolean(false);
+
+
+    public ServerTpl() {
+        log = Log.of(getClass());
+    }
 
 
     /**

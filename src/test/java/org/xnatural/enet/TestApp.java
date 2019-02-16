@@ -1,9 +1,12 @@
 package org.xnatural.enet;
 
 
+import org.xnatural.enet.common.Log;
 import org.xnatural.enet.core.AppContext;
+import org.xnatural.enet.core.Environment;
 import org.xnatural.enet.event.EC;
 import org.xnatural.enet.event.EL;
+import org.xnatural.enet.event.EP;
 import org.xnatural.enet.server.cache.ehcache.EhcacheServer;
 import org.xnatural.enet.server.dao.hibernate.HibernateServer;
 import org.xnatural.enet.server.http.netty.Netty4HttpServer;
@@ -29,14 +32,21 @@ public class TestApp {
         app.addSource(new SwaggerServer());
         app.addSource(new HibernateServer().scan(TestEntity.class));
         app.addSource(new EhcacheServer());
-        app.addSource(new MemSessionManager());
         app.addSource(new TestApp());
         app.start();
     }
 
 
-    @EL(name = {"sys.started", "${ns}.sys.started"})
-    protected void staredListen(EC ec) {
+    @EL(name = "env.configured", async = false)
+    private void init(EC ec) {
+        Environment env = ((Environment) ec.source());
+        String t = env.getString("server.session.type", "memory");
+        if ("memory".equalsIgnoreCase(t)) ec.ep().fire("sys.addSource", new MemSessionManager());
+    }
+
+
+    @EL(name = {"sys.started"})
+    private void staredListen(EC ec) {
         // ((AppContext) ec.source()).stop();
         // ((AppContext) ec.source()).env().setAttr("server.http-netty.port", "8080");
     }

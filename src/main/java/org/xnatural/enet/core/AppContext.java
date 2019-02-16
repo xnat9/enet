@@ -86,13 +86,13 @@ public class AppContext {
      * @param source 不能是一个 Class
      * @return
      */
-    @EL(name = "sys.addSource")
+    @EL(name = "sys.addSource", async = false)
     public AppContext addSource(Object source) {
         if (source == null) return this;
         if (source instanceof Class) return this;
         Method m = findMethod(source.getClass(), "getName");
         if (m == null) {
-            log.warn("Source object must have property 'name'"); return this;
+            log.warn("Source '{}' must have name property", source); return this;
         }
         String name = (String) invoke(m, source);
         if (Utils.isEmpty(name)) {

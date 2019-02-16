@@ -12,6 +12,7 @@ import java.io.InputStream;
 import java.net.URL;
 import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.function.BiConsumer;
 import java.util.stream.Collectors;
 
 /**
@@ -19,7 +20,7 @@ import java.util.stream.Collectors;
  */
 public class Environment {
     public final static String                           PROP_ACTIVE      = "env.profiles.active";
-    protected final     Log                              log              = Log.of(Environment.class);
+    protected           Log                              log              = Log.of(Environment.class);
     protected           EP                               ep;
     /**
      * 配置文件路径
@@ -61,7 +62,7 @@ public class Environment {
         cfgFileLocations.add("classpath:/config/");
         cfgFileLocations.add("file:./");
         cfgFileLocations.add("file:./config/");
-        String p = System.getProperty("enet.env.cfgFileLocations");
+        String p = System.getProperty("enet.cfgFileLocations");
         if (p != null && !p.isEmpty()) {
             for (String s : p.split(",")) {
                 if (s != null && !s.trim().isEmpty()) cfgFileLocations.add(s.trim());
@@ -69,7 +70,7 @@ public class Environment {
         }
 
         cfgFileNames.add("application");
-        p = System.getProperty("enet.env.cfgFileName");
+        p = System.getProperty("enet.cfgFileName");
         if (p != null && !p.isEmpty()) {
             for (String s : p.split(",")) {
                 if (s != null && !s.trim().isEmpty()) cfgFileNames.add(s.trim());
@@ -80,6 +81,7 @@ public class Environment {
 
     /**
      * 加载配置
+     * 支持: properties 文件
      */
     protected void loadCfg() {
         log.trace("start loading cgf file");
@@ -87,7 +89,8 @@ public class Environment {
         for (String l : cfgFileLocations) {
             if (l == null || l.isEmpty()) continue;
             for (String n : cfgFileNames) {
-                loadPropertiesFile(null, l, n); loadYamlFile(null, l, n);
+                loadPropertiesFile(null, l, n);
+                // loadYamlFile(null, l, n);
             }
         }
         // 遍历加载所有profile对应的配置文件
@@ -99,7 +102,8 @@ public class Environment {
                 for (String l : cfgFileLocations) {
                     if (l == null || l.isEmpty()) continue;
                     for (String n : cfgFileNames) {
-                        loadPropertiesFile(p, l, n); // loadYamlFile(p, l, n);
+                        loadPropertiesFile(p, l, n);
+                        // loadYamlFile(p, l, n);
                     }
                 }
             }
@@ -134,20 +138,20 @@ public class Environment {
                     r = new LinkedHashMap(p);
                 }
             } catch (Exception e) {
-                log.error(e, "加载配置文件出错. location: {}", f);
+                log.error(e, "load cfg file '{}' error", f);
             }
         } else {
             try (InputStream in = new URL(f).openStream()) {
                 Properties p = new Properties(); p.load(in);
                 r = new LinkedHashMap(p);
             } catch (FileNotFoundException e) {
-                log.trace("配置文件没找到. location: {}", f);
+                log.trace("not found cfg file '{}'", f);
             } catch (Exception e) {
-                log.error(e, "加载配置文件出错. location: {}", f);
+                log.error(e, "load cfg file '{}' error", f);
             }
         }
         if (r == null) return;
-        log.trace("加载配置文件. location: {}\n{}", f, r);
+        log.trace("load cfg file '{}'\n{}", f, r);
         locationSources.put(f, r);
         profileSources.computeIfAbsent(profile, s -> new LinkedHashMap<>()).putAll(r);
         if (r.containsKey(PROP_ACTIVE)) {
@@ -259,23 +263,19 @@ public class Environment {
     }
 
 
+    /**
+     * 取属性.
+     * @param key
+     * @return
+     */
     @EL(name = "env.getAttr", async = false)
     protected String getAttr(String key) {
         String v = runtimeAttrs.get(key);
+        if (v == null) v = System.getProperty(key);
         if (v == null) v = finalAttrs.get(key);
         return v;
     }
 
-
-    /**
-     * 取一个命令空间下的所有属性集合
-     * @param ns
-     * @return
-     */
-    @EL(name = "env.ns", async = false)
-    protected Map<String, String> ns(String ns) {
-        return getGroupAttr(ns);
-    }
 
 
     /**
@@ -302,18 +302,18 @@ public class Environment {
      * @param key
      * @return
      */
+    @EL(name = "env.ns", async = false)
     public Map<String, String> getGroupAttr(String key) {
         Map<String, String> group = new HashMap<>();
-        finalAttrs.forEach((k, v) -> {
+        BiConsumer<String, String> fn = (k, v) -> {
             if (!k.startsWith(key)) return;
             if (k.equals(key)) group.put(k, v);
             else group.put(k.substring(key.length() + 1), v);
-        });
-        runtimeAttrs.forEach((k, v) -> {
-            if (!k.startsWith(key)) return;
-            if (k.equals(key)) group.put(k, v);
-            else group.put(k.substring(key.length() + 1), v);
-        });
+        };
+
+        finalAttrs.forEach(fn);
+        System.getProperties().forEach((k, v) -> fn.accept(k.toString(), Objects.toString(v, null)));
+        runtimeAttrs.forEach(fn);
         return group;
     }
 

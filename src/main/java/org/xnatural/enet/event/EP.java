@@ -97,12 +97,11 @@ public class EP {
     /**
      * 发布事件到各个监听者
      * @param eName 事件名
-     * @param ec @{@link EC}event context 事件执行过程上下文
+     * @param ec {@link EC} 事件执行过程上下文
      * @param completeFn 所有事件执行完后回调
      * @return Note: 取返回值时, 要注意是同步执行还是异步执行
      */
     protected Object doPublish(String eName, EC ec, Consumer<EC> completeFn) {
-        ec.ep = this;
         List<Listener> ls = lsMap.get(eName);
         if (ls == null || ls.isEmpty()) {
             log.trace("not found listener for event name: {}", eName);
@@ -310,7 +309,8 @@ public class EP {
                     Object r;
                     if (m.getParameterCount() == 0) r = m.invoke(source);
                     else if (m.getParameterCount() == 1) {
-                        if (m.getParameterTypes()[0].isAssignableFrom(EC.class)) r = m.invoke(source, ec);
+                        if (EC.class.isAssignableFrom(m.getParameterTypes()[0])) r = m.invoke(source, ec);
+                        else if (EP.class.isAssignableFrom(m.getParameterTypes()[0])) r = m.invoke(source, EP.this);
                         else r = m.invoke(source, ec.args);
                     } else { // m.getParameterCount() > 1 的情况
                         Object[] args = new Object[m.getParameterCount()]; // 参数传少了, 补null

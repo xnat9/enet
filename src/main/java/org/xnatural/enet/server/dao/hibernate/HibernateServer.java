@@ -41,7 +41,7 @@ public class HibernateServer extends ServerTpl {
     protected List<String>         entities   = new LinkedList<>();
 
     public HibernateServer() {
-        setName("hibernate");
+        setName("dao");
     }
 
 

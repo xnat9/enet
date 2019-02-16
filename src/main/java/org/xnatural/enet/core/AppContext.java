@@ -21,7 +21,7 @@ import static org.xnatural.enet.common.Utils.*;
  * 系统运行上下文
  */
 public class AppContext {
-    protected final Log                 log       = Log.of(AppContext.class);
+    protected       Log                 log       = Log.of(AppContext.class);
     /**
      * 系统名字. 用于多个系统启动区别
      */

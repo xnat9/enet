@@ -89,6 +89,15 @@ public class ServerTpl {
 
 
     /**
+     * 子类应该重新定义自己的重启逻辑
+     */
+    @EL(name = "sys.restart")
+    protected void restart() {
+        stop(); start();
+    }
+
+
+    /**
      * bean 容器. {@link #findBean}
      */
     protected Context beanCtx;

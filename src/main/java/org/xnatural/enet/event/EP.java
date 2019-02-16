@@ -199,6 +199,24 @@ public class EP {
 
 
     /**
+     * 删除指定对象源中的事件监听
+     * @param eName 事件名
+     * @param source 监听器对象源
+     * @return this
+     */
+    public EP removeEvent(String eName, Object source) {
+        if (source == null) lsMap.remove(eName);
+        else {
+            for (Iterator<Listener> it = lsMap.get(eName).iterator(); it.hasNext(); ) {
+                Listener l = it.next();
+                if (l.source == source) it.remove();
+            }
+        };
+        return this;
+    }
+
+
+    /**
      * 从一个对象中 解析出 所有带有 {@link EL}注解的方法 转换成监听器{@link Listener}
      * 如果带有注解 {@link EL}的方法被重写, 则用子类的方法
      * @param source
@@ -310,7 +328,6 @@ public class EP {
                     if (m.getParameterCount() == 0) r = m.invoke(source);
                     else if (m.getParameterCount() == 1) {
                         if (EC.class.isAssignableFrom(m.getParameterTypes()[0])) r = m.invoke(source, ec);
-                        else if (EP.class.isAssignableFrom(m.getParameterTypes()[0])) r = m.invoke(source, EP.this);
                         else r = m.invoke(source, ec.args);
                     } else { // m.getParameterCount() > 1 的情况
                         Object[] args = new Object[m.getParameterCount()]; // 参数传少了, 补null

@@ -1,12 +1,10 @@
 package org.xnatural.enet;
 
 
-import org.xnatural.enet.common.Log;
 import org.xnatural.enet.core.AppContext;
 import org.xnatural.enet.core.Environment;
 import org.xnatural.enet.event.EC;
 import org.xnatural.enet.event.EL;
-import org.xnatural.enet.event.EP;
 import org.xnatural.enet.server.cache.ehcache.EhcacheServer;
 import org.xnatural.enet.server.dao.hibernate.HibernateServer;
 import org.xnatural.enet.server.http.netty.Netty4HttpServer;
@@ -22,10 +20,6 @@ public class TestApp {
 
     public static void main(String[] args) {
         AppContext app = new AppContext();
-        // app.addSource(new MVCServer().scan(RestTpl.class));
-        // app.addSource(new UndertowResteasySever().scan(RestTpl.class));
-        // app.addSource(new UndertowResteasySever());
-
         app.addSource(new Netty4HttpServer().setPort(8081));
         app.addSource(new Netty4ResteasyServer().scan(RestTpl.class));
         app.addSource(new MViewServer());

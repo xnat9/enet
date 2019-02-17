@@ -78,9 +78,7 @@ public class EhcacheServer extends ServerTpl {
                     else if (heapOfEntries == null && heapOfMB == null) throw new IllegalArgumentException("heapOfEntries 和 heapOfMB 必须指定一个");
                     else if (heapOfEntries != null) b = b.heap(heapOfEntries, ENTRIES);
                     else if (heapOfMB != null) b = b.heap(heapOfMB, MB);
-                    cache = cm.createCache(cName, newCacheConfigurationBuilder(
-                                Object.class, Object.class, b.build()
-                            )
+                    cache = cm.createCache(cName, newCacheConfigurationBuilder(Object.class, Object.class, b.build())
                             .withExpiry(ExpiryPolicyBuilder.timeToLiveExpiration(expire == null ? Duration.ofMinutes(20) : expire))
                     );
                 }

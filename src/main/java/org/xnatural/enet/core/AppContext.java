@@ -153,33 +153,15 @@ public class AppContext {
                     }
                 }
         ) {
-            long idleStartTime;
-            long idleMinute = TimeUnit.MINUTES.toMillis(10);
-            @Override
-            protected void beforeExecute(Thread t, Runnable r) {
-                super.beforeExecute(t, r);
-                if (idleStartTime != 0) {
-                    if (System.currentTimeMillis() - idleStartTime > idleMinute) {
-                        log.info("executor pool idle " + ((System.currentTimeMillis() - idleStartTime) / 1000) + " seconds, now work beginning");
-                    }
-                    idleStartTime = 0;
-                }
-                if (getQueue().size() >= (capacity * 0.6)) log.warn("executor池正在重负运行, " + toString());
-            }
             @Override
             public void execute(Runnable command) {
                 try {
                     super.execute(command);
                 } catch (RejectedExecutionException ex) {
-                    log.warn("executor池已不堪重负, " + toString());
+                    log.warn("thread pool rejected new task very heavy load. {}", this);
                 } catch (Exception t) {
-                    log.error("executor执行错误", t);
+                    log.error("task happen error", t);
                 }
-            }
-            @Override
-            protected void afterExecute(Runnable r, Throwable t) {
-                super.afterExecute(r, t);
-                if (getQueue().size() == 0) idleStartTime = System.currentTimeMillis();
             }
         };
         exec.allowCoreThreadTimeOut(true);

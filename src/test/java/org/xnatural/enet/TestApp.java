@@ -43,10 +43,15 @@ public class TestApp extends ServerTpl {
     }
 
 
+    /**
+     * 环境配置完成后执行
+     * @param ec
+     */
     @EL(name = "env.configured", async = false)
     private void init(EC ec) {
         Environment env = ((Environment) ec.source());
         String t = env.getString("server.session.type", "memory");
+        // 动态启动服务
         if ("memory".equalsIgnoreCase(t)) ec.ep().fire("sys.addSource", new MemSessionManager());
     }
 
@@ -62,7 +67,7 @@ public class TestApp extends ServerTpl {
             f.setAccessible(true);
             Object v = f.get(ec.source());
             if (v instanceof ThreadPoolExecutor) {
-                coreEp.fire("sched.cron", "31 */2 * * * ? 2019", (Runnable) () -> monitorExec((ThreadPoolExecutor) v));
+                coreEp.fire("sched.cron", "31 */2 * * * ?", (Runnable) () -> monitorExec((ThreadPoolExecutor) v));
             }
         } catch (Exception e) {
             log.error(e);

@@ -89,6 +89,15 @@ public class ServerTpl {
 
 
     /**
+     * 注册Server本身
+     */
+    @EL(name = "${ns}.started")
+    protected void started() {
+        exposeBean(this, getName());
+    }
+
+
+    /**
      * 子类应该重新定义自己的重启逻辑
      */
     @EL(name = "sys.restart")

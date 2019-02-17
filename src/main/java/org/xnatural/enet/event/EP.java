@@ -352,7 +352,7 @@ public class EP {
                 ec.ex = e;
                 log.error(e, "Listener execute error! name: {}, id: {}, method: {}, event source: {}",
                         name, ec.id, (m == null ? "" : source.getClass().getSimpleName() + "." + m.getName()),
-                        ec.source().getClass().getSimpleName()
+                        (ec.source() == null ? null : ec.source().getClass().getSimpleName())
                 );
             }
         }

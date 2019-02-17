@@ -70,7 +70,7 @@ public class HibernateServer extends ServerTpl {
         emf = new HibernatePersistenceProvider().createContainerEntityManagerFactory(createPersistenceUnit(), attrs);
         exposeBean(emf, "entityManagerFactory", "sessionFactory");
         coreEp.fire(getNs() + ".started");
-        log.info("Started {} Server", getName());
+        log.info("Started {}(hibernate) Server", getName());
     }
 
 

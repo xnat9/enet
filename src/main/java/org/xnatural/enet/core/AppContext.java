@@ -81,6 +81,13 @@ public class AppContext {
 
 
     /**
+     * 启动完成
+     */
+    @EL(name = "sys.started")
+    protected void started() {}
+
+
+    /**
      * {@link #ep} 会找出source对象中所有其暴露的功能. 即: 用 @EL 标注的方法
      * 注: 每个对象源都必须有一个 name 属性标识
      * @param source 不能是一个 Class

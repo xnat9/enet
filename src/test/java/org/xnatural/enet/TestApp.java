@@ -1,6 +1,7 @@
 package org.xnatural.enet;
 
 
+import org.xnatural.enet.common.Utils;
 import org.xnatural.enet.core.AppContext;
 import org.xnatural.enet.core.Environment;
 import org.xnatural.enet.event.EC;
@@ -18,6 +19,8 @@ import org.xnatural.enet.server.swagger.SwaggerServer;
 import java.lang.reflect.Field;
 import java.util.concurrent.ThreadPoolExecutor;
 import java.util.concurrent.TimeUnit;
+
+import static org.xnatural.enet.common.Utils.sleep;
 
 /**
  * @author xiangxb, 2018-12-22
@@ -52,7 +55,7 @@ public class TestApp extends ServerTpl {
         Environment env = ((Environment) ec.source());
         String t = env.getString("server.session.type", "memory");
         // 动态启动服务
-        if ("memory".equalsIgnoreCase(t)) ec.ep().fire("sys.addSource", new MemSessionManager());
+        if ("memory".equalsIgnoreCase(t)) coreEp.fire("sys.addSource", new MemSessionManager());
     }
 
 
@@ -72,6 +75,7 @@ public class TestApp extends ServerTpl {
         } catch (Exception e) {
             log.error(e);
         }
+        ((AppContext) ec.source()).stop();
     }
 
 

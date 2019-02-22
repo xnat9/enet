@@ -16,6 +16,7 @@ import java.util.regex.Pattern;
 /**
  * event publisher 事件发布器.事件分发中心
  * TODO 事件死锁. 事件执行链
+ * TODO 事件等待. 事件b, 需要在事件a执行完后才能执行()
  */
 public class EP {
     protected final Log                         log         = Log.of(EP.class);

@@ -1,5 +1,6 @@
 package org.xnatural.enet.server.resteasy;
 
+import io.netty.channel.ChannelHandlerContext;
 import io.netty.channel.ChannelPipeline;
 import org.jboss.resteasy.core.SynchronousDispatcher;
 import org.jboss.resteasy.plugins.server.netty.RequestDispatcher;
@@ -86,7 +87,18 @@ public class Netty4ResteasyServer extends ServerTpl {
         // 参考 NettyJaxrsServer
         cp.addLast(new RestEasyHttpRequestDecoder(dispatcher.getDispatcher(), rootPath, RestEasyHttpRequestDecoder.Protocol.HTTP));
         cp.addLast(new RestEasyHttpResponseEncoder());
-        cp.addLast(new RequestHandler(dispatcher));
+        cp.addLast(new RequestHandler(dispatcher) {
+            @Override
+            protected void channelRead0(ChannelHandlerContext ctx, Object msg) throws Exception {
+                coreExec.execute(() -> {
+                    try {
+                        super.channelRead0(ctx, msg);
+                    } catch (Exception e) {
+                        log.error(e);
+                    }
+                });
+            }
+        });
     }
 
 

@@ -20,9 +20,14 @@
 ## 安装教程
 ```
 <dependency>
-    <groupId>org.xnatural</groupId>
-    <artifactId>enet</artifactId>
-    <version>0.1.0</version>
+    <groupId>org.xnatural.enet</groupId>
+    <artifactId>enet-core</artifactId>
+    <version>0.0.6</version>
+</dependency>
+<dependency>
+    <groupId>org.xnatural.enet</groupId>
+    <artifactId>enet-server</artifactId>
+    <version>0.0.6</version>
 </dependency>
 ```
 
@@ -80,7 +85,7 @@ public class TestApp extends ServerTpl {
     env.updateAttr: 有属性改变. 可在运行时改变某属性
 
 
-## 各模块说明
+## enet-server内置可用多模块说明
 ServerTpl: 服务模块模板
   
    ### Netty4HttpServer: http服务

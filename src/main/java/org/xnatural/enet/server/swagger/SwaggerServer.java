@@ -35,7 +35,7 @@ public class SwaggerServer extends ServerTpl {
         }
         if (coreExec == null) initExecutor();
         if (coreEp == null) coreEp = new EP(coreExec);
-        coreEp.fire(getNs() + ".starting");
+        coreEp.fire(getName() + ".starting");
         // 先从核心取配置, 然后再启动
         Map<String, String> r = (Map) coreEp.fire("env.ns", getNs());
         root = r.getOrDefault("root", getRoot());
@@ -44,6 +44,7 @@ public class SwaggerServer extends ServerTpl {
         ctl = new Controller(this);
         coreEp.fire("resteasy.addResource", ctl, getRoot());
         log.info("Started {} Server. pathPrefix: {}", getName(), ("/" + getRoot() + "/").replace("//", "/"));
+        coreEp.fire(getName() + ".started");
     }
 
 

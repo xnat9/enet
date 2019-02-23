@@ -3,6 +3,7 @@ package org.xnatural.enet.server.sched;
 import org.quartz.*;
 import org.quartz.impl.StdSchedulerFactory;
 import org.quartz.spi.ThreadPool;
+import org.xnatural.enet.common.Utils;
 import org.xnatural.enet.event.EL;
 import org.xnatural.enet.event.EP;
 import org.xnatural.enet.server.ServerTpl;
@@ -12,6 +13,7 @@ import java.util.Date;
 import java.util.Map;
 import java.util.Properties;
 import java.util.concurrent.Executor;
+import java.util.concurrent.ExecutorService;
 import java.util.concurrent.TimeUnit;
 
 /**
@@ -34,7 +36,7 @@ public class SchedServer extends ServerTpl {
         }
         if (coreExec == null) initExecutor();
         if (coreEp == null) coreEp = new EP(coreExec);
-        coreEp.fire(getNs() + ".starting");
+        coreEp.fire(getName() + ".starting");
         // 先从核心取配置, 然后再启动
         Map<String, String> r = (Map) coreEp.fire("env.ns", getNs());
         attrs.putAll(r);
@@ -47,24 +49,26 @@ public class SchedServer extends ServerTpl {
             scheduler = f.getScheduler();
             scheduler.start();
         } catch (SchedulerException e) { throw new RuntimeException(e); }
-        coreEp.fire(getNs() + ".started");
+        coreEp.fire(getName() + ".started");
         log.info("Started {}(Quartz) Server", getName());
     }
 
 
     @Override
     public void stop() {
+        log.info("Shutdown '{}(Quartz)' Server", getName());
         try {
             if (scheduler != null) scheduler.shutdown();
         } catch (SchedulerException e) {
             log.error(e);
         }
-        super.stop();
+        if (coreExec instanceof ExecutorService) ((ExecutorService) coreExec).shutdown();
     }
 
 
     @EL(name = "sched.cron")
     public void sched(String cron, Runnable fn) {
+        if (Utils.isEmpty(cron) || fn == null) throw new IllegalArgumentException("参数错误");
         JobDataMap data = new JobDataMap();
         data.put("fn", fn);
         String id = cron + "_" + System.currentTimeMillis();
@@ -85,6 +89,7 @@ public class SchedServer extends ServerTpl {
 
     @EL(name = "sched.time")
     public void sched(Integer time, TimeUnit unit, Runnable fn) {
+        if (time == null || unit == null || fn == null) throw new IllegalArgumentException("参数错误");
         JobDataMap data = new JobDataMap();
         data.put("fn", fn);
         String id = time + "_" + unit + "_" + System.currentTimeMillis();

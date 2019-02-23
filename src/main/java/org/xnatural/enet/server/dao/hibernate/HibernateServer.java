@@ -52,7 +52,7 @@ public class HibernateServer extends ServerTpl {
         }
         if (coreExec == null) initExecutor();
         if (coreEp == null) coreEp = new EP(coreExec);
-        coreEp.fire(getNs() + ".starting");
+        coreEp.fire(getName() + ".starting");
         // 先从核心取配置, 然后再启动
         Map<String, String> r = (Map) coreEp.fire("env.ns", getNs());
         if (r.containsKey("entity-scan")) {
@@ -69,14 +69,14 @@ public class HibernateServer extends ServerTpl {
 
         emf = new HibernatePersistenceProvider().createContainerEntityManagerFactory(createPersistenceUnit(), attrs);
         exposeBean(emf, "entityManagerFactory", "sessionFactory");
-        coreEp.fire(getNs() + ".started");
-        log.info("Started {}(hibernate) Server", getName());
+        coreEp.fire(getName() + ".started");
+        log.info("Started {}(Hibernate) Server", getName());
     }
 
 
     @Override
     public void stop() {
-        log.info("Shutdown '{}' Server", getName());
+        log.info("Shutdown '{}(Hibernate)' Server", getName());
         emf.close(); closeDs();
         if (coreExec instanceof ExecutorService) ((ExecutorService) coreExec).shutdown();
     }

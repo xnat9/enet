@@ -69,11 +69,11 @@ public class ServerTpl {
         }
         if (coreExec == null) initExecutor();
         if (coreEp == null) coreEp = new EP(coreExec);
-        coreEp.fire(getNs() + ".starting");
+        coreEp.fire(getName() + ".starting");
         // 先从核心取配置, 然后再启动
         Map<String, String> r = (Map) coreEp.fire("env.ns", getNs());
         attrs.putAll(r);
-        coreEp.fire(getNs() + ".started");
+        coreEp.fire(getName() + ".started");
         log.info("Started {} Server", getName());
     }
 
@@ -225,7 +225,7 @@ public class ServerTpl {
         if (running.get()) throw new RuntimeException("服务正在运行.不允许更新服务名");
         if (name == null || name.isEmpty()) throw new IllegalArgumentException("服务标识名不能为空");
         this.name = name;
-        setNs("server." + name);
+        setNs(name);
         return this;
     }
 

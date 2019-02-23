@@ -39,7 +39,7 @@ public class Netty4ResteasyServer extends ServerTpl {
 
 
     public Netty4ResteasyServer() {
-        setName("netty4Resteasy");
+        setName("resteasy");
     }
 
 
@@ -50,7 +50,7 @@ public class Netty4ResteasyServer extends ServerTpl {
         }
         if (coreExec == null) initExecutor();
         if (coreEp == null) coreEp = new EP(coreExec);
-        coreEp.fire(getNs() + ".starting");
+        coreEp.fire(getName() + ".starting");
         // 先从核心取配置, 然后再启动
         Map<String, String> r = (Map) coreEp.fire("env.ns", getNs());
         rootPath = r.getOrDefault("rootPath", "/");
@@ -66,7 +66,7 @@ public class Netty4ResteasyServer extends ServerTpl {
         attrs.putAll(r);
 
         startDeployment(); initDispatcher(); collect();
-        coreEp.fire(getNs() + ".started");
+        coreEp.fire(getName() + ".started");
         log.info("Started {} Server. rootPath: {}", getName(), getRootPath());
     }
 
@@ -95,7 +95,7 @@ public class Netty4ResteasyServer extends ServerTpl {
      * @param source
      * @return
      */
-    @EL(name = {"${ns}.addResource", "resteasy.addResource"})
+    @EL(name = {"resteasy.addResource"})
     public Netty4ResteasyServer addResource(Object source, String path) {
         if (source instanceof Class) return this;
         startDeployment();

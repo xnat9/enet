@@ -29,12 +29,12 @@ public class MemSessionManager extends ServerTpl {
         }
         if (coreExec == null) initExecutor();
         if (coreEp == null) coreEp = new EP(coreExec);
-        coreEp.fire(getNs() + ".starting");
+        coreEp.fire(getName() + ".starting");
         // 先从核心取配置, 然后再启动
         Map<String, String> r = (Map) coreEp.fire("env.ns", getNs());
         attrs.putAll(r);
         sMap = new ConcurrentHashMap<>();
-        coreEp.fire(getNs() + ".started");
+        coreEp.fire(getName() + ".started");
         log.info("Started {} Server", getName());
     }
 

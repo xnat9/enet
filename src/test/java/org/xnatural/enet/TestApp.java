@@ -20,12 +20,11 @@ import java.lang.reflect.Field;
 import java.util.concurrent.ThreadPoolExecutor;
 import java.util.concurrent.TimeUnit;
 
-import static org.xnatural.enet.common.Utils.sleep;
-
 /**
  * @author xiangxb, 2018-12-22
  */
 public class TestApp extends ServerTpl {
+
 
     public static void main(String[] args) {
         AppContext app = new AppContext();
@@ -36,13 +35,16 @@ public class TestApp extends ServerTpl {
         app.addSource(new HibernateServer().scan(TestEntity.class));
         app.addSource(new EhcacheServer());
         app.addSource(new SchedServer());
-        app.addSource(new TestApp());
+        app.addSource(new TestApp(app));
         app.start();
     }
 
 
-    public TestApp() {
-        setName("testApp");
+    AppContext ctx;
+
+    public TestApp(AppContext ctx) {
+        setName("starter");
+        this.ctx = ctx;
     }
 
 
@@ -61,21 +63,26 @@ public class TestApp extends ServerTpl {
 
     /**
      * 系统启动结束后执行
-     * @param ec
      */
-    @EL(name = {"sys.started"})
-    private void stared(EC ec) {
+    @EL(name = "sys.started")
+    private void sysStarted() {
+        // Utils.sleep(1000);
+        // ctx.stop();
+    }
+
+
+    @EL(name = "sched.started")
+    private void jobsInit() {
         try {
             Field f = AppContext.class.getDeclaredField("exec");
             f.setAccessible(true);
-            Object v = f.get(ec.source());
+            Object v = f.get(ctx);
             if (v instanceof ThreadPoolExecutor) {
                 coreEp.fire("sched.cron", "31 */2 * * * ?", (Runnable) () -> monitorExec((ThreadPoolExecutor) v));
             }
         } catch (Exception e) {
             log.error(e);
         }
-        ((AppContext) ec.source()).stop();
     }
 
 

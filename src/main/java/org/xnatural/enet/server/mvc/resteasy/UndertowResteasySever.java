@@ -51,7 +51,7 @@ public class UndertowResteasySever extends ServerTpl {
         }
         if (coreExec == null) initExecutor();
         if (coreEp == null) coreEp = new EP(coreExec);
-        coreEp.fire(getNs() + ".starting");
+        coreEp.fire(getName() + ".starting");
         // 先从核心取配置, 然后再启动
         Map<String, String> r = (Map) coreEp.fire("env.ns", getNs());
         port = Utils.toInteger(r.get("port"), getPort());
@@ -74,7 +74,7 @@ public class UndertowResteasySever extends ServerTpl {
         );
         log.info("创建({})服务. hostname: {}, port: {}", getName(), getHostname(), getPort());
         collect();
-        coreEp.fire(getNs() + ".started");
+        coreEp.fire(getName() + ".started");
     }
 
 

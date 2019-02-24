@@ -47,6 +47,7 @@ public class MViewServer extends ServerTpl {
         ctl = new Controller(this);
         log.info("Started {} Server. pathPrefix: {}", getName(), ("/" + getPath() + "/").replace("//", "/"));
         coreEp.fire("resteasy.addResource", ctl, getPath());
+        // coreEp.fire("swagger.addJaxrsDoc", ctl, getPath(), getName());
     }
 
     @Override
@@ -54,36 +55,6 @@ public class MViewServer extends ServerTpl {
         log.debug("Shutdown '{}' Server", getName());
         if (coreExec instanceof ExecutorService) ((ExecutorService) coreExec).shutdown();
         // TODO
-    }
-
-
-    @EL(name = "swagger.openApi")
-    protected void openApi(EC ec) throws Exception {
-        // 参照: SwaggerLoader
-        HashSet<String> rs = new HashSet<>(1); rs.add(ctl.getClass().getName());
-        OpenAPI openApi = new XmlWebOpenApiContext().id(getName()).cacheTTL(0L).resourceClasses(rs).openApiConfiguration(
-                new SwaggerConfiguration()
-                        .scannerClass(JaxrsApplicationAndAnnotationScanner.class.getName())
-                        .resourceClasses(rs).cacheTTL(0L)
-        ).init().read();
-        if (openApi == null) return;
-        Tag t = new Tag(); t.setName(getName()); t.setDescription("mview rest api");
-        openApi.addTagsItem(t);
-        Map<String, PathItem> rPaths = new LinkedHashMap<>();
-        for (Iterator<Map.Entry<String, PathItem>> it = openApi.getPaths().entrySet().iterator(); it.hasNext(); ) {
-            Map.Entry<String, PathItem> e = it.next();
-            PathItem pi = e.getValue();
-            if (pi.getGet() != null && pi.getGet().getTags() == null) {
-                pi.getGet().setTags(Collections.singletonList(t.getName()));
-            }
-            if (pi.getPost() != null && pi.getPost().getTags() == null) {
-                pi.getPost().setTags(Collections.singletonList(t.getName()));
-            }
-            rPaths.put(("/" + getPath() + "/" + e.getKey()).replace("//", "/"), pi);
-            it.remove();
-        }
-        openApi.getPaths().putAll(rPaths);
-        ((List) ec.result).add(openApi);
     }
 
 

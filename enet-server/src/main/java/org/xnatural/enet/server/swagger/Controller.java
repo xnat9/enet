@@ -40,6 +40,10 @@ public class Controller {
         openApi.setPaths(new Paths()); openApi.setTags(new LinkedList<>());
         ep.fire("swagger.openApi", EC.of(this).result(new LinkedList<OpenAPI>()),
                 ec -> {
+                    server.apis.forEach(o -> {
+                        openApi.getPaths().putAll(o.getPaths());
+                        openApi.getTags().addAll(o.getTags());
+                    });
                     ((List<OpenAPI>) ec.result).forEach(o -> {
                         openApi.getPaths().putAll(o.getPaths());
                         openApi.getTags().addAll(o.getTags());

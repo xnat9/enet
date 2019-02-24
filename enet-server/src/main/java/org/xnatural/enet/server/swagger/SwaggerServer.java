@@ -2,12 +2,13 @@ package org.xnatural.enet.server.swagger;
 
 import io.swagger.v3.jaxrs2.integration.JaxrsApplicationAndAnnotationScanner;
 import io.swagger.v3.jaxrs2.integration.XmlWebOpenApiContext;
+import io.swagger.v3.oas.integration.OpenApiConfigurationException;
 import io.swagger.v3.oas.integration.OpenApiContextLocator;
 import io.swagger.v3.oas.integration.SwaggerConfiguration;
 import io.swagger.v3.oas.models.OpenAPI;
 import io.swagger.v3.oas.models.PathItem;
 import io.swagger.v3.oas.models.tags.Tag;
-import org.xnatural.enet.event.EC;
+import org.xnatural.enet.common.Utils;
 import org.xnatural.enet.event.EL;
 import org.xnatural.enet.event.EP;
 import org.xnatural.enet.server.ServerTpl;
@@ -16,10 +17,13 @@ import java.lang.reflect.Field;
 import java.util.*;
 import java.util.concurrent.ExecutorService;
 
+import static org.xnatural.enet.common.Utils.*;
+
 public class SwaggerServer extends ServerTpl {
 
     protected String root;
     protected Controller ctl;
+    protected List<OpenAPI> apis = new LinkedList<>();
 
 
     public SwaggerServer() {
@@ -42,7 +46,7 @@ public class SwaggerServer extends ServerTpl {
         attrs.putAll(r);
 
         ctl = new Controller(this);
-        coreEp.fire("resteasy.addResource", ctl, getRoot());
+        coreEp.fire("resteasy.addResource", ctl, getRoot()); // addJaxrsDoc(ctl, getRoot(), getName(), null);
         log.info("Started {} Server. pathPrefix: {}", getName(), ("/" + getRoot() + "/").replace("//", "/"));
         coreEp.fire(getName() + ".started");
     }
@@ -62,17 +66,22 @@ public class SwaggerServer extends ServerTpl {
     }
 
 
-    @EL(name = "swagger.openApi")
-    protected void openApi(EC ec) throws Exception {
+    @EL(name = "${name}.addJaxrsDoc")
+    public void addJaxrsDoc(Object source, String path, String tag, String desc) {
         // 参照: SwaggerLoader
-        HashSet<String> rs = new HashSet<>(1); rs.add(ctl.getClass().getName());
-        OpenAPI openApi = new XmlWebOpenApiContext().id(getName()).cacheTTL(0L).resourceClasses(rs).openApiConfiguration(
-                new SwaggerConfiguration()
-                        .scannerClass(JaxrsApplicationAndAnnotationScanner.class.getName())
-                        .resourceClasses(rs).cacheTTL(0L)
-        ).init().read();
+        HashSet<String> rs = new HashSet<>(1); rs.add(source.getClass().getName());
+        OpenAPI openApi = null;
+        try {
+            openApi = new XmlWebOpenApiContext().id(getName()).cacheTTL(0L).resourceClasses(rs).openApiConfiguration(
+                    new SwaggerConfiguration()
+                            .scannerClass(JaxrsApplicationAndAnnotationScanner.class.getName())
+                            .resourceClasses(rs).cacheTTL(0L)
+            ).init().read();
+        } catch (OpenApiConfigurationException e) {
+            log.error(e);
+        }
         if (openApi == null) return;
-        Tag t = new Tag(); t.setName(getName()); t.setDescription("swagger rest api");
+        Tag t = new Tag(); t.setName(tag); t.setDescription(desc);
         openApi.addTagsItem(t);
         Map<String, PathItem> rPaths = new LinkedHashMap<>();
         for (Iterator<Map.Entry<String, PathItem>> it = openApi.getPaths().entrySet().iterator(); it.hasNext(); ) {
@@ -84,11 +93,12 @@ public class SwaggerServer extends ServerTpl {
             if (pi.getPost() != null && pi.getPost().getTags() == null) {
                 pi.getPost().setTags(Collections.singletonList(t.getName()));
             }
-            rPaths.put(("/" + getRoot() + "/" + e.getKey()).replace("//", "/"), pi);
+            rPaths.put(("/" + (isEmpty(path) ? "" : path) + "/" + e.getKey()).replace("///", "/").replace("//", "/"), pi);
             it.remove();
         }
         openApi.getPaths().putAll(rPaths);
-        ((List) ec.result).add(openApi);
+
+        this.apis.add(openApi);
     }
 
 

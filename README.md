@@ -61,7 +61,7 @@ public class TestApp extends ServerTpl {
     @EL(name = "env.configured", async = false)
     private void init(EC ec) {
         Environment env = ((Environment) ec.source());
-        String t = env.getString("server.session.type", "memory");
+        String t = env.getString("session.type", "memory");
         // 动态启动服务
         if ("memory".equalsIgnoreCase(t)) ec.ep().fire("sys.addSource", new MemSessionManager());
     }

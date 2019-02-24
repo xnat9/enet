@@ -18,7 +18,7 @@ public class MemSessionManager extends ServerTpl {
     protected Map<String, Map> sMap;
 
     public MemSessionManager() {
-        setName("memSession");
+        setName("session-mem");
     }
 
 

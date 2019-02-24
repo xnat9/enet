@@ -54,7 +54,7 @@ public class TestApp extends ServerTpl {
     @EL(name = "env.configured", async = false)
     private void init(EC ec) {
         Environment env = ((Environment) ec.source());
-        String t = env.getString("server.session.type", "memory");
+        String t = env.getString("session.type", "memory");
         // 动态启动服务
         if ("memory".equalsIgnoreCase(t)) coreEp.fire("sys.addSource", new MemSessionManager());
     }
@@ -71,7 +71,7 @@ public class TestApp extends ServerTpl {
 
 
     @EL(name = "sched.started")
-    private void jobsInit() {
+    private void schedStarted() {
         try {
             Field f = AppContext.class.getDeclaredField("exec");
             f.setAccessible(true);

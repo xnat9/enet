@@ -30,6 +30,7 @@ public class RestTpl {
     @EL(name = "sys.started")
     public void init() {
         emf = (EntityManagerFactory) ep.fire("bean.get", EntityManagerFactory.class);
+        ep.fire("swagger.addJaxrsDoc", this, null, "tpl", "tpl rest doc");
     }
 
 
@@ -67,13 +68,14 @@ public class RestTpl {
     @Produces("application/json")
     public String get() {
         log.info("get1");
+        if (true) throw new IllegalArgumentException("xxxxxxxxxxxxx");
         return "ssssssssss";
     }
 
 
     @GET
     @Path("cache")
-    @Produces("application/json")
+    // @Produces("application/json")
     public Object cache() {
         Object r = ep.fire("cache.get", "test", "key1");
         if (r == null) ep.fire("cache.add", "test", "key1", "qqqqqqqqqq");

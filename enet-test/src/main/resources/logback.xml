@@ -37,7 +37,7 @@ custom logback configuration
     <!--<logger name="org.hibernate.engine.jdbc.env.internal.JdbcEnvironmentInitiator" level="debug"/>-->
     <!--<logger name="org.hibernate.internal.SessionFactoryImpl" level="debug"/>-->
     <!--<logger name="org.xnatural.enet" level="info" />-->
-    <!--<logger name="org.xnatural.enet.event.EP" level="trace" />-->
+    <logger name="org.xnatural.enet.event.EP" level="trace" />
 
     <root level="info">
         <appender-ref ref="CONSOLE" />

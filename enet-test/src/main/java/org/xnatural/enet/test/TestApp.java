@@ -27,7 +27,7 @@ public class TestApp extends ServerTpl {
 
     public static void main(String[] args) {
         AppContext app = new AppContext();
-        app.addSource(new Netty4HttpServer().setPort(8080));
+        app.addSource(new Netty4HttpServer());
         app.addSource(new Netty4ResteasyServer().scan(RestTpl.class));
         app.addSource(new MViewServer());
         app.addSource(new SwaggerServer());
@@ -42,7 +42,7 @@ public class TestApp extends ServerTpl {
     AppContext ctx;
 
     public TestApp(AppContext ctx) {
-        setName("starter");
+        setName("app");
         this.ctx = ctx;
     }
 
@@ -52,7 +52,7 @@ public class TestApp extends ServerTpl {
      * @param ec
      */
     @EL(name = "env.configured", async = false)
-    private void init(EC ec) {
+    private void envConfigured(EC ec) {
         Environment env = ((Environment) ec.source());
         String t = env.getString("session.type", "memory");
         // 动态启动服务
@@ -66,7 +66,7 @@ public class TestApp extends ServerTpl {
     @EL(name = "sys.started")
     private void sysStarted() {
         // Utils.sleep(1000);
-         // ctx.stop();
+        // ctx.stop();
     }
 
 

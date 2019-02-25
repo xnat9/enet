@@ -24,17 +24,12 @@ import java.util.stream.Collectors;
 public class ServerTpl {
     protected Log                 log;
     /**
-     * 服务名字标识
+     * 服务名字标识.(保证唯一)
+     * 可用于命名空间:
+     *      1. 可用于属性配置前缀
+     *      2. 可用于事件名字前缀
      */
     private   String              name;
-    /**
-     * 服务命令空间. 一般系统中有多个服务, 用于区别各个服务的配置空间
-     * 约定以server.为前缀: 例: server.http1, server.http2, server.mvc, server.ws, server.bls, server.mview, server.sched,
-     * server.session.jdbc, server.session.redis, server.dao
-     * 1. 用于属性配置前缀
-     * 2. 用于事件名字前缀
-     */
-    private   String              ns;
     /**
      * 可配置属性集.
      */
@@ -71,7 +66,7 @@ public class ServerTpl {
         if (coreEp == null) coreEp = new EP(coreExec);
         coreEp.fire(getName() + ".starting");
         // 先从核心取配置, 然后再启动
-        Map<String, String> r = (Map) coreEp.fire("env.ns", getNs());
+        Map<String, String> r = (Map) coreEp.fire("env.ns", getName());
         attrs.putAll(r);
         coreEp.fire(getName() + ".started");
         log.info("Started {} Server", getName());
@@ -91,7 +86,7 @@ public class ServerTpl {
     /**
      * 注册Server本身
      */
-    @EL(name = "${ns}.started")
+    @EL(name = "${name}.started")
     protected void started() {
         exposeBean(this, getName());
     }
@@ -110,7 +105,7 @@ public class ServerTpl {
      * bean 容器. {@link #findBean}
      */
     protected Context beanCtx;
-    @EL(name = {"bean.get", "${ns}.bean.get"}, async = false)
+    @EL(name = {"bean.get", "${name}.bean.get"}, async = false)
     protected Object findBean(EC ec, Class beanType, String beanName) {
         if (beanCtx == null) return ec.result;
         if (ec.result != null) return ec.result; // 已经找到结果了, 就直接返回
@@ -225,7 +220,6 @@ public class ServerTpl {
         if (running.get()) throw new RuntimeException("服务正在运行.不允许更新服务名");
         if (name == null || name.isEmpty()) throw new IllegalArgumentException("服务标识名不能为空");
         this.name = name;
-        setNs(name);
         return this;
     }
 
@@ -237,18 +231,6 @@ public class ServerTpl {
 
     public String getName() {
         return name;
-    }
-
-
-    public ServerTpl setNs(String ns) {
-        if (running.get()) throw new RuntimeException("服务正在运行.不允许更新服务命令空间");
-        this.ns = ns;
-        return this;
-    }
-
-
-    public String getNs() {
-        return ns;
     }
 
 

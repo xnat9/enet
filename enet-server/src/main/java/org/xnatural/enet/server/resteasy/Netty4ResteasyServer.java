@@ -53,7 +53,7 @@ public class Netty4ResteasyServer extends ServerTpl {
         if (coreEp == null) coreEp = new EP(coreExec);
         coreEp.fire(getName() + ".starting");
         // 先从核心取配置, 然后再启动
-        Map<String, String> r = (Map) coreEp.fire("env.ns", getNs());
+        Map<String, String> r = (Map) coreEp.fire("env.ns", getName());
         rootPath = r.getOrDefault("rootPath", "/");
         if (attrs.containsKey("scan")) {
             for (String c : ((String) attrs.get("scan")).split(",")) {

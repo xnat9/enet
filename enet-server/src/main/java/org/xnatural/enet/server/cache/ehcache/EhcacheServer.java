@@ -40,11 +40,11 @@ public class EhcacheServer extends ServerTpl {
         if (coreEp == null) coreEp = new EP(coreExec);
         coreEp.fire(getName() + ".starting");
         // 先从核心取配置, 然后再启动
-        Map<String, String> r = (Map) coreEp.fire("env.ns", getNs() + ".ds");
+        Map<String, String> r = (Map) coreEp.fire("env.ns", getName() + ".ds");
         attrs.putAll(r);
 
         cm = CacheManagerBuilder.newCacheManagerBuilder().build(true);
-        exposeBean(cm, "ehcacheManager", "em");
+        exposeBean(cm, "ehcacheManager");
 
         coreEp.fire(getName() + ".started");
         log.info("Started {} Server", getName());
@@ -59,7 +59,7 @@ public class EhcacheServer extends ServerTpl {
     }
 
 
-    @EL(name = {"${ns}.add", "cache.add", "ehcache.add"})
+    @EL(name = {"${name}.add", "cache.add"})
     protected void addCache(String cName, Object key, Object value) {
         Cache<Object, Object> cache = cm.getCache(cName, Object.class, Object.class);
         if (cache == null) cache = createCache(cName, null, null, 20);
@@ -67,7 +67,7 @@ public class EhcacheServer extends ServerTpl {
     }
 
 
-    @EL(name = {"${ns}.create", "cache.create", "ehcache.create"}, async = false)
+    @EL(name = {"${name}.create", "cache.create"}, async = false)
     protected Cache<Object, Object> createCache(String cName, Duration expire, Integer heapOfEntries, Integer heapOfMB) {
         Cache<Object, Object> cache = cm.getCache(cName, Object.class, Object.class);
         if (cache == null) {
@@ -88,7 +88,7 @@ public class EhcacheServer extends ServerTpl {
     }
 
 
-    @EL(name = {"${ns}.get", "cache.get", "ehcache.get"}, async = false)
+    @EL(name = {"${name}.get", "cache.get"}, async = false)
     protected Object getCache(String cName, Object key) {
         Cache<Object, Object> cache = cm.getCache(cName, Object.class, Object.class);
         return (cache == null ? null : cache.get(key));

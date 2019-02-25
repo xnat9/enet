@@ -53,7 +53,7 @@ public class UndertowResteasySever extends ServerTpl {
         if (coreEp == null) coreEp = new EP(coreExec);
         coreEp.fire(getName() + ".starting");
         // 先从核心取配置, 然后再启动
-        Map<String, String> r = (Map) coreEp.fire("env.ns", getNs());
+        Map<String, String> r = (Map) coreEp.fire("env.ns", getName());
         port = Utils.toInteger(r.get("port"), getPort());
         hostname = r.getOrDefault("hostname", getHostname());
         if (attrs.containsKey("scan")) {
@@ -105,7 +105,7 @@ public class UndertowResteasySever extends ServerTpl {
      * @param o
      * @return
      */
-    @EL(name = "${ns}.addResource")
+    @EL(name = "${name}.addResource")
     public UndertowResteasySever addResource(Object o) {
         if (o instanceof Class) return this;
         if (o instanceof EC) {

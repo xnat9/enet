@@ -38,7 +38,7 @@ public class SchedServer extends ServerTpl {
         if (coreEp == null) coreEp = new EP(coreExec);
         coreEp.fire(getName() + ".starting");
         // 先从核心取配置, 然后再启动
-        Map<String, String> r = (Map) coreEp.fire("env.ns", getNs());
+        Map<String, String> r = (Map) coreEp.fire("env.ns", getName());
         attrs.putAll(r);
         try {
             StdSchedulerFactory f = new StdSchedulerFactory();

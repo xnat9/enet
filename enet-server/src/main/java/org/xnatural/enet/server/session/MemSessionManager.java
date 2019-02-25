@@ -31,7 +31,7 @@ public class MemSessionManager extends ServerTpl {
         if (coreEp == null) coreEp = new EP(coreExec);
         coreEp.fire(getName() + ".starting");
         // 先从核心取配置, 然后再启动
-        Map<String, String> r = (Map) coreEp.fire("env.ns", getNs());
+        Map<String, String> r = (Map) coreEp.fire("env.ns", getName());
         attrs.putAll(r);
         sMap = new ConcurrentHashMap<>();
         coreEp.fire(getName() + ".started");
@@ -46,14 +46,14 @@ public class MemSessionManager extends ServerTpl {
     }
 
 
-    @EL(name = {"${ns}.session.set", "session.set"})
+    @EL(name = {"${name}.session.set", "session.set"})
     protected MemSessionManager put(String sId, Object key, Object value) {
         sMap.computeIfAbsent(sId, s -> new ConcurrentHashMap<>()).put(key, value);
         return this;
     }
 
 
-    @EL(name = {"${ns}.session.get", "session.get"}, async = false)
+    @EL(name = {"${name}.session.get", "session.get"}, async = false)
     protected Object get(String sId, Object key) {
         return sMap.getOrDefault(sId, emptyMap()).get(key);
     }

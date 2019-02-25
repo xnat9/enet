@@ -94,30 +94,29 @@ public class AppContext {
      * @return
      */
     @EL(name = "sys.addSource", async = false)
-    public AppContext addSource(Object source) {
-        if (source == null) return this;
-        if (source instanceof Class) return this;
+    public void addSource(Object source) {
+        if (source == null) return;
+        if (source instanceof Class) return;
         Method m = findMethod(source.getClass(), "getName");
         if (m == null) {
-            log.warn("Source '{}' must have name property", source); return this;
+            log.warn("Source '{}' must have name property", source); return;
         }
         String name = (String) invoke(m, source);
         if (Utils.isEmpty(name)) {
-            log.warn("Get name property is empty from '{}'", source); return this;
+            log.warn("Get name property is empty from '{}'", source); return;
         }
         if ("sys".equalsIgnoreCase(name) || "env".equalsIgnoreCase(name)) {
-            log.warn("name property cannot equal 'sys' or 'env'. source: {}", source); return this;
+            log.warn("name property cannot equal 'sys' or 'env'. source: {}", source); return;
         }
         if (sourceMap.containsKey(name)) {
             log.warn("name property '{}' already exist in source: {}", name, sourceMap.get(name));
-            return this;
+            return;
         }
         sourceMap.put(name, source);
         if (ep != null) {
             ep.addListenerSource(source);
             setForSource(source);
         }
-        return this;
     }
 
 

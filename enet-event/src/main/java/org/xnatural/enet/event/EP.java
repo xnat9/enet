@@ -239,7 +239,7 @@ public class EP {
                         List<Listener> ls = lsMap.computeIfAbsent(listener.name, s -> new LinkedList<>());
                         // 同一个对象源中, 不能有相同的事件监听名. 忽略
                         if (ls.stream().anyMatch(l -> l.source == source && Objects.equals(l.name, listener.name))) {
-                            log.trace("Exist listener. name: {}, source: {}", n, listener.source);
+                            log.warn("Exist listener. name: {}, source: {}", n, listener.source);
                             continue;
                         }
                         // 同一个对象源中, 不同的监听, 方法名不能相同.

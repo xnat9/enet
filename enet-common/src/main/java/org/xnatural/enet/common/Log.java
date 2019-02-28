@@ -13,6 +13,8 @@ import java.lang.reflect.UndeclaredThrowableException;
 import java.text.MessageFormat;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Queue;
+import java.util.concurrent.ConcurrentLinkedQueue;
 import java.util.function.Supplier;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
@@ -28,6 +30,7 @@ import java.util.regex.Pattern;
  * @author hubert
  */
 public class Log {
+    private static boolean early = true;
     private static final Pattern             PATTERN_PARAM = Pattern.compile("\\{(([0-9]+).([\\w]+))\\}");
     private static final Pattern             PATTERN_INDEX = Pattern.compile("\\{([0-9]+)\\}");
     private static final Pattern             PATTERN_BRACE = Pattern.compile("\\{\\}");
@@ -35,20 +38,24 @@ public class Log {
     /**
      * delegate logger.
      */
-    private final        LocationAwareLogger logger;
+    private        LocationAwareLogger    logger;
+    /**
+     * 日志名
+     */
+    private String                        name;
     /**
      * 日志前缀提供器
      */
-    private              Supplier<String>    prefixSupplier;
+    private              Supplier<String> prefixSupplier;
     /**
      * 日志后缀提供器
      */
-    private              Supplier<String>    suffixSupplier;
-    private static final Object[]            EMPTY         = new Object[0];
-    private static final boolean POST_1_6;
-    private static final Method LOG_METHOD;
-    private static final String FQCN = Log.class.getName();
-    private static Log    root;
+    private              Supplier<String> suffixSupplier;
+    private static final Object[]         EMPTY         = new Object[0];
+    private static final boolean          POST_1_6;
+    private static final Method           LOG_METHOD;
+    private static final String           FQCN = Log.class.getName();
+    private static Log                    root;
 
     static {
         Method[] methods = LocationAwareLogger.class.getDeclaredMethods();
@@ -131,42 +138,93 @@ public class Log {
     }
 
 
+    private Log() {}
     private Log(LocationAwareLogger logger) {
         this.logger = logger;
     }
 
-    public static Log of(Class<?> clazz) {
-        return new Log((LocationAwareLogger) LoggerFactory.getLogger(clazz));
-    }
     /**
      *
      * @param name NOTE: 不要是个变化的String
      * @return
      */
     public static Log of(String name) {
+        if (early) {
+            synchronized (Log.class) {
+                if (early) {
+                    Log l = new Log(); l.name = name;
+                    return l;
+                }
+            }
+        };
         return new Log((LocationAwareLogger) LoggerFactory.getLogger(name));
     }
-    public static Log root() {
-        return root;
-    }
+    public static Log of(Class<?> clazz) { return of(clazz.getName()); }
+    public static Log root() { return root; }
 
 
-    private void doLog(final Level level, final String loggerClassName, final String message, final Object[] pArgs, final Throwable thrown) {
-        if (isEnabled(level)) {
-            StringBuilder sb = new StringBuilder();
-            if (prefixSupplier != null) sb.append(prefixSupplier.get()).append(message);
-            else sb.append(message);
-            if (suffixSupplier != null) sb.append(suffixSupplier.get());
-            final String text = format(sb.toString(), pArgs);
-            doLog(logger, loggerClassName, translate(level), text, thrown);
+    /**
+     * 配置日志系统
+     * @param cfgFn 配置函数
+     */
+    public static void init(Runnable cfgFn) {
+        if (early) {
+            synchronized (Log.class) {
+                if (early) {
+                    if (cfgFn != null) cfgFn.run();
+                    while (!earlyLog.isEmpty()) {
+                        LogData d = earlyLog.poll();
+                        if (d.log.logger == null) {d.log.logger = (LocationAwareLogger) LoggerFactory.getLogger(d.log.name); d.log.name = null;}
+                        if (d.log.isEnabled(d.level)) {
+                            StringBuilder sb = new StringBuilder();
+                            if (d.log.prefixSupplier != null) sb.append(d.log.prefixSupplier.get()).append(d.msg);
+                            else sb.append(d.msg);
+                            if (d.log.suffixSupplier != null) sb.append(d.log.suffixSupplier.get());
+                            doLog(d.log.logger, d.loggerClassName, translate(d.level), format(sb.toString(), d.args), d.th);
+                        }
+                    }
+                    early = false;
+                }
+            }
         }
     }
 
 
-    private void doLogf(final Level level, final String loggerClassName, final String format, final Object[] parameters, final Throwable thrown) {
+    /**
+     * 日志数据结构
+     */
+    private static class LogData {
+        Log log; Level level; String loggerClassName;
+        String msg; Object[] args; Throwable th;
+    }
+
+    private static Queue<LogData> earlyLog = new ConcurrentLinkedQueue<>();
+    private void doLog(final Level level, final String loggerClassName, final String msg, final Object[] args, final Throwable th) {
+        if (early) {
+            synchronized (Log.class) {
+                if (early) { // 早期日志(环境还没初始化完成)
+                    LogData d = new LogData();
+                    d.log = this; d.level = level; d.loggerClassName = loggerClassName;
+                    d.msg = msg; d.args = args; d.th = th;
+                    earlyLog.offer(d);
+                    if (earlyLog.size() > 200) {
+                        earlyLog.poll(); System.err.println("early log too much");
+                    }
+                    return;
+                }
+            }
+        }
+
+        if (logger == null) {
+            logger = (LocationAwareLogger) LoggerFactory.getLogger(name); name = null;
+        }
+
         if (isEnabled(level)) {
-            final String text = String.format(format, parameters);
-            doLog(logger, loggerClassName, translate(level), text, thrown);
+            StringBuilder sb = new StringBuilder();
+            if (prefixSupplier != null) sb.append(prefixSupplier.get()).append(msg);
+            else sb.append(msg);
+            if (suffixSupplier != null) sb.append(suffixSupplier.get());
+            doLog(logger, loggerClassName, translate(level), format(sb.toString(), args), th);
         }
     }
 
@@ -277,31 +335,31 @@ public class Log {
 
 
     public boolean isInfoEnabled() {
-        return logger.isInfoEnabled();
+        return logger == null ? true: logger.isInfoEnabled();
     }
 
 
 
     public boolean isWarnEnabled() {
-        return logger.isWarnEnabled();
+        return logger == null ? true: logger.isWarnEnabled();
     }
 
 
 
     public boolean isErrorEnabled() {
-        return logger.isErrorEnabled();
+        return logger == null ? true: logger.isErrorEnabled();
     }
 
 
 
     public boolean isDebugEnabled() {
-        return logger.isDebugEnabled();
+        return logger == null ? false: logger.isDebugEnabled();
     }
 
 
 
     public boolean isTraceEnabled() {
-        return logger.isTraceEnabled();
+        return logger == null ? false: logger.isTraceEnabled();
     }
 
 
@@ -315,8 +373,9 @@ public class Log {
         return this;
     }
 
+
     @Override
     public String toString() {
-        return logger.getName();
+        return logger == null ? name: logger.getName();
     }
 }

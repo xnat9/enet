@@ -1,7 +1,6 @@
 package org.xnatural.enet.server.dao.hibernate;
 
 import org.hibernate.jpa.HibernatePersistenceProvider;
-import org.xnatural.enet.event.EC;
 import org.xnatural.enet.event.EP;
 import org.xnatural.enet.server.ServerTpl;
 

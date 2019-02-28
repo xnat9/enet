@@ -1,5 +1,7 @@
 package org.xnatural.enet.core;
 
+import org.slf4j.ILoggerFactory;
+import org.slf4j.LoggerFactory;
 import org.xnatural.enet.common.Log;
 import org.xnatural.enet.common.Utils;
 import org.xnatural.enet.event.EC;
@@ -9,11 +11,14 @@ import org.yaml.snakeyaml.Yaml;
 
 import java.io.FileNotFoundException;
 import java.io.InputStream;
+import java.lang.reflect.Method;
 import java.net.URL;
 import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.function.BiConsumer;
 import java.util.stream.Collectors;
+
+import static org.xnatural.enet.common.Utils.findMethod;
 
 /**
  * 系统环境
@@ -118,7 +123,38 @@ public class Environment {
         }
         finalAttrs.put(PROP_ACTIVE, activeProfiles.stream().collect(Collectors.joining(",")));
         log.info("The following profiles are active: {}", finalAttrs.get(PROP_ACTIVE));
+        // 配置日志相关
+        Log.init(() -> initLog());
         ep.fire("env.configured", EC.of(this));
+    }
+
+
+    /**
+     * 初始化日志实现系统
+     */
+    protected void initLog() {
+        ILoggerFactory fa = LoggerFactory.getILoggerFactory();
+        // 配置 logback
+        if ("ch.qos.logback.classic.LoggerContext".equals(fa.getClass().getName())) {
+            try {
+                Object o = Class.forName("ch.qos.logback.classic.joran.JoranConfigurator").newInstance();
+                Method m = findMethod(o.getClass(), "setContext", Class.forName("ch.qos.logback.core.Context"));
+                m.invoke(o, fa);
+                m = findMethod(fa.getClass(), "reset"); m.invoke(fa);
+                m = findMethod(o.getClass(), "doConfigure", InputStream.class);
+                boolean f = false;
+                for (String p : activeProfiles) {
+                    InputStream in = getClass().getClassLoader().getResourceAsStream("logback-" + p + ".xml");
+                    if (in != null) { m.invoke(o, in); f = true; }
+                }
+                if (!f) {// 如果没有和 profile相关的配置 就加载默认的配置文件
+                    InputStream in = getClass().getClassLoader().getResourceAsStream("logback.xml");
+                    if (in != null) m.invoke(o, in);
+                }
+            } catch (Exception e) {
+                log.error(e);
+            }
+        }
     }
 
 

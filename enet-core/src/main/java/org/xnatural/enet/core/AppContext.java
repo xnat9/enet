@@ -175,7 +175,7 @@ public class AppContext {
 
 
     @EL(name = "env.configured")
-    protected void reAdjustExec() {
+    protected void envConfigured() {
         // 重置 exec 相关属性
         Integer c = env.getInteger("sys.exec.corePoolSize", null);
         if (c != null) exec.setCorePoolSize(c);
@@ -299,6 +299,8 @@ public class AppContext {
      */
     protected EP wrapEpForSource(Object source) {
         return new EP() {
+            @Override
+            protected void init(Executor exec) {}
             @Override
             public Object fire(String eName, EC ec, Consumer<EC> completeFn) {
                 if (ec.source() == null) ec.source(source);

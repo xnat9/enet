@@ -19,18 +19,31 @@ import java.util.regex.Pattern;
  * TODO 事件等待. 事件b, 需要在事件a执行完后才能执行()
  */
 public class EP {
-    protected final Log                         log         = Log.of(EP.class);
-    protected       Executor                    exec;
-    protected       Map<String, List<Listener>> lsMap       = new ConcurrentHashMap<>(7);
+    protected Log                         log;
+    protected Executor                    exec;
+    /**
+     * 事件名 -> 监听器
+     */
+    protected Map<String, List<Listener>> lsMap;
     /**
      * 需要追踪的事件名字
      */
-    protected final Set<String>                 trackEvents = new HashSet<>(7);
+    protected Set<String>                 trackEvents;
 
 
-    public EP() {}
-    public EP(Executor exec) { this.exec = exec; }
+    public EP() { init(null); }
+    public EP(Executor exec) { init(exec); }
 
+    /**
+     * 初始化
+     * @param exec
+     */
+    protected void init(Executor exec) {
+        this.exec = exec;
+        log = Log.of(EP.class);
+        lsMap = new ConcurrentHashMap<>(7);
+        trackEvents = new HashSet<>(7);
+    }
 
     /**
      * {@link #fire(String, EC, Consumer)}

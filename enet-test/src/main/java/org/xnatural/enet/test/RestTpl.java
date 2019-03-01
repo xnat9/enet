@@ -68,7 +68,7 @@ public class RestTpl {
     @Produces("application/json")
     public String get() {
         log.info("get1");
-        if (true) throw new IllegalArgumentException("xxxxxxxxxxxxx");
+        // if (true) throw new IllegalArgumentException("xxxxxxxxxxxxx");
         return "ssssssssss";
     }
 

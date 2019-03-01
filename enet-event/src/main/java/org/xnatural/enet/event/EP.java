@@ -3,6 +3,7 @@ package org.xnatural.enet.event;
 
 import org.xnatural.enet.common.Log;
 
+import java.lang.reflect.Array;
 import java.lang.reflect.Method;
 import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
@@ -338,10 +339,18 @@ public class EP {
             try {
                 if (fn != null) fn.run();
                 else {
-                    Object r;
+                    Object r = null;
                     if (m.getParameterCount() == 0) r = m.invoke(source);
                     else if (m.getParameterCount() == 1) {
-                        if (EC.class.isAssignableFrom(m.getParameterTypes()[0])) r = m.invoke(source, ec);
+                        Class<?> t = m.getParameterTypes()[0];
+                        if (EC.class.isAssignableFrom(t)) r = m.invoke(source, ec);
+                        else if (t.isArray()) { // 如果是数组得转下类型
+                            Object arr = Array.newInstance(t.getComponentType(), ec.args.length);
+                            for (int i = 0; i < ec.args.length; i++) {
+                                Array.set(arr, i, t.getComponentType().cast(ec.args[i]));
+                            }
+                            r = m.invoke(source, arr);
+                        }
                         else r = m.invoke(source, ec.args);
                     } else { // m.getParameterCount() > 1 的情况
                         Object[] args = new Object[m.getParameterCount()]; // 参数传少了, 补null

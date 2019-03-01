@@ -335,16 +335,19 @@ public class Environment {
 
     /**
      * 取一组属性集合
-     * @param key
+     * @param keys 属性前缀
      * @return
      */
     @EL(name = "env.ns", async = false)
-    public Map<String, String> getGroupAttr(String key) {
+    public Map<String, String> groupAttr(String... keys) {
         Map<String, String> group = new HashMap<>();
+        if (keys == null) return group;
         BiConsumer<String, String> fn = (k, v) -> {
-            if (!k.startsWith(key)) return;
-            if (k.equals(key)) group.put(k, v);
-            else group.put(k.substring(key.length() + 1), v);
+            for (String key : keys) {
+                if (!k.startsWith(key)) return;
+                if (k.equals(key)) group.put(k, v);
+                else group.put(k.substring(key.length() + 1), v);
+            }
         };
 
         finalAttrs.forEach(fn);

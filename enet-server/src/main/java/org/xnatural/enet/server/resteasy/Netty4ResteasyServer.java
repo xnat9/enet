@@ -3,10 +3,7 @@ package org.xnatural.enet.server.resteasy;
 import io.netty.channel.ChannelHandlerContext;
 import io.netty.channel.ChannelPipeline;
 import org.jboss.resteasy.core.SynchronousDispatcher;
-import org.jboss.resteasy.plugins.server.netty.RequestDispatcher;
-import org.jboss.resteasy.plugins.server.netty.RequestHandler;
-import org.jboss.resteasy.plugins.server.netty.RestEasyHttpRequestDecoder;
-import org.jboss.resteasy.plugins.server.netty.RestEasyHttpResponseEncoder;
+import org.jboss.resteasy.plugins.server.netty.*;
 import org.jboss.resteasy.spi.ResteasyDeployment;
 import org.xnatural.enet.common.Utils;
 import org.xnatural.enet.event.EL;
@@ -15,13 +12,17 @@ import org.xnatural.enet.server.ServerTpl;
 
 import javax.annotation.PostConstruct;
 import javax.ws.rs.Path;
+import javax.ws.rs.core.Cookie;
+import javax.ws.rs.core.NewCookie;
 import java.io.File;
 import java.lang.reflect.Field;
 import java.lang.reflect.Method;
 import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
+import java.util.UUID;
 import java.util.concurrent.ExecutorService;
+import java.util.concurrent.TimeUnit;
 
 /**
  * netty4 和 resteasy 结合
@@ -31,6 +32,14 @@ public class Netty4ResteasyServer extends ServerTpl {
      * 根 path 前缀
      */
     protected String             rootPath;
+    /**
+     * 表示 session 的 cookie 名字
+     */
+    protected String sessionCookieName = "sId";
+    /**
+     * 是否启用session
+     */
+    protected boolean enableSession = true;
     /**
      * see: {@link #collect()}
      */
@@ -55,7 +64,7 @@ public class Netty4ResteasyServer extends ServerTpl {
         // 先从核心取配置, 然后再启动
         Map<String, String> r = (Map) coreEp.fire("env.ns", getName());
         rootPath = r.getOrDefault("rootPath", "/");
-        if (attrs.containsKey("scan")) {
+        if (r.containsKey("scan")) {
             for (String c : ((String) attrs.get("scan")).split(",")) {
                 try {
                     if (c != null && !c.trim().isEmpty()) scan.add(Class.forName(c.trim()));
@@ -64,6 +73,7 @@ public class Netty4ResteasyServer extends ServerTpl {
                 }
             }
         }
+        if (r.containsKey("sessionCookieName")) { sessionCookieName = r.get("sessionCookieName"); }
         attrs.putAll(r);
 
         startDeployment(); initDispatcher(); collect();
@@ -92,6 +102,20 @@ public class Netty4ResteasyServer extends ServerTpl {
             protected void channelRead0(ChannelHandlerContext ctx, Object msg) throws Exception {
                 coreExec.execute(() -> {
                     try {
+                        if (isEnableSession() && msg instanceof NettyHttpRequest) { // 添加session控制
+                            Cookie c = ((NettyHttpRequest) msg).getHttpHeaders().getCookies().get(getSessionCookieName());
+                            if (c == null || Utils.isEmpty(c.getValue())) {
+                                String newSid = UUID.randomUUID().toString().replace("-", "");
+                                ((NettyHttpRequest) msg).getResponse().addNewCookie(
+                                    new NewCookie(
+                                        getSessionCookieName(), newSid, "/", (String) null, 1, (String) null,
+                                        (int) TimeUnit.MINUTES.toSeconds((Integer) coreEp.fire("session.getExpire") + 10)
+                                        , null, false, false
+                                    )
+                                );
+                                coreEp.fire("session.access", newSid);
+                            } else coreEp.fire("session.access", c.getValue());
+                        }
                         super.channelRead0(ctx, msg);
                     } catch (Exception e) {
                         log.error(e);
@@ -218,5 +242,30 @@ public class Netty4ResteasyServer extends ServerTpl {
         if (running.get()) throw new RuntimeException("服务正在运行, 不充许更改");
         this.rootPath = rootPath;
         return this;
+    }
+
+
+    public String getSessionCookieName() {
+        return sessionCookieName;
+    }
+
+
+    public Netty4ResteasyServer setSessionCookieName(String sessionCookieName) {
+        if (running.get()) throw new RuntimeException("不允许运行时更改");
+        if (sessionCookieName == null || sessionCookieName.isEmpty()) throw new NullPointerException("参数为空");
+        this.sessionCookieName = sessionCookieName;
+        return this;
+    }
+
+
+    public Netty4ResteasyServer setEnableSession(boolean enableSession) {
+        if (running.get()) throw new RuntimeException("运行时不允许更改");
+        this.enableSession = enableSession;
+        return this;
+    }
+
+
+    public boolean isEnableSession() {
+        return enableSession;
     }
 }

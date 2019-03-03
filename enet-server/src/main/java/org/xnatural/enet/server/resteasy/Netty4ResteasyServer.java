@@ -2,9 +2,15 @@ package org.xnatural.enet.server.resteasy;
 
 import io.netty.channel.ChannelHandlerContext;
 import io.netty.channel.ChannelPipeline;
+import org.jboss.resteasy.core.InjectorFactoryImpl;
 import org.jboss.resteasy.core.SynchronousDispatcher;
+import org.jboss.resteasy.core.ValueInjector;
 import org.jboss.resteasy.plugins.server.netty.*;
+import org.jboss.resteasy.spi.HttpRequest;
+import org.jboss.resteasy.spi.HttpResponse;
 import org.jboss.resteasy.spi.ResteasyDeployment;
+import org.jboss.resteasy.spi.ResteasyProviderFactory;
+import org.jboss.resteasy.spi.metadata.Parameter;
 import org.xnatural.enet.common.Utils;
 import org.xnatural.enet.event.EL;
 import org.xnatural.enet.event.EP;
@@ -23,6 +29,8 @@ import java.util.Map;
 import java.util.UUID;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.TimeUnit;
+
+import static org.jboss.resteasy.util.FindAnnotation.findAnnotation;
 
 /**
  * netty4 和 resteasy 结合
@@ -48,9 +56,7 @@ public class Netty4ResteasyServer extends ServerTpl {
     protected RequestDispatcher  dispatcher;
 
 
-    public Netty4ResteasyServer() {
-        setName("resteasy");
-    }
+    public Netty4ResteasyServer() { setName("resteasy"); }
 
 
     @Override
@@ -62,7 +68,7 @@ public class Netty4ResteasyServer extends ServerTpl {
         if (coreEp == null) coreEp = new EP(coreExec);
         coreEp.fire(getName() + ".starting");
         // 先从核心取配置, 然后再启动
-        Map<String, String> r = (Map) coreEp.fire("env.ns", getName());
+        Map<String, String> r = (Map) coreEp.fire("env.ns", "mvc", getName());
         rootPath = r.getOrDefault("rootPath", "/");
         if (r.containsKey("scan")) {
             for (String c : ((String) attrs.get("scan")).split(",")) {
@@ -85,8 +91,7 @@ public class Netty4ResteasyServer extends ServerTpl {
     @Override
     public void stop() {
         log.info("Shutdown '{}' Server", getName());
-        dispatcher = null;
-        deployment.stop(); deployment = null;
+        dispatcher = null; deployment.stop(); deployment = null;
         if (coreExec instanceof ExecutorService) ((ExecutorService) coreExec).shutdown();
     }
 
@@ -104,17 +109,19 @@ public class Netty4ResteasyServer extends ServerTpl {
                     try {
                         if (isEnableSession() && msg instanceof NettyHttpRequest) { // 添加session控制
                             Cookie c = ((NettyHttpRequest) msg).getHttpHeaders().getCookies().get(getSessionCookieName());
+                            String sId;
                             if (c == null || Utils.isEmpty(c.getValue())) {
-                                String newSid = UUID.randomUUID().toString().replace("-", "");
+                                 sId = UUID.randomUUID().toString().replace("-", "");
                                 ((NettyHttpRequest) msg).getResponse().addNewCookie(
                                     new NewCookie(
-                                        getSessionCookieName(), newSid, "/", (String) null, 1, (String) null,
+                                        getSessionCookieName(), sId, "/", (String) null, 1, (String) null,
                                         (int) TimeUnit.MINUTES.toSeconds((Integer) coreEp.fire("session.getExpire") + 10)
                                         , null, false, false
                                     )
                                 );
-                                coreEp.fire("session.access", newSid);
-                            } else coreEp.fire("session.access", c.getValue());
+                            } else sId = c.getValue();
+                            coreEp.fire("session.access", sId);
+                            ((NettyHttpRequest) msg).setAttribute(getSessionCookieName(), sId);
                         }
                         super.channelRead0(ctx, msg);
                     } catch (Exception e) {
@@ -156,6 +163,32 @@ public class Netty4ResteasyServer extends ServerTpl {
         if (deployment.getRegistry() != null) return;
         synchronized(this) {
             if (deployment.getRegistry() != null) return;
+            deployment.setInjectorFactory(new InjectorFactoryImpl() {
+                @Override
+                public ValueInjector createParameterExtractor(Parameter param, ResteasyProviderFactory pf) {
+                    SessionAttr sessionAttr = findAnnotation(param.getAnnotations(), SessionAttr.class);
+                    if (findAnnotation(param.getAnnotations(), SessionId.class) != null) {
+                        return new ValueInjector() {
+                            @Override
+                            public Object inject() { return null; }
+                            @Override
+                            public Object inject(HttpRequest request, HttpResponse response) {
+                                return request.getAttribute(getSessionCookieName());
+                            }
+                        };
+                    } else if (sessionAttr != null) {
+                        return new ValueInjector() {
+                            @Override
+                            public Object inject() { return null; }
+                            @Override
+                            public Object inject(HttpRequest request, HttpResponse response) {
+                                return coreEp.fire("session.get", request.getAttribute(getSessionCookieName()), sessionAttr.value());
+                            }
+                        };
+                    }
+                    return super.createParameterExtractor(param, pf);
+                }
+            });
             deployment.start();
         }
     }

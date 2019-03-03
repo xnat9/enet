@@ -35,7 +35,7 @@ public class MemSessionManager extends ServerTpl {
         if (coreEp == null) coreEp = new EP(coreExec);
         coreEp.fire(getName() + ".starting");
         // 先从核心取配置, 然后再启动
-        Map<String, String> r = (Map) coreEp.fire("env.ns", getName(), "session");
+        Map<String, String> r = (Map) coreEp.fire("env.ns", "session", getName());
         if (r.containsKey("expire")) {
             setExpire(Utils.toInteger(r.get("expire"), getExpire()));
         }

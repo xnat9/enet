@@ -197,8 +197,7 @@ public class ServerTpl {
      */
     protected void initExecutor() {
         if (coreEp instanceof ExecutorService) {
-            log.warn("关闭之前的线程池");
-            ((ExecutorService) coreEp).shutdown();
+            log.warn("关闭之前的线程池"); ((ExecutorService) coreEp).shutdown();
         }
         log.debug("为服务({})创建私有线程池. ", getName());
         ThreadPoolExecutor e = new ThreadPoolExecutor(

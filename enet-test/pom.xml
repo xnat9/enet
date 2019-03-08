@@ -41,6 +41,14 @@
             <version>1.2.3</version>
         </dependency>
 
+        <!-- https://mvnrepository.com/artifact/com.jfinal/jfinal -->
+        <dependency>
+            <groupId>com.jfinal</groupId>
+            <artifactId>jfinal</artifactId>
+            <version>3.6</version>
+        </dependency>
+
+
     </dependencies>
 
 </project>

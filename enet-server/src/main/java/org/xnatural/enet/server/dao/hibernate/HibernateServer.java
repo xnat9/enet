@@ -1,5 +1,6 @@
 package org.xnatural.enet.server.dao.hibernate;
 
+import org.hibernate.SessionFactory;
 import org.hibernate.jpa.HibernatePersistenceProvider;
 import org.xnatural.enet.event.EP;
 import org.xnatural.enet.server.ServerTpl;
@@ -13,6 +14,7 @@ import javax.persistence.spi.PersistenceUnitInfo;
 import javax.persistence.spi.PersistenceUnitTransactionType;
 import javax.sql.DataSource;
 import java.io.File;
+import java.lang.reflect.Field;
 import java.lang.reflect.Method;
 import java.net.URL;
 import java.util.LinkedList;
@@ -28,16 +30,22 @@ import static javax.persistence.SharedCacheMode.UNSPECIFIED;
  * 暴露出 {@link EntityManagerFactory} 实例(所有的数据库操作入口)
  */
 public class HibernateServer extends ServerTpl {
-    protected DataSource           ds;
-    protected EntityManagerFactory emf;
+    protected DataSource     ds;
+    protected SessionFactory sf;
+    protected TransWrapper   tm;
     /**
      * 实体扫描
      */
-    protected List<Class>          entityScan = new LinkedList<>();
+    protected List<Class>    entityScan = new LinkedList<>();
+    /**
+     * repo 扫描
+     */
+    protected List<Class>    repoScan   = new LinkedList<>();
     /**
      * 被管理的实体类名
      */
-    protected List<String>         entities   = new LinkedList<>();
+    protected List<String>   entities   = new LinkedList<>();
+
 
     public HibernateServer() {
         setName("dao");
@@ -52,6 +60,7 @@ public class HibernateServer extends ServerTpl {
         if (coreExec == null) initExecutor();
         if (coreEp == null) coreEp = new EP(coreExec);
         coreEp.fire(getName() + ".starting");
+        attrs.put("hibernate.current_session_context_class", "thread");
         // 先从核心取配置, 然后再启动
         Map<String, String> r = (Map) coreEp.fire("env.ns", getName());
         if (r.containsKey("entity-scan")) {
@@ -64,26 +73,38 @@ public class HibernateServer extends ServerTpl {
                 }
             }
         }
+        if (r.containsKey("repo-scan")) {
+            for (String s : r.get("repo-scan").split(",")) {
+                if (s == null || s.trim().isEmpty()) continue;
+                try {
+                    repoScan.add(Class.forName(s.trim()));
+                } catch (ClassNotFoundException e) {
+                    log.error("not found class: " + s);
+                }
+            }
+        }
         attrs.putAll(r);
 
-        emf = new HibernatePersistenceProvider().createContainerEntityManagerFactory(createPersistenceUnit(), attrs);
-        exposeBean(emf, "entityManagerFactory", "sessionFactory");
-        coreEp.fire(getName() + ".started");
+        sf = (SessionFactory) new HibernatePersistenceProvider().createContainerEntityManagerFactory(createPersistenceUnit(), attrs);
+        exposeBean(sf, "entityManagerFactory", "sessionFactory");
+        tm = new TransWrapper(sf); exposeBean(tm, "transManager");
+        repoCollect();
         log.info("Started {}(Hibernate) Server", getName());
+        coreEp.fire(getName() + ".started");
     }
 
 
     @Override
     public void stop() {
         log.info("Shutdown '{}(Hibernate)' Server", getName());
-        emf.close(); closeDs();
+        sf.close(); closeDs();
         if (coreExec instanceof ExecutorService) ((ExecutorService) coreExec).shutdown();
     }
 
 
     protected PersistenceUnitInfo createPersistenceUnit() {
         initDataSource();
-        collect();
+        entityCollect();
         return new PersistenceUnitInfo() {
             @Override
             public String getPersistenceUnitName() {
@@ -173,21 +194,28 @@ public class HibernateServer extends ServerTpl {
     }
 
 
-    public HibernateServer scan(Class clz) {
+    public HibernateServer scanEntity(Class clz) {
         if (running.get()) throw new IllegalArgumentException("Server is running, not allow change");
         entityScan.add(clz);
         return this;
     }
 
 
-    protected void collect() {
+    public HibernateServer scanRepo(Class clz) {
+        if (running.get()) throw new IllegalArgumentException("Server is running, not allow change");
+        repoScan.add(clz);
+        return this;
+    }
+
+
+    protected void entityCollect() {
         if (entityScan == null || entityScan.isEmpty()) return;
         try {
             for (Class clz : entityScan) {
                 String pkg = clz.getPackage().getName();
                 File pkgDir = new File(getClass().getClassLoader().getResource(pkg.replaceAll("\\.", "/")).getFile());
                 File[] arr = pkgDir.listFiles(f -> f.getName().endsWith(".class"));
-                if (arr != null) for (File f : arr) load(pkg, f);
+                if (arr != null) for (File f : arr) entityLoad(pkg, f);
             }
         } catch (Exception e) {
             log.error(e, "扫描Entity类出错!");
@@ -195,14 +223,59 @@ public class HibernateServer extends ServerTpl {
     }
 
 
-    protected void load(String pkg, File f) throws Exception {
+    protected void entityLoad(String pkg, File f) throws Exception {
         if (f.isDirectory()) {
             for (File ff : f.listFiles(ff -> ff.getName().endsWith(".class"))) {
-                load(pkg + "." + f.getName(), ff);
+                entityLoad(pkg + "." + f.getName(), ff);
             }
         } else if (f.isFile() && f.getName().endsWith(".class")) {
             Class<?> clz = getClass().getClassLoader().loadClass(pkg + "." + f.getName().replace(".class", ""));
             if (clz.getAnnotation(Entity.class) != null) entities.add(clz.getName());
+        }
+    }
+
+
+    protected void repoCollect() {
+        if (repoScan == null || repoScan.isEmpty()) return;
+        try {
+            for (Class clz : repoScan) {
+                String pkg = clz.getPackage().getName();
+                File pkgDir = new File(getClass().getClassLoader().getResource(pkg.replaceAll("\\.", "/")).getFile());
+                File[] arr = pkgDir.listFiles(f -> f.getName().endsWith(".class"));
+                if (arr != null) for (File f : arr) repoLoad(pkg, f);
+            }
+        } catch (Exception e) {
+            log.error(e, "扫描Repo类出错!");
+        }
+    }
+
+
+    protected void repoLoad(String pkg, File f) throws Exception {
+        if (f.isDirectory()) {
+            for (File ff : f.listFiles(ff -> ff.getName().endsWith(".class"))) {
+                repoLoad(pkg + "." + f.getName(), ff);
+            }
+        } else if (f.isFile() && f.getName().endsWith(".class")) {
+            Class<?> clz = getClass().getClassLoader().loadClass(pkg + "." + f.getName().replace(".class", ""));
+            if (clz.getAnnotation(Repository.class) != null) {
+                Object o = clz.newInstance();
+                Class c = clz;
+                do {
+                    for (Field field : c.getDeclaredFields()) {
+                        if (HibernateServer.class.isAssignableFrom(field.getType())) {
+                            field.setAccessible(true); field.set(o, this);
+                        } else if (EP.class.isAssignableFrom(field.getType())) {
+                            field.setAccessible(true); field.set(o, getCoreEp());
+                        } else if (EntityManagerFactory.class.isAssignableFrom(field.getType()) || SessionFactory.class.isAssignableFrom(field.getType())) {
+                            field.setAccessible(true); field.set(o, sf);
+                        } else if (TransWrapper.class.isAssignableFrom(field.getType())) {
+                            field.setAccessible(true); field.set(o, tm);
+                        }
+                    }
+                    c = c.getSuperclass();
+                } while (c != null);
+                exposeBean(o, clz.getSimpleName()); // 暴露所有Repo出去
+            }
         }
     }
 

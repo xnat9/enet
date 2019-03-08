@@ -3,14 +3,15 @@ package org.xnatural.enet.test;
 import org.xnatural.enet.common.Log;
 import org.xnatural.enet.event.EL;
 import org.xnatural.enet.event.EP;
+import org.xnatural.enet.server.dao.hibernate.TransWrapper;
 import org.xnatural.enet.server.resteasy.SessionAttr;
 import org.xnatural.enet.server.resteasy.SessionId;
 
-import javax.persistence.EntityManager;
-import javax.persistence.EntityManagerFactory;
 import javax.ws.rs.*;
 import javax.ws.rs.core.Response;
 import java.io.File;
+import java.text.SimpleDateFormat;
+import java.util.Date;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CompletionStage;
 
@@ -23,12 +24,14 @@ public class RestTpl {
     private EP ep;
     final Log log = Log.of(getClass());
 
-    private EntityManagerFactory emf;
+    private TestRepo     testRepo;
+    private TransWrapper transManager;
 
 
     @EL(name = "sys.started")
     public void init() {
-        emf = (EntityManagerFactory) ep.fire("bean.get", EntityManagerFactory.class);
+        testRepo = (TestRepo) ep.fire("dao.bean.get", TestRepo.class);
+        transManager = (TransWrapper) ep.fire("dao.bean.get", TransWrapper.class);
         ep.fire("swagger.addJaxrsDoc", this, null, "tpl", "tpl rest doc");
     }
 
@@ -36,16 +39,10 @@ public class RestTpl {
     @GET
     @Path("insert")
     public void insert() {
-        EntityManager em = emf.createEntityManager();
-        em.getTransaction().begin();
-
         TestEntity e = new TestEntity();
-        e.setName("aaaa");
+        e.setName("aaaa" + new SimpleDateFormat("yyyy-MM-dd HH:mm:ss").format(new Date()));
         e.setAge(111);
-        em.persist(e);
-
-        em.getTransaction().commit();
-        em.close();
+        transManager.trans(() -> testRepo.saveOrUpdate(e));
     }
 
 
@@ -53,7 +50,7 @@ public class RestTpl {
     @Path("find")
     @Produces("application/json")
     public Object find() {
-        return emf.createEntityManager().createQuery("from TestEntity").getResultList();
+        return testRepo.findPage(0, 100, null);
     }
 
 

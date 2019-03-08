@@ -31,7 +31,7 @@ public class TestApp extends ServerTpl {
         app.addSource(new Netty4ResteasyServer().scan(RestTpl.class));
         app.addSource(new MViewServer());
         app.addSource(new SwaggerServer());
-        app.addSource(new HibernateServer().scan(TestEntity.class));
+        app.addSource(new HibernateServer().scanEntity(TestEntity.class).scanRepo(TestRepo.class));
         app.addSource(new EhcacheServer());
         app.addSource(new SchedServer());
         app.addSource(new TestApp(app));

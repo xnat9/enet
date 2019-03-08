@@ -148,7 +148,7 @@ public class AppContext {
      * see:  {@link ThreadPoolExecutor#runWorker(ThreadPoolExecutor.Worker)} 这里面当有异常抛出时 1128行代码 {@link ThreadPoolExecutor#processWorkerExit(ThreadPoolExecutor.Worker, boolean)}
      */
     protected void initExecutor() {
-        int capacity = 100000;
+        int capacity = 500000;
         exec = new ThreadPoolExecutor(
                 4, 8, 30, TimeUnit.MINUTES, new LinkedBlockingQueue<>(capacity),
                 new ThreadFactory() {

@@ -105,8 +105,8 @@ public class AppContext {
         if (Utils.isEmpty(name)) {
             log.warn("Get name property is empty from '{}'", source); return;
         }
-        if ("sys".equalsIgnoreCase(name) || "env".equalsIgnoreCase(name)) {
-            log.warn("name property cannot equal 'sys' or 'env'. source: {}", source); return;
+        if ("sys".equalsIgnoreCase(name) || "env".equalsIgnoreCase(name) || "log".equalsIgnoreCase(name)) {
+            log.warn("name property cannot equal 'sys', 'env' or 'log' . source: {}", source); return;
         }
         if (sourceMap.containsKey(name)) {
             log.warn("name property '{}' already exist in source: {}", name, sourceMap.get(name));

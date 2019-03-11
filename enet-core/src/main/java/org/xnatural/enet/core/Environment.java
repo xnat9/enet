@@ -151,6 +151,12 @@ public class Environment {
                     InputStream in = getClass().getClassLoader().getResourceAsStream("logback.xml");
                     if (in != null) m.invoke(o, in);
                 }
+                // 设置日志级别
+                Method setLevel = findMethod(Class.forName("ch.qos.logback.classic.Logger"), "setLevel", Class.forName("ch.qos.logback.classic.Level"));
+                Method toLevel = findMethod(Class.forName("ch.qos.logback.classic.Level"), "toLevel", String.class);
+                for (Map.Entry<String, String> e : groupAttr("log.level").entrySet()) {
+                    setLevel.invoke(fa.getLogger(e.getKey()), toLevel.invoke(null, e.getValue()));
+                }
             } catch (Exception e) {
                 log.error(e);
             }

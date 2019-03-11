@@ -194,9 +194,12 @@ public class HibernateServer extends ServerTpl {
     }
 
 
-    public HibernateServer scanEntity(Class clz) {
+    public HibernateServer scanEntity(Class... clzs) {
         if (running.get()) throw new IllegalArgumentException("Server is running, not allow change");
-        entityScan.add(clz);
+        if (clzs == null || clzs.length == 0) {
+            log.warn("参数错误"); return this;
+        }
+        for (Class clz : clzs) entityScan.add(clz);
         return this;
     }
 

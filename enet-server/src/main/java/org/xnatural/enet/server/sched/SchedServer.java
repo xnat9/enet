@@ -66,6 +66,11 @@ public class SchedServer extends ServerTpl {
     }
 
 
+    /**
+     * cron 时间表达式
+     * @param cron
+     * @param fn
+     */
     @EL(name = "sched.cron")
     public void sched(String cron, Runnable fn) {
         if (Utils.isEmpty(cron) || fn == null) throw new IllegalArgumentException("参数错误");
@@ -87,7 +92,13 @@ public class SchedServer extends ServerTpl {
     }
 
 
-    @EL(name = "sched.time")
+    /**
+     * 在多少时间之后执行
+     * @param time
+     * @param unit
+     * @param fn
+     */
+    @EL(name = "sched.after")
     public void sched(Integer time, TimeUnit unit, Runnable fn) {
         if (time == null || unit == null || fn == null) throw new IllegalArgumentException("参数错误");
         JobDataMap data = new JobDataMap();
@@ -103,9 +114,37 @@ public class SchedServer extends ServerTpl {
                             .withSchedule(CronScheduleBuilder.cronSchedule(cron))
                             .build()
             );
-            log.info("add time '{}' job will execute last time '{}'", id, new SimpleDateFormat("yyyy-MM-dd HH:mm:ss SSS").format(d));
+            log.info("add after '{}' job will execute at '{}'", id, new SimpleDateFormat("yyyy-MM-dd HH:mm:ss SSS").format(d));
         } catch (SchedulerException e) {
-            log.error(e, "add time job error! time: {}, unit: {}", time, unit);
+            log.error(e, "add after job error! time: {}, unit: {}", time, unit);
+        }
+    }
+
+
+    /**
+     * 在将来的某个时间点执行
+     * @param time
+     * @param fn
+     */
+    @EL(name = "sched.time")
+    public void sched(Date time, Runnable fn) {
+        if (time == null || fn == null) throw new IllegalArgumentException("参数错误");
+        JobDataMap data = new JobDataMap();
+        data.put("fn", fn);
+        String id = time + "_" + System.currentTimeMillis();
+        try {
+            SimpleDateFormat sdf = new SimpleDateFormat("ss mm HH dd MM ? yyyy");
+            String cron = sdf.format(time);
+            Date d = scheduler.scheduleJob(
+                    JobBuilder.newJob(JopTpl.class).withIdentity(id).setJobData(data).build(),
+                    TriggerBuilder.newTrigger()
+                            .withIdentity(new TriggerKey(id, "default"))
+                            .withSchedule(CronScheduleBuilder.cronSchedule(cron))
+                            .build()
+            );
+            log.info("add time '{}' job will execute at '{}'", id, new SimpleDateFormat("yyyy-MM-dd HH:mm:ss SSS").format(d));
+        } catch (SchedulerException e) {
+            log.error(e, "add time job error! time: {}", time);
         }
     }
 

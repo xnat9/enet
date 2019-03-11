@@ -93,19 +93,19 @@ public class TestApp extends ServerTpl {
         if (e.getQueue().size() > 1200) {
             log.warn("system is very heavy load running. {}", "[" + e.toString().split("\\[")[1]);
         } else if (e.getQueue().size() > 700) {
-            coreEp.fire("sched.time", 45, TimeUnit.SECONDS, (Runnable) () -> {
+            coreEp.fire("sched.after", 45, TimeUnit.SECONDS, (Runnable) () -> {
                 if (e.getQueue().size() > 1000) {
                     log.warn("system is heavy load running. {}", "[" + e.toString().split("\\[")[1]);
                 }
             });
         } else if (e.getQueue().size() > 200) {
-            coreEp.fire("sched.time", 30, TimeUnit.SECONDS, (Runnable) () -> {
+            coreEp.fire("sched.after", 30, TimeUnit.SECONDS, (Runnable) () -> {
                 if (e.getQueue().size() > 500) {
                     log.warn("system will heavy load running. {}", "[" + e.toString().split("\\[")[1]);
                 }
             });
         } else if (e.getQueue().size() > 20) {
-            coreEp.fire("sched.time", 25, TimeUnit.SECONDS, (Runnable) () -> {
+            coreEp.fire("sched.after", 25, TimeUnit.SECONDS, (Runnable) () -> {
                 if (e.getQueue().size() > 70) {
                     log.warn("system is litter heavy load running. {}", "[" + e.toString().split("\\[")[1]);
                 }

@@ -131,8 +131,10 @@ ServerTpl: 服务模块模板
    ### SchedServer: quartz 时间任务调度器
         1. sched.cron: cron表达式 来调度任务执行
             例: coreEp.fire("sched.cron", "31 */2 * * * ? 2019", (Runnable) () -> {// TODO});
-        2. sched.time: 某个时间点执行
-            例: coreEp.fire("sched.time", 45, TimeUnit.SECONDS, (Runnable) () -> {// TODO});
+        2. sched.after: 多少时间之后执行
+            例: coreEp.fire("sched.after", 45, TimeUnit.SECONDS, (Runnable) () -> {// TODO});
+        3. sched.time: 在将来的某个时间点执行
+            例: coreEp.time("sched.after", new Date(new Date().getTime() + 5000), (Runnable) () -> {// TODO});
 
 ## 参与贡献
 

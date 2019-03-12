@@ -6,10 +6,7 @@ import org.jboss.resteasy.core.InjectorFactoryImpl;
 import org.jboss.resteasy.core.SynchronousDispatcher;
 import org.jboss.resteasy.core.ValueInjector;
 import org.jboss.resteasy.plugins.server.netty.*;
-import org.jboss.resteasy.spi.HttpRequest;
-import org.jboss.resteasy.spi.HttpResponse;
-import org.jboss.resteasy.spi.ResteasyDeployment;
-import org.jboss.resteasy.spi.ResteasyProviderFactory;
+import org.jboss.resteasy.spi.*;
 import org.jboss.resteasy.spi.metadata.Parameter;
 import org.xnatural.enet.common.Utils;
 import org.xnatural.enet.event.EL;
@@ -123,7 +120,32 @@ public class Netty4ResteasyServer extends ServerTpl {
                             coreEp.fire("session.access", sId);
                             ((NettyHttpRequest) msg).setAttribute(getSessionCookieName(), sId);
                         }
-                        super.channelRead0(ctx, msg);
+                        if (msg instanceof NettyHttpRequest) {
+                            NettyHttpRequest request = (NettyHttpRequest) msg;
+                            try {
+                                NettyHttpResponse response = request.getResponse();
+                                try {
+                                    dispatcher.service(ctx, request, response, true);
+                                } catch (Failure e1) {
+                                    response.reset();
+                                    response.setStatus(e1.getErrorCode());
+                                } catch (UnhandledException e) {
+                                    response.reset();
+                                    response.setStatus(500);
+                                    if (e.getCause() != null) log.error(e.getCause());
+                                    else log.error(e);
+                                } catch (Exception ex) {
+                                    response.reset();
+                                    response.setStatus(500);
+                                    log.error(ex);
+                                }
+                                if (!request.getAsyncContext().isSuspended()) {
+                                    response.finish();
+                                }
+                            } finally {
+                                request.releaseContentBuffer();
+                            }
+                        }
                     } catch (Exception e) {
                         log.error(e);
                     }

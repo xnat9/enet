@@ -14,6 +14,7 @@ import javax.persistence.criteria.Root;
 import java.io.Serializable;
 import java.lang.reflect.ParameterizedType;
 import java.lang.reflect.Type;
+import java.util.Collections;
 import java.util.Date;
 import java.util.Objects;
 
@@ -21,6 +22,7 @@ public class BaseRepo<T extends IEntity, ID extends Serializable> {
     protected Log             log = Log.of(getClass());
     protected SessionFactory  sf;
     protected HibernateServer hs;
+    protected TransWrapper    tm;
     protected Class<T>        entityType;
     protected Class<ID>       idType;
     /**
@@ -65,67 +67,76 @@ public class BaseRepo<T extends IEntity, ID extends Serializable> {
 
 
     public <S extends T> S saveOrUpdate(S e) {
-        if (e instanceof BaseEntity) {
-            Date d = new Date();
-            if (((BaseEntity) e).getCreateTime() == null) ((BaseEntity) e).setCreateTime(d);
-            ((BaseEntity) e).setUpdateTime(d);
-        }
-        sf.getCurrentSession().saveOrUpdate(e);
-        return e;
+        return tm.trans(() -> {
+            if (e instanceof BaseEntity) {
+                Date d = new Date();
+                if (((BaseEntity) e).getCreateTime() == null) ((BaseEntity) e).setCreateTime(d);
+                ((BaseEntity) e).setUpdateTime(d);
+            }
+            sf.getCurrentSession().saveOrUpdate(e);
+            return e;
+        });
     }
 
 
     public T findById(ID id) {
-        return sf.getCurrentSession().get(entityType, id);
+        return tm.trans(() -> sf.getCurrentSession().get(entityType, id));
     }
 
 
     public T findOne(Query query) {
-        try {
-            return (T) query.setMaxResults(1).getSingleResult();
-        } catch (NoResultException e) {}
-        return null;
+        return tm.trans(() -> {
+            try {
+                return (T) query.setMaxResults(1).getSingleResult();
+            } catch (NoResultException e) {}
+            return null;
+        });
     }
 
 
     public boolean delete(ID id) {
         // NOTE: 被删除的实体主键名必须为 "id";
-        return sf.getCurrentSession().createQuery("delete from " + entityType.getSimpleName() + " where id=:id")
+        return tm.trans(() -> sf.getCurrentSession().createQuery("delete from " + entityType.getSimpleName() + " where id=:id")
             .setParameter("id", id)
-            .executeUpdate() > 0;
+            .executeUpdate() > 0);
     }
 
 
     public void delete(T e) {
-        sf.getCurrentSession().delete(e);
+        tm.trans(() -> sf.getCurrentSession().delete(e));
     }
 
 
     public Page<T> findPage(Integer pageIndex, Integer pageSize, Specification spec) {
-        Session s = sf.getCurrentSession();
-        CriteriaBuilder cb = s.getCriteriaBuilder();
-        CriteriaQuery<T> query = cb.createQuery(entityType);
-        Root<T> root = query.from(entityType);
-        Predicate p = (spec == null ? null : spec.toPredicate(root, query, cb));
-        if (p != null) query.where(p);
-        int ps = (pageSize == null ? defaultPageSize : (pageSize > maxPageSize ? defaultPageSize : pageSize));
-        int pi = (pageIndex == null ? 0 : pageIndex);
-        return new Page<T>(
-            s.createQuery(query).setFirstResult(pi * ps).setMaxResults(ps).list(),
-            pi, ps, (int) (Math.ceil(count(spec) / ps))
-        );
+        return tm.trans(() -> {
+            Session s = sf.getCurrentSession();
+            CriteriaBuilder cb = s.getCriteriaBuilder();
+            CriteriaQuery<T> query = cb.createQuery(entityType);
+            Root<T> root = query.from(entityType);
+            Predicate p = (spec == null ? null : spec.toPredicate(root, query, cb));
+            if (p != null) query.where(p);
+            int ps = (pageSize == null ? defaultPageSize : (pageSize > maxPageSize ? defaultPageSize : pageSize));
+            int pi = (pageIndex == null ? 0 : pageIndex);
+            return new Page<T>(
+                s.createQuery(query).setFirstResult(pi * ps).setMaxResults(ps).list(),
+                pi, ps, count(spec)
+            );
+        });
     }
 
 
     public long count(Specification spec) {
-        Session s = sf.getCurrentSession();
-        CriteriaBuilder cb = s.getCriteriaBuilder();
-        CriteriaQuery<Long> query = cb.createQuery(Long.class);
-        Root<T> root = query.from(entityType);
-        Predicate p = spec == null ? null : spec.toPredicate(root, query, cb);
-        if (query.isDistinct()) query.select(cb.countDistinct(root));
-        else query.select(cb.count(root));
-        if (p != null) query.where(p);
-        return s.createQuery(query).getSingleResult();
+        return tm.trans(() -> {
+            Session s = sf.getCurrentSession();
+            CriteriaBuilder cb = s.getCriteriaBuilder();
+            CriteriaQuery<Long> query = cb.createQuery(Long.class);
+            Root<T> root = query.from(entityType);
+            Predicate p = spec == null ? null : spec.toPredicate(root, query, cb);
+            if (query.isDistinct()) query.select(cb.countDistinct(root));
+            else query.select(cb.count(root));
+            query.orderBy(Collections.emptyList());
+            if (p != null) query.where(p);
+            return s.createQuery(query).getSingleResult();
+        });
     }
 }

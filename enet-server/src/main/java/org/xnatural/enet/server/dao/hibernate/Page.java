@@ -1,18 +1,20 @@
 package org.xnatural.enet.server.dao.hibernate;
 
+import java.io.Serializable;
 import java.util.Collection;
 
-public class Page<E extends IEntity> {
+public class Page<E> implements Serializable {
     private Integer       pageIndex;
     private Integer       pageSize;
     private Integer       totalPage;
+    private Long          totalRow;
     private Collection<E> list;
 
 
-    public Page(Collection<E> list, Integer pageIndex, Integer pageSize, Integer totalPage) {
+    public Page(Collection<E> list, Integer pageIndex, Integer pageSize, Long totalRow) {
         this.pageIndex = pageIndex;
         this.pageSize = pageSize;
-        this.totalPage = totalPage;
+        setTotalRow(totalRow);
         this.list = list;
     }
 
@@ -60,6 +62,18 @@ public class Page<E extends IEntity> {
 
     public Page<E> setList(Collection<E> list) {
         this.list = list;
+        return this;
+    }
+
+
+    public Long getTotalRow() {
+        return totalRow;
+    }
+
+
+    public Page<E> setTotalRow(Long totalRow) {
+        this.totalRow = totalRow;
+        this.totalPage = (int) (Math.ceil(totalRow / Double.valueOf(this.pageSize)));
         return this;
     }
 }

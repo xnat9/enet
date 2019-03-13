@@ -25,33 +25,32 @@ public class RestTpl {
     final Log log = Log.of(getClass());
 
     private TestRepo     testRepo;
-    private TransWrapper transManager;
+    private TransWrapper transWrapper;
 
 
     @EL(name = "sys.started")
     public void init() {
         testRepo = (TestRepo) ep.fire("dao.bean.get", TestRepo.class);
-        transManager = (TransWrapper) ep.fire("dao.bean.get", TransWrapper.class);
+        transWrapper = (TransWrapper) ep.fire("dao.bean.get", TransWrapper.class);
         ep.fire("swagger.addJaxrsDoc", this, null, "tpl", "tpl rest doc");
     }
 
 
     @GET
-    @Path("insert")
-    public void insert() {
+    @Path("dao")
+    @Produces("application/json")
+    public Object dao() {
         TestEntity e = new TestEntity();
         e.setName("aaaa" + new SimpleDateFormat("yyyy-MM-dd HH:mm:ss").format(new Date()));
         e.setAge(111);
-        transManager.trans(() -> testRepo.saveOrUpdate(e));
+        return transWrapper.trans(() -> {
+            // testRepo.findPage(0, 5, (root, query, cb) -> {query.orderBy(cb.desc(root.get("id"))); return null;});
+            testRepo.saveOrUpdate(e);
+            return testRepo.findPage(0, 5, (root, query, cb) -> {query.orderBy(cb.desc(root.get("id"))); return null;});
+        });
+        //return testRepo.findPage(0, 10, (root, query, cb) -> {query.orderBy(cb.desc(root.get("id"))); return null;});
     }
 
-
-    @GET
-    @Path("find")
-    @Produces("application/json")
-    public Object find() {
-        return testRepo.findPage(0, 100, null);
-    }
 
 
 //    public Object session(@CookieParam("sessionid") Cookie cookie) {

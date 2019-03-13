@@ -5,6 +5,7 @@ import org.hibernate.jpa.HibernatePersistenceProvider;
 import org.xnatural.enet.event.EP;
 import org.xnatural.enet.server.ServerTpl;
 
+import javax.annotation.PostConstruct;
 import javax.persistence.Entity;
 import javax.persistence.EntityManagerFactory;
 import javax.persistence.SharedCacheMode;
@@ -24,6 +25,7 @@ import java.util.Properties;
 import java.util.concurrent.ExecutorService;
 
 import static javax.persistence.SharedCacheMode.UNSPECIFIED;
+import static org.xnatural.enet.common.Utils.invoke;
 
 /**
  * hibernate 服务
@@ -274,6 +276,16 @@ public class HibernateServer extends ServerTpl {
                         } else if (TransWrapper.class.isAssignableFrom(field.getType())) {
                             field.setAccessible(true); field.set(o, tm);
                         }
+                    }
+                    c = c.getSuperclass();
+                } while (c != null);
+                // init method invoke
+                c = clz;
+                loop: do {
+                    for (Method m : c.getDeclaredMethods()) {
+                        PostConstruct an = m.getAnnotation(PostConstruct.class);
+                        if (an == null) continue;
+                        invoke(m, o); break loop;
                     }
                     c = c.getSuperclass();
                 } while (c != null);

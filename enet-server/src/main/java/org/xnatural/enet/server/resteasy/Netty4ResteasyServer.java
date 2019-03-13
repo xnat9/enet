@@ -53,7 +53,7 @@ public class Netty4ResteasyServer extends ServerTpl {
     protected RequestDispatcher  dispatcher;
 
 
-    public Netty4ResteasyServer() { setName("resteasy"); }
+    public Netty4ResteasyServer() { setName("resteasy-netty"); }
 
 
     @Override

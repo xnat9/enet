@@ -38,7 +38,7 @@ public class UndertowResteasySever extends ServerTpl {
 
 
     public UndertowResteasySever() {
-        setName("undertowRestEasy");
+        setName("resteasy-undertow");
         setPort(8080);
         setHostname("localhost");
     }

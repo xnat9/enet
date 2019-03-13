@@ -2,6 +2,8 @@ package org.xnatural.enet.server.dao.hibernate;
 
 import org.hibernate.Session;
 import org.hibernate.SessionFactory;
+import org.hibernate.metamodel.spi.MetamodelImplementor;
+import org.hibernate.persister.entity.AbstractEntityPersister;
 import org.xnatural.enet.common.Log;
 
 import javax.annotation.PostConstruct;
@@ -61,8 +63,7 @@ public class BaseRepo<T extends IEntity, ID extends Serializable> {
 
 
     public String tbName(Class<IEntity> eClass) {
-        // return ((AbstractEntityPersister) ((SessionImpl) em.getDelegate()).getFactory().getMetamodel().locateEntityPersister(entityClass)).getRootTableName();
-        return null;
+        return ((AbstractEntityPersister) ((MetamodelImplementor) sf.getMetamodel()).locateEntityPersister(eClass)).getRootTableName();
     }
 
 

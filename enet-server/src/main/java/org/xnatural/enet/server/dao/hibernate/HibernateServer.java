@@ -62,6 +62,8 @@ public class HibernateServer extends ServerTpl {
         if (coreExec == null) initExecutor();
         if (coreEp == null) coreEp = new EP(coreExec);
         coreEp.fire(getName() + ".starting");
+        attrs.put("hibernate.physical_naming_strategy", "org.xnatural.enet.server.dao.hibernate.SpringPhysicalNamingStrategy");
+        attrs.put("hibernate.implicit_naming_strategy", "org.xnatural.enet.server.dao.hibernate.SpringImplicitNamingStrategy");
         attrs.put("hibernate.current_session_context_class", "thread");
         // 先从核心取配置, 然后再启动
         Map<String, String> r = (Map) coreEp.fire("env.ns", getName());

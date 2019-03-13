@@ -43,6 +43,7 @@ public class RestTpl {
         TestEntity e = new TestEntity();
         e.setName("aaaa" + new SimpleDateFormat("yyyy-MM-dd HH:mm:ss").format(new Date()));
         e.setAge(111);
+        // return testRepo.tbName();
         return transWrapper.trans(() -> {
             // testRepo.findPage(0, 5, (root, query, cb) -> {query.orderBy(cb.desc(root.get("id"))); return null;});
             testRepo.saveOrUpdate(e);

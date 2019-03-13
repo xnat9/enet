@@ -37,20 +37,22 @@ public class TestApp extends ServerTpl {
 
     public static void main(String[] args) {
         AppContext app = new AppContext();
-        app.addSource(new Netty4HttpServer().setPort(8080));
+        app.addSource(new Netty4HttpServer());
         app.addSource(new Netty4ResteasyServer().scan(RestTpl.class));
         app.addSource(new MViewServer());
         app.addSource(new SwaggerServer());
-        app.addSource(new HibernateServer().scan(TestEntity.class));
+        app.addSource(new HibernateServer().scanEntity(TestEntity.class).scanRepo(TestRepo.class));
         app.addSource(new EhcacheServer());
         app.addSource(new SchedServer());
-        app.addSource(new TestApp());
+        app.addSource(new TestApp(app));
         app.start();
     }
 
 
-    public TestApp() {
-        setName("testApp");
+    AppContext ctx;
+    public TestApp(AppContext ctx) {
+        setName("app");
+        this.ctx = ctx;
     }
 
 
@@ -65,14 +67,6 @@ public class TestApp extends ServerTpl {
         // 动态启动服务
         if ("memory".equalsIgnoreCase(t)) ec.ep().fire("sys.addSource", new MemSessionManager());
     }
-    
-    
-    /**
-     * 系统启动结束后执行
-     * @param ec
-     */
-    @EL(name = {"sys.started"})
-    private void sysStarted(EC ec) {}
 }
 
 ```
@@ -87,11 +81,17 @@ public class TestApp extends ServerTpl {
 
 ## enet-server内置可用多模块说明
 ServerTpl: 服务模块模板
+
+约定: 所有Server的配置属性前缀以Server的name开头(具体以Server中的start方法为准)
   
    ### Netty4HttpServer: http服务
         1. netty4 实现的
         2. threads-boos 属性调节http处理的线程个数
         例: new Netty4HttpServer().setPort(8080).start();
+        多个配置属性前缀: http, http-netty
+            http.port: 8080
+            http-netty.port: 8081
+            最终是服务的端口是8081
         
    ### Netty4ResteasyServer: mvc
         1. 基于resteasy实现的mvc功能
@@ -100,6 +100,7 @@ ServerTpl: 服务模块模板
                app.addSource(new Netty4HttpServer().setPort(8080));
                app.addSource(new Netty4ResteasyServer().scan(RestTpl.class));
                app.start();
+         多个配置属性前缀: mvc, resteasy-netty
                
    ### UndertowResteasySever: mvc
         1. 基于resteasy实现的mvc功能.
@@ -108,7 +109,8 @@ ServerTpl: 服务模块模板
                app.addSource(new Netty4HttpServer().setPort(8080));
                app.addSource(new UndertowResteasySever().scan(RestTpl.class));
                app.start();
-               
+        多个配置属性前缀: mvc, resteasy-undertow
+        
    ### MViewServer: 一个系统管理界面(待完善)
    
    ### SwaggerServer: swagger api 文档服务
@@ -121,20 +123,34 @@ ServerTpl: 服务模块模板
                然后访问: http://localhost:8080/api-doc/
                
    ### HibernateServer: dao 层 hibernate 实现
-        1. 此服务暴露出一个 EntityManagerFactory/SessionFactory. 用这个对象来作为数据库的访问
+        1. 暴露对象: EntityManagerFactory/SessionFactory, TransWrapper(事务包装器)
             例: EntityManagerFactory emf = (EntityManagerFactory) ep.fire("bean.get", EntityManagerFactory.class);
+            TransWrapper emf = (TransWrapper) ep.fire("bean.get", TransWrapper.class);
+        2. 添加实体对象扫描: app.addSource(new HibernateServer().scanEntity(TestEntity.class) 会扫描TestEntity这个类所在的包下边的所有实体
+        3. 添加实体对象扫描: app.addSource(new HibernateServer().scanRepo(TestRepo.class)) 会扫描TestRepo这个类所在的包下边的所有dao对象
+        4. 建议所有dao对象 都继承自BaseRepo
+        5. 可单独取出 SessionFactory 进行数据库操作
+            
    ### EhcacheServer: ehcache 缓存服务
         1. cache.add: 添加缓存
             例: ep.fire("cache.add", "缓存名", "key1", "qqqqqqqqqq");
         2. cache.get: 获取缓存
-        
+            例: ep.fire("cache.get", "缓存名", "key1")
+
    ### SchedServer: quartz 时间任务调度器
         1. sched.cron: cron表达式 来调度任务执行
-            例: coreEp.fire("sched.cron", "31 */2 * * * ? 2019", (Runnable) () -> {// TODO});
+            例: ep.fire("sched.cron", "31 */2 * * * ? 2019", (Runnable) () -> {// TODO});
         2. sched.after: 多少时间之后执行
-            例: coreEp.fire("sched.after", 45, TimeUnit.SECONDS, (Runnable) () -> {// TODO});
+            例: ep.fire("sched.after", 45, TimeUnit.SECONDS, (Runnable) () -> {// TODO});
         3. sched.time: 在将来的某个时间点执行
-            例: coreEp.time("sched.after", new Date(new Date().getTime() + 5000), (Runnable) () -> {// TODO});
+            例: ep.time("sched.time", new Date(new Date().getTime() + 5000), (Runnable) () -> {// TODO});
+            
+   ### MemSessionManager: session管理(内存session)
+        1. 配置: session.expire: 30. 单位分钟
+        2. 保存属性到session. 
+            ep.fire("session.set", "sessionId", "key1", "value1")
+        2. 从session中取属性. 
+            ep.fire("session.get", "sessionId", "key1")
 
 ## 参与贡献
 

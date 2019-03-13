@@ -86,7 +86,7 @@ public class MemSessionManager extends ServerTpl {
             SessionData d = new SessionData(); sMap.put(sId, d);
             d.data = new ConcurrentHashMap<>();
             d.accessTime = System.currentTimeMillis();
-            log.info("create session '{}' at {}", sId, d.accessTime);
+            log.info("new session '{}' at {}", sId, d.accessTime);
             return d;
         }
     }

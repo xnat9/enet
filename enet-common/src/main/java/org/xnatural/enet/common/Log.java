@@ -26,7 +26,7 @@ import java.util.regex.Pattern;
  *    这样做的好处是: 只有当debug为true时才会去计算 user.getName();
  * 2. 支持日志前后缀
  * 依赖 slf4j
- * common log function.
+ * 注意: 必须要调有下 {@link #init(Runnable)} 才能正常使用
  * @author hubert
  */
 public class Log {

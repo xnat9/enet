@@ -87,7 +87,7 @@ public class Netty4ResteasyServer extends ServerTpl {
 
     @Override
     public void stop() {
-        log.info("Shutdown '{}' Server", getName());
+        log.debug("Shutdown '{}' Server", getName());
         dispatcher = null; deployment.stop(); deployment = null;
         if (coreExec instanceof ExecutorService) ((ExecutorService) coreExec).shutdown();
     }

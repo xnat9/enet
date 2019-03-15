@@ -65,7 +65,7 @@ public class Utils {
         private void reset() {
             contentType = "application/x-www-form-urlencoded";
             urlStr = null; method = null; params = null;
-            cookies = null; headers = null; jsonBody = null;
+            headers = null; jsonBody = null;
             timeout = 3000;
         }
         public Http get(String url) { this.urlStr = url; this.method = "GET"; return this; }
@@ -158,7 +158,7 @@ public class Utils {
                 if (isNotEmpty(cookies)) {
                     StringBuilder sb = new StringBuilder();
                     cookies.forEach((s, o) -> {
-                        if (o != null) sb.append(s).append("=").append(o);
+                        if (o != null) sb.append(s).append("=").append(o).append(";");
                     });
                     conn.setRequestProperty("Cookie", sb.toString());
                 }
@@ -204,6 +204,14 @@ public class Utils {
                         };
                         os.write(sb.toString().getBytes("utf-8"));
                         os.flush(); os.close();
+                    }
+                }
+                // 保存cookie
+                List<String> cs = conn.getHeaderFields().get("Set-Cookie");
+                if (isNotEmpty(cs)) {
+                    for (String c : cs) {
+                        String[] arr = c.split(";")[0].split("=");
+                        cookie(arr[0], arr[1]);
                     }
                 }
                 // 取结果

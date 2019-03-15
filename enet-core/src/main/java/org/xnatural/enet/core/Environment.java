@@ -7,7 +7,6 @@ import org.xnatural.enet.common.Utils;
 import org.xnatural.enet.event.EC;
 import org.xnatural.enet.event.EL;
 import org.xnatural.enet.event.EP;
-import org.yaml.snakeyaml.Yaml;
 
 import java.io.FileNotFoundException;
 import java.io.InputStream;
@@ -123,7 +122,7 @@ public class Environment {
         }
         finalAttrs.put(PROP_ACTIVE, activeProfiles.stream().collect(Collectors.joining(",")));
         log.info("The following profiles are active: {}", finalAttrs.get(PROP_ACTIVE));
-        // 配置日志相关
+        // 初始化日志相关
         Log.init(() -> initLog());
         ep.fire("env.configured", EC.of(this));
     }
@@ -205,82 +204,6 @@ public class Environment {
     }
 
 
-    /**
-     * 加载yaml/yml配置文件
-     * @param profile
-     * @param cfgFileLocation
-     * @param cfgFileName
-     */
-    protected void loadYamlFile(String profile, String cfgFileLocation, String cfgFileName) {
-        loadYamlFile(profile, cfgFileLocation, cfgFileName, "yaml");
-        loadYamlFile(profile, cfgFileLocation, cfgFileName, "yml");
-    }
-
-
-    protected void loadYamlFile(String profile, String cfgFileLocation, String cfgFileName, String suffix) {
-        String f = cfgFileLocation + cfgFileName + (profile == null ? "" : "-" + profile) + "." + suffix;
-        Map<String, String> r = null;
-        if (cfgFileLocation.startsWith("classpath:")) {
-            try (InputStream in = getClass().getClassLoader().getResourceAsStream(f.replace("classpath:/", ""))) {
-                if (in != null) {
-                    r = new LinkedHashMap<>();
-                    for (Object o : new Yaml().loadAll(in)) {
-                        Map<String, Object> m = (Map) o;
-                        Map<String, String> t = flattenMap(m, null);
-                        if (t != null) r.putAll(t);
-                    };
-                }
-            } catch (Exception e) {
-                log.error(e, "加载配置文件出错. location: {}", f);
-            }
-        } else {
-            try (InputStream in = new URL(f).openStream()) {
-                r = new LinkedHashMap<>();
-                for (Object o : new Yaml().loadAll(in)) {
-                    Map<String, Object> m = (Map) o;
-                    Map<String, String> t = flattenMap(m, null);
-                    if (t != null) r.putAll(t);
-                };
-            }  catch (FileNotFoundException e) {
-                log.trace("配置文件没找到. location: {}", f);
-            } catch (Exception e) {
-                log.error(e, "加载配置文件出错. location: {}", f);
-            }
-        }
-        if (r == null) return;
-        log.trace("加载配置文件. location: {}\n{}", f, r);
-        locationSources.put(f, r);
-        profileSources.computeIfAbsent(profile, s -> new LinkedHashMap<>()).putAll(r);
-        if (r.containsKey(PROP_ACTIVE)) {
-            for (String p : r.get(PROP_ACTIVE).split(",")) {
-                if (Utils.isNotBlank(p)) activeProfiles.add(p.trim());
-            }
-            allProfiles.addAll(activeProfiles);
-        }
-    }
-
-
-    /**
-     * 扁平化 yaml 文件的 map
-     * @param m
-     * @param pKey
-     * @return
-     */
-    protected Map<String, String> flattenMap(Map<String, Object> m, String pKey) {
-        if (m == null) return null;
-        Map<String, String> r = new LinkedHashMap<>();
-        m.forEach((k, v) -> {
-            if (v == null) return;
-            if (Map.class.isAssignableFrom(v.getClass())) {
-                //  TODO 尾调用
-                Map<String, String> t = flattenMap((Map<String, Object>) v, (pKey == null ? "" : pKey + ".") + k);
-                if (t != null) r.putAll(t);
-            } else r.put((pKey == null ? "" : pKey + ".") + k, v.toString());
-        });
-        return r;
-    }
-
-
     public Integer getInteger(String key, Integer defaultValue) {
         String v = getAttr(key);
         return Utils.toInteger(v, defaultValue);
@@ -319,7 +242,6 @@ public class Environment {
     }
 
 
-
     /**
      * 用于运行时改变属性
      * @param key
@@ -327,7 +249,7 @@ public class Environment {
      * @return
      */
     public Environment setAttr(String key, String value) {
-        if (PROP_ACTIVE.equals(key)) throw new IllegalArgumentException("not allow change this property '" + PROP_ACTIVE + "'");
+        if (PROP_ACTIVE.equals(key)) throw new RuntimeException("not allow change this property '" + PROP_ACTIVE + "'");
         ep.fire(
                 "env.updateAttr",
                 EC.of(this).args(key, value),

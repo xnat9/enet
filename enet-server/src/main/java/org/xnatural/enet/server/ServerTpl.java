@@ -111,7 +111,6 @@ public class ServerTpl {
         if (ec.result != null) return ec.result; // 已经找到结果了, 就直接返回
 
         Object bean = null;
-
         if (beanName != null && beanType != null) {
             bean = beanCtx.getAttr(beanName);
             if (bean != null && !beanType.isAssignableFrom(bean.getClass())) bean = null;

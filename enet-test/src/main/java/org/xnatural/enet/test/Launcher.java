@@ -22,7 +22,7 @@ import java.util.concurrent.TimeUnit;
 /**
  * @author xiangxb, 2018-12-22
  */
-public class TestApp extends ServerTpl {
+public class Launcher extends ServerTpl {
 
 
     public static void main(String[] args) {
@@ -34,15 +34,15 @@ public class TestApp extends ServerTpl {
         app.addSource(new HibernateServer().scanEntity(TestEntity.class).scanRepo(TestRepo.class));
         app.addSource(new EhcacheServer());
         app.addSource(new SchedServer());
-        app.addSource(new TestApp(app));
+        app.addSource(new Launcher(app));
         app.start();
     }
 
 
     AppContext ctx;
 
-    public TestApp(AppContext ctx) {
-        setName("app");
+    public Launcher(AppContext ctx) {
+        setName("launcher");
         this.ctx = ctx;
     }
 
@@ -65,19 +65,28 @@ public class TestApp extends ServerTpl {
      */
     @EL(name = "sys.started")
     private void sysStarted() {
-        // Utils.sleep(1000);
         // ctx.stop();
     }
 
 
     @EL(name = "sched.started")
     private void schedStarted() {
+        systemLoadMonitor();
+    }
+
+
+    /**
+     * 系统负载监控
+     */
+    private void systemLoadMonitor() {
         try {
             Field f = AppContext.class.getDeclaredField("exec");
             f.setAccessible(true);
-            Object v = f.get(ctx);
+            ThreadPoolExecutor v = (ThreadPoolExecutor) f.get(ctx);
             if (v instanceof ThreadPoolExecutor) {
-                coreEp.fire("sched.cron", "31 */2 * * * ?", (Runnable) () -> monitorExec((ThreadPoolExecutor) v));
+                coreEp.fire("sched.cron", "31 */1 * * * ?", (Runnable) () -> {
+                    monitorExec(v);
+                });
             }
         } catch (Exception e) {
             log.error(e);
@@ -90,27 +99,36 @@ public class TestApp extends ServerTpl {
      * @param e
      */
     private void monitorExec(ThreadPoolExecutor e) {
-        if (e.getQueue().size() > 1200) {
-            log.warn("system is very heavy load running. {}", "[" + e.toString().split("\\[")[1]);
-        } else if (e.getQueue().size() > 700) {
+        if (e.getQueue().size() > 10000) {
+            log.warn("system is very heavy load running!. {}", "[" + e.toString().split("\\[")[1]);
+        } else if (e.getQueue().size() > 7000) {
+            log.warn("system is heavy load running. {}", "[" + e.toString().split("\\[")[1]);
             coreEp.fire("sched.after", 45, TimeUnit.SECONDS, (Runnable) () -> {
-                if (e.getQueue().size() > 1000) {
-                    log.warn("system is heavy load running. {}", "[" + e.toString().split("\\[")[1]);
+                if (e.getQueue().size() > 7000) {
+                    log.warn("system is heavy(up) load running. {}", "[" + e.toString().split("\\[")[1]);
+                } else {
+                    log.warn("system is heavy(down) load running. {}", "[" + e.toString().split("\\[")[1]);
                 }
             });
-        } else if (e.getQueue().size() > 200) {
+        } else if (e.getQueue().size() > 3000) {
+            log.warn("system will heavy load running. {}", "[" + e.toString().split("\\[")[1]);
             coreEp.fire("sched.after", 30, TimeUnit.SECONDS, (Runnable) () -> {
-                if (e.getQueue().size() > 500) {
-                    log.warn("system will heavy load running. {}", "[" + e.toString().split("\\[")[1]);
+                if (e.getQueue().size() > 3000) {
+                    log.warn("system will heavy(up) load running. {}", "[" + e.toString().split("\\[")[1]);
+                } else {
+                    log.warn("system will heavy(down) load running. {}", "[" + e.toString().split("\\[")[1]);
                 }
             });
-        } else if (e.getQueue().size() > 20) {
+        } else if (e.getQueue().size() > 500) {
+            log.warn("system is litter heavy load running. {}", "[" + e.toString().split("\\[")[1]);
             coreEp.fire("sched.after", 25, TimeUnit.SECONDS, (Runnable) () -> {
-                if (e.getQueue().size() > 70) {
-                    log.warn("system is litter heavy load running. {}", "[" + e.toString().split("\\[")[1]);
+                if (e.getQueue().size() > 500) {
+                    log.warn("system is litter heavy(up) load running. {}", "[" + e.toString().split("\\[")[1]);
+                } else {
+                    log.warn("system is litter heavy(down) load running. {}", "[" + e.toString().split("\\[")[1]);
                 }
             });
-        } else if (e.getQueue().size() > e.getCorePoolSize()) {
+        } else if (e.getQueue().size() > e.getCorePoolSize() * 2) {
             log.info("system executor: {}", "[" + e.toString().split("\\[")[1]);
         }
     }

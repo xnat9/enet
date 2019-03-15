@@ -67,7 +67,7 @@ public class EhcacheServer extends ServerTpl {
     }
 
 
-    @EL(name = {"${name}.create", "cache.create"}, async = false)
+    @EL(name = {"${name}.create"}, async = false)
     protected Cache<Object, Object> createCache(String cName, Duration expire, Integer heapOfEntries, Integer heapOfMB) {
         Cache<Object, Object> cache = cm.getCache(cName, Object.class, Object.class);
         if (cache == null) {

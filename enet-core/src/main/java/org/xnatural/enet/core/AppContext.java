@@ -32,6 +32,7 @@ public class AppContext {
      */
     protected       ThreadPoolExecutor  exec;
     /**
+     * 事件中心
      * {@link #wrapEpForSource(Object)}
      */
     protected       EP                  ep;
@@ -54,10 +55,9 @@ public class AppContext {
     public void start() {
         log.info("Starting Application on {} with PID {}", getHostname(), getPid());
         if (exec == null) initExecutor();
-        // 1. 创建事件发布器
-        ep = initEp();
-        ep.addListenerSource(this);
-        sourceMap.forEach((k, v) -> { ep.addListenerSource(v); setForSource(v); });
+        // 1. 初始化事件发布器
+        ep = initEp(); ep.addListenerSource(this);
+        sourceMap.forEach((k, v) -> { setForSource(v); ep.addListenerSource(v); });
         // 2. 设置系统环境
         env = new Environment(); env.setEp(ep); env.loadCfg();
         // 3. 通知所有服务启动
@@ -81,7 +81,7 @@ public class AppContext {
 
 
     /**
-     * 启动完成
+     * 启动完成调用
      */
     @EL(name = "sys.started")
     protected void started() {}
@@ -97,26 +97,18 @@ public class AppContext {
     public void addSource(Object source) {
         if (source == null) return;
         if (source instanceof Class) return;
-        Method m = findMethod(source.getClass(), "getName");
-        if (m == null) {
-            log.warn("Source '{}' must have name property", source); return;
-        }
+        Method m = findMethod(source.getClass(), "getName"); // 每个source对象都必须有一个name属性并且唯一
+        if (m == null) { log.warn("Source '{}' must have name property", source); return; }
         String name = (String) invoke(m, source);
-        if (Utils.isEmpty(name)) {
-            log.warn("Get name property is empty from '{}'", source); return;
-        }
+        if (Utils.isEmpty(name)) { log.warn("Get name property is empty from '{}'", source); return; }
         if ("sys".equalsIgnoreCase(name) || "env".equalsIgnoreCase(name) || "log".equalsIgnoreCase(name)) {
             log.warn("name property cannot equal 'sys', 'env' or 'log' . source: {}", source); return;
         }
         if (sourceMap.containsKey(name)) {
-            log.warn("name property '{}' already exist in source: {}", name, sourceMap.get(name));
-            return;
+            log.warn("name property '{}' already exist in source: {}", name, sourceMap.get(name)); return;
         }
         sourceMap.put(name, source);
-        if (ep != null) {
-            ep.addListenerSource(source);
-            setForSource(source);
-        }
+        if (ep != null) { setForSource(source); ep.addListenerSource(source); }
     }
 
 
@@ -148,24 +140,23 @@ public class AppContext {
      * see:  {@link ThreadPoolExecutor#runWorker(ThreadPoolExecutor.Worker)} 这里面当有异常抛出时 1128行代码 {@link ThreadPoolExecutor#processWorkerExit(ThreadPoolExecutor.Worker, boolean)}
      */
     protected void initExecutor() {
-        int capacity = 500000;
         exec = new ThreadPoolExecutor(
-                4, 8, 30, TimeUnit.MINUTES, new LinkedBlockingQueue<>(capacity),
+                4, 8, 30, TimeUnit.MINUTES, new LinkedBlockingQueue<>(),
                 new ThreadFactory() {
-                    final AtomicInteger count = new AtomicInteger(1);
+                    final AtomicInteger i = new AtomicInteger(1);
                     @Override
                     public Thread newThread(Runnable r) {
-                        return new Thread(r, "sys-" + count.getAndIncrement());
+                        return new Thread(r, "sys-" + i.getAndIncrement());
                     }
                 }
         ) {
             @Override
-            public void execute(Runnable command) {
+            public void execute(Runnable fn) {
                 try {
-                    super.execute(command);
+                    super.execute(fn);
                 } catch (RejectedExecutionException ex) {
                     log.warn("thread pool rejected new task very heavy load. {}", this);
-                } catch (Exception t) {
+                } catch (Throwable t) {
                     log.error("task happen error", t);
                 }
             }
@@ -192,7 +183,7 @@ public class AppContext {
 
 
     @EL(name = "env.updateAttr")
-    protected void reAdjustExec(String k, String v) {
+    protected void updateAttr(String k, String v) {
         if (k.startsWith("sys.exec")) {
             if ("sys.exec.corePoolSize".equals(k)) {
                 Integer i = toInteger(v, null);
@@ -206,7 +197,7 @@ public class AppContext {
                 Long l = toLong(v, null);
                 if (l == null) throw new IllegalArgumentException("sys.exec.keepAliveTime属性值只能是整数");
                 exec.setKeepAliveTime(l, TimeUnit.MILLISECONDS);
-            } else log.warn("不允许更新属性: " + k);
+            } else log.warn("not allow change property '{}'", k);
         }
     }
 
@@ -308,8 +299,7 @@ public class AppContext {
             }
             @Override
             public EP addListenerSource(Object source) {
-                ep.addListenerSource(source);
-                return this;
+                ep.addListenerSource(source); return this;
             }
             @Override
             public String toString() {

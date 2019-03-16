@@ -154,6 +154,10 @@ public class Launcher extends ServerTpl {
             例: ep.fire("cache.get", "缓存名", "key1")
         3. 创建自定义缓存
             例: ep.fire("ehcache.create", "缓存名", "过期时间(Duration对象)", "最多保存多少条(heapOfEntries)", "最多大小(单位:MB)")
+        4. 使某个缓存key过期
+            例: ep.fire("cache.evict", "缓存名", "key1")
+        5. 清理某个缓存
+            例: ep.fire("cache.clear", "缓存名")
 
    ### SchedServer: quartz 时间任务调度器
         1. sched.cron: cron表达式 来调度任务执行

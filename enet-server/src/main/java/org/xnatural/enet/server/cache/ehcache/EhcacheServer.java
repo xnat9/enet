@@ -93,4 +93,18 @@ public class EhcacheServer extends ServerTpl {
         Cache<Object, Object> cache = cm.getCache(cName, Object.class, Object.class);
         return (cache == null ? null : cache.get(key));
     }
+
+
+    @EL(name = {"${name}.evict", "cache.evict"}, async = false)
+    protected void evict(String cName, Object key) {
+        Cache<Object, Object> cache = cm.getCache(cName, Object.class, Object.class);
+        if (cache != null) cache.remove(key);
+    }
+
+
+    @EL(name = {"${name}.clear", "cache.clear"})
+    protected void evict(String cName) {
+        Cache<Object, Object> cache = cm.getCache(cName, Object.class, Object.class);
+        if (cache != null) cache.clear();
+    }
 }

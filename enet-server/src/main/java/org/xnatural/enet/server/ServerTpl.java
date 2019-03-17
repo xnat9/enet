@@ -7,15 +7,17 @@ import org.xnatural.enet.event.EC;
 import org.xnatural.enet.event.EL;
 import org.xnatural.enet.event.EP;
 
-import java.beans.Introspector;
-import java.beans.PropertyDescriptor;
 import java.lang.reflect.Method;
 import java.lang.reflect.Modifier;
 import java.util.*;
 import java.util.concurrent.*;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
+import java.util.concurrent.atomic.AtomicReference;
+import java.util.function.Supplier;
 import java.util.stream.Collectors;
+
+import static org.xnatural.enet.common.Utils.*;
 
 /**
  * 模块 模板 代码.
@@ -145,6 +147,11 @@ public class ServerTpl {
     }
 
 
+    /**
+     * 用于mview server
+     * @return
+     * @throws Exception
+     */
     @EL(name = "server.${name}.info")
     protected Map<String, Object> info() throws Exception {
         Map<String, Object> r = new HashMap<>(5);
@@ -152,32 +159,69 @@ public class ServerTpl {
 
         // 属性
         List<Map<String, Object>> properties = new LinkedList<>(); r.put("properties", properties);
-        for (PropertyDescriptor pd : Introspector.getBeanInfo(getClass()).getPropertyDescriptors()) {
-            Map<String, Object> prop = new HashMap<>(2); properties.add(prop);
-            prop.put("name", pd.getName());
-            prop.put("set", pd.getWriteMethod() != null);
-            prop.put("type", pd.getPropertyType());
-            try {
-                prop.put("value", pd.getReadMethod().invoke(this));
-            } catch (Exception e) {
-                log.warn(e, "属性取值错误. name: {}", pd.getName());
-            }
-        }
-
-        // 方法
         List<Map<String, Object>> methods = new LinkedList<>(); r.put("methods", methods);
-        Class c = getClass();
-        do {
-            for (Method m : c.getDeclaredMethods()) {
-                if (m.getParameterCount() > 0) continue;
-                if (Modifier.isAbstract(m.getModifiers())) continue;
-                if (!Modifier.isPublic(m.getModifiers())) continue;
-                Map<String, Object> method = new HashMap<>(2); methods.add(method);
-                method.put("name", m.getName());
-                method.put("annotations", Arrays.stream(m.getAnnotations()).map(a -> "@" + a.getClass().getSimpleName()).collect(Collectors.toList()));
+        AtomicReference<Method> pm = new AtomicReference<>();
+        iterateMethod(getClass(),
+            m -> { // 取属性
+                if (m.getParameterCount() != 0) return;
+                if (void.class.isAssignableFrom(m.getReturnType()) || Void.class.isAssignableFrom(m.getReturnType())) return;
+                Map<String, Object> prop;
+                String suffix; // get, is, set 方法后缀
+                if (m.getName().startsWith("get")) {
+                    prop = new HashMap<>(7); properties.add(prop);
+                    suffix = m.getName().substring(3);
+                } else if (m.getName().startsWith("is") && (boolean.class.equals(m.getReturnType()) || Boolean.class.equals(m.getReturnType()))) {
+                    prop = new HashMap<>(7); properties.add(prop);
+                    suffix = m.getName().substring(2);
+                } else return;
+                prop.put("name", suffix.substring(0, 1).toLowerCase() + suffix.substring(1));
+                prop.put("type", m.getReturnType());
+                prop.put("value", invoke(m, this));
+                prop.put("settable", ((Supplier<Boolean>) () -> {
+                    String n = "set" + suffix;
+                    if (int.class.equals(m.getReturnType()) || Integer.class.equals(m.getReturnType())) {
+                        Method mm = findMethod(getClass(), n, int.class);
+                        if (mm == null) mm = findMethod(getClass(), n, Integer.class);
+                        if (mm != null) return true;
+                    } else if (long.class.equals(m.getReturnType()) || Long.class.equals(m.getReturnType())) {
+                        Method mm = findMethod(getClass(), n, long.class);
+                        if (mm == null) mm = findMethod(getClass(), n, Long.class);
+                        if (mm != null) return true;
+                    } else if (boolean.class.equals(m.getReturnType()) || Boolean.class.equals(m.getReturnType())) {
+                        Method mm = findMethod(getClass(), n, boolean.class);
+                        if (mm == null) mm = findMethod(getClass(), n, Boolean.class);
+                        if (mm != null) return true;
+                    } else if (double.class.equals(m.getReturnType()) || Double.class.equals(m.getReturnType())) {
+                        Method mm = findMethod(getClass(), n, double.class);
+                        if (mm == null) mm = findMethod(getClass(), n, Double.class);
+                        if (mm != null) return true;
+                    } else if (float.class.equals(m.getReturnType()) || Float.class.equals(m.getReturnType())) {
+                        Method mm = findMethod(getClass(), n, float.class);
+                        if (mm == null) mm = findMethod(getClass(), n, Float.class);
+                        if (mm != null) return true;
+                    } else {
+                        return findMethod(getClass(), n, m.getReturnType()) != null;
+                    }
+                    return false;
+                }).get());
+                pm.set(m);
+            },
+            m -> { // 取方法
+                if (!Modifier.isPublic(m.getModifiers())) return;
+                if (m.getParameterCount() > 0) return;
+                if (Modifier.isAbstract(m.getModifiers())) return;
+                if (m.equals(pm.get())) return; // 是属性方法
+                if ("notify".equals(m.getName()) || "notifyAll".equals(m.getName()) || "wait".equals(m.getName()) || "hashCode".equals(m.getName())) return;
+                if (methods.stream().anyMatch(e -> m.getName().equals(e.get("name")))) return;
+                Map<String, Object> attr = new HashMap<>(2); methods.add(attr);
+                attr.put("name", m.getName());
+                attr.put("annotations", Arrays.stream(m.getAnnotations()).map(a -> "@" + a.getClass().getSimpleName()).collect(Collectors.toList()));
+                attr.put("returnType", m.getReturnType());
+                attr.put("invokeReturn", "");
             }
-            c = c.getSuperclass();
-        } while (c != null);
+        );
+        properties.sort(Comparator.comparing(o -> o.get("name").toString()));
+        methods.sort(Comparator.comparing(o -> o.get("name").toString()));
         return r;
     }
 
@@ -219,6 +263,22 @@ public class ServerTpl {
         if (name == null || name.isEmpty()) throw new IllegalArgumentException("服务标识名不能为空");
         this.name = name;
         return this;
+    }
+
+
+    public String getLogLevel() {
+        if (log == null) return null;
+        else if (log.isTraceEnabled()) return "trace";
+        else if (log.isDebugEnabled()) return "debug";
+        else if (log.isInfoEnabled()) return "info";
+        else if (log.isWarnEnabled()) return "warn";
+        else if (log.isErrorEnabled()) return "error";
+        return null;
+    }
+
+
+    public void setLogLevel(String level) {
+        log.setLevel(level);
     }
 
 

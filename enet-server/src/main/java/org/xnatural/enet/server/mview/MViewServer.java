@@ -1,17 +1,9 @@
 package org.xnatural.enet.server.mview;
 
-import io.swagger.v3.jaxrs2.integration.JaxrsApplicationAndAnnotationScanner;
-import io.swagger.v3.jaxrs2.integration.XmlWebOpenApiContext;
-import io.swagger.v3.oas.integration.SwaggerConfiguration;
-import io.swagger.v3.oas.models.OpenAPI;
-import io.swagger.v3.oas.models.PathItem;
-import io.swagger.v3.oas.models.tags.Tag;
-import org.xnatural.enet.event.EC;
-import org.xnatural.enet.event.EL;
 import org.xnatural.enet.event.EP;
 import org.xnatural.enet.server.ServerTpl;
 
-import java.util.*;
+import java.util.Map;
 import java.util.concurrent.ExecutorService;
 
 /**
@@ -47,7 +39,6 @@ public class MViewServer extends ServerTpl {
         ctl = new Controller(this);
         log.info("Started {} Server. pathPrefix: {}", getName(), ("/" + getPath() + "/").replace("//", "/"));
         coreEp.fire("resteasy.addResource", ctl, getPath());
-        // coreEp.fire("swagger.addJaxrsDoc", ctl, getPath(), getName());
     }
 
     @Override

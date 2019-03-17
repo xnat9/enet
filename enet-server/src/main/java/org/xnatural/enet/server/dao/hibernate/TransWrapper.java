@@ -46,10 +46,9 @@ public class TransWrapper {
     public <T> T trans(Supplier<T> fn, Runnable successFn, Consumer<Throwable> failFn) {
         Session s = sf.getCurrentSession();
         Transaction tx = s.getTransaction();
-        if (txFlag.get()) { // 当前线程是否有事务存在
-            try { return fn.get(); }
-            catch (Throwable t) { tx.rollback(); s.close(); txFlag.set(false); throw t; }
-        } else {
+        // 当前线程是否有事务存在
+        if (txFlag.get()) return fn.get();
+        else {
             tx.begin(); txFlag.set(true);
             try { T r = fn.get(); tx.commit(); if (successFn != null) successFn.run(); return r;}
             catch (Throwable t) { tx.rollback(); if (failFn != null) failFn.accept(t); throw t; }

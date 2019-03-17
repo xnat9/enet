@@ -188,7 +188,7 @@ public class Netty4ResteasyServer extends ServerTpl {
             deployment.setInjectorFactory(new InjectorFactoryImpl() {
                 @Override
                 public ValueInjector createParameterExtractor(Parameter param, ResteasyProviderFactory pf) {
-                    SessionAttr sessionAttr = findAnnotation(param.getAnnotations(), SessionAttr.class);
+                    SessionAttr attrAnno = findAnnotation(param.getAnnotations(), SessionAttr.class);
                     if (findAnnotation(param.getAnnotations(), SessionId.class) != null) {
                         return new ValueInjector() {
                             @Override
@@ -198,13 +198,13 @@ public class Netty4ResteasyServer extends ServerTpl {
                                 return request.getAttribute(getSessionCookieName());
                             }
                         };
-                    } else if (sessionAttr != null) {
+                    } else if (attrAnno != null) {
                         return new ValueInjector() {
                             @Override
                             public Object inject() { return null; }
                             @Override
                             public Object inject(HttpRequest request, HttpResponse response) {
-                                return coreEp.fire("session.get", request.getAttribute(getSessionCookieName()), sessionAttr.value());
+                                return coreEp.fire("session.get", request.getAttribute(getSessionCookieName()), attrAnno.value());
                             }
                         };
                     }

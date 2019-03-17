@@ -3,26 +3,30 @@
 <head>
     <meta charset="UTF-8">
     <title>${serverName}</title>
-    <link rel="stylesheet" type="text/css" href="../css/bootstrap.min.4.0.0.css"></link>
+    <link rel="stylesheet" type="text/css" href="../css/bootstrap.min.4.0.0.css"/>
+    <script src="../js/lib/vue.js"></script>
+    <script src="../js/lib/iview.min.js"></script>
 </head>
 <body>
 <div id="app" class="container-fluid">
     <div class="row" v-if="properties">
         <properties-view :properties="properties" />
     </div>
+    <div class="row" v-if="methods">
+        <methods-view :methods="methods" />
+    </div>
 </div>
 
 <script type="text/x-template" id="properties-view-tpl">
     <div class="panel panel-default">
         <div class="panel-heading">
-            <h3>Properties View</h3>
+            <h3>Property View</h3>
         </div>
         <table class="table table-bordered table-condensed table-striped table-hover">
             <thead>
-            <tr><th>Name</th><th>Value</th><th>Type</th></tr>
+                <tr><th>Name</th><th>Value</th><th>Type</th></tr>
             </thead>
             <tbody>
-            <!--<tr is="prop-item" v-for="prop in properties" :prop="prop"/>-->
             <tr v-for="prop in properties">
                 <td>
                     <ul v-if="prop.annotations" class="list-unstyled">
@@ -39,16 +43,45 @@
             </tr>
             </tbody>
             <tfoot>
-            <tr><td><total :total="properties.length"/></td></tr>
+                <tr><td><total :total="properties.length"/></td></tr>
             </tfoot>
         </table>
     </div>
 </script>
 
+<script type="text/x-template" id="methods-view-tpl">
+    <div class="panel panel-default">
+        <div class="panel-heading">
+            <h3>Method View</h3>
+        </div>
+        <table class="table table-bordered table-condensed table-striped table-hover">
+            <thead>
+                <tr><th>Name</th><th>ReturnType</th><th>操作</th><th>调用返回</th></tr>
+            </thead>
+            <tbody>
+            <tr v-for="m in methods">
+                <td>
+                    <ul v-if="m.annotations" class="list-unstyled">
+                        <li v-for="mark in m.annotations">
+                            <i>{{mark}}</i>
+                        </li>
+                    </ul>
+                    {{m.name}}
+                </td>
+                <td>
+                    {{m.returnType}}
+                </td>
+                <td><button @click="invoke(m)" class="btn">调用</button></td>
+                <td>{{m.invokeReturn}}</td>
+            </tr>
+            </tbody>
+            <tfoot>
+                <tr><td><total :total="methods.length"/></td></tr>
+            </tfoot>
+        </table>
+    </div>
+</script>
 
-
-</body>
-<script src="../js/lib/vue.js"></script>
 <script>
     var state = {
         rootPath: "${rootPath}",
@@ -64,9 +97,20 @@
         props: ['properties'],
         template: '#properties-view-tpl'
     });
+    Vue.component('methods-view', {
+        props: ['methods'],
+        template: '#methods-view-tpl',
+        methods: {
+            invoke: function (m) {
+                m.invokeReturn = "xxxxxxxxx";
+                console.log(m);
+            }
+        }
+    });
     var app = new Vue({
         el: '#app',
-        data: state
+        data: state,
     });
 </script>
+</body>
 </html>

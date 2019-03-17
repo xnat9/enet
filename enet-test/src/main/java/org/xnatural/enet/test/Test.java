@@ -15,7 +15,8 @@ public class Test {
         Log.init(null);
     }
     public static void main(String[] args) {
-
+        System.out.println(650/30*12 - 550/30*12);
+        if (true) return;
         Utils.Http h = Utils.http();
         long start = System.currentTimeMillis();
         System.out.println(h.get("http://localhost:8080/tpl/dao").execute());

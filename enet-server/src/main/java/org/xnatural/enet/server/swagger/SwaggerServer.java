@@ -17,6 +17,7 @@ import java.lang.reflect.Field;
 import java.util.*;
 import java.util.concurrent.ExecutorService;
 
+import static java.util.Collections.*;
 import static org.xnatural.enet.common.Utils.*;
 
 public class SwaggerServer extends ServerTpl {
@@ -88,10 +89,10 @@ public class SwaggerServer extends ServerTpl {
             Map.Entry<String, PathItem> e = it.next();
             PathItem pi = e.getValue();
             if (pi.getGet() != null && pi.getGet().getTags() == null) {
-                pi.getGet().setTags(Collections.singletonList(t.getName()));
+                pi.getGet().setTags(singletonList(t.getName()));
             }
             if (pi.getPost() != null && pi.getPost().getTags() == null) {
-                pi.getPost().setTags(Collections.singletonList(t.getName()));
+                pi.getPost().setTags(singletonList(t.getName()));
             }
             rPaths.put(("/" + (isEmpty(path) ? "" : path) + "/" + e.getKey()).replace("///", "/").replace("//", "/"), pi);
             it.remove();

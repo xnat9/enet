@@ -1,5 +1,7 @@
 package org.xnatural.enet.test;
 
+import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.Parameter;
 import org.xnatural.enet.common.Log;
 import org.xnatural.enet.event.EL;
 import org.xnatural.enet.event.EP;
@@ -15,6 +17,8 @@ import java.util.Date;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CompletionStage;
 
+import static org.xnatural.enet.test.ApiResp.ok;
+
 /**
  * @author xiangxb, 2019-01-13
  */
@@ -25,26 +29,25 @@ public class RestTpl {
     final Log log = Log.of(getClass());
 
     private TestRepo     testRepo;
-    private TransWrapper transWrapper;
+    private TransWrapper tm;
 
 
     @EL(name = "sys.started")
     public void init() {
-        testRepo = (TestRepo) ep.fire("dao.bean.get", TestRepo.class);
-        transWrapper = (TransWrapper) ep.fire("dao.bean.get", TransWrapper.class);
         ep.fire("swagger.addJaxrsDoc", this, null, "tpl", "tpl rest doc");
+        testRepo = (TestRepo) ep.fire("dao.bean.get", TestRepo.class);
+        tm = (TransWrapper) ep.fire("dao.bean.get", TransWrapper.class);
     }
 
 
-    @GET
-    @Path("dao")
+    @GET @Path("dao")
     @Produces("application/json")
     public Object dao() {
         TestEntity e = new TestEntity();
         e.setName("aaaa" + new SimpleDateFormat("yyyy-MM-dd HH:mm:ss").format(new Date()));
         e.setAge(111);
         // return testRepo.tbName();
-        return transWrapper.trans(() -> {
+        return tm.trans(() -> {
             // testRepo.findPage(0, 5, (root, query, cb) -> {query.orderBy(cb.desc(root.get("id"))); return null;});
             testRepo.saveOrUpdate(e);
             return testRepo.findPage(0, 5, (root, query, cb) -> {query.orderBy(cb.desc(root.get("id"))); return null;});
@@ -53,36 +56,37 @@ public class RestTpl {
     }
 
 
+    @GET @Path("get1")
+    @Produces("application/json")
+    public ApiResp get(@QueryParam("a") String a) {
+        return ok("a", a);
+    }
 
-//    public Object session(@CookieParam("sessionid") Cookie cookie) {
-//        cookie.getValue();
-//    }
 
-
-    @GET
-    @Path("get1")
-    //@Produces("application/json")
-    public String get(@SessionId String sId, @QueryParam("a") String a, @SessionAttr("attr1") Object attr1) {
-        log.info("get1 {}" + a);
+    @Operation(summary = "session 测试")
+    @GET @Path("session")
+    @Produces("application/json")
+    public Object session(
+        @Parameter(hidden = true) @SessionId String sId,
+        @Parameter(hidden = true) @SessionAttr("attr1") Object attr1,
+        @Parameter(description = "参数a") @QueryParam("a") String a
+    ) {
         // if (true) throw new IllegalArgumentException("xxxxxxxxxxxxx");
         ep.fire("session.set", sId, "attr1", "value1" + System.currentTimeMillis());
-        log.info("session attr1: {}", attr1);
-        return sId;
+        return ok("sId", sId).attr("attr1", attr1).attr("param_a", a);
     }
 
 
-    @GET
-    @Path("cache")
-    // @Produces("application/json")
-    public Object cache() {
+    @GET @Path("cache")
+    @Produces("application/json")
+    public ApiResp cache() {
         Object r = ep.fire("cache.get", "test", "key1");
         if (r == null) ep.fire("cache.add", "test", "key1", "qqqqqqqqqq");
-        return r;
+        return ok(r);
     }
 
 
-    @GET
-    @Path("async")
+    @GET @Path("async")
     @Produces("text/plain")
     public CompletionStage<String> async() {
         CompletableFuture<String> f = new CompletableFuture();
@@ -91,8 +95,7 @@ public class RestTpl {
     }
 
 
-    @GET
-    @Path("js/lib/{fName}")
+    @GET @Path("js/lib/{fName}")
     public Response jsLib(@PathParam("fName") String fName) {
         File f = new File(getClass().getClassLoader().getResource("static/js/lib/" + fName).getFile());
         return Response.ok()

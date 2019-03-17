@@ -19,6 +19,8 @@ import java.util.function.Supplier;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
+import static org.xnatural.enet.common.Utils.*;
+
 /**
  * 通用 Log
  * 1. 支持 log.debug("user name is {0.name}, age is {0.age}", user)
@@ -75,7 +77,7 @@ public class Log {
         POST_1_6 = post16;
         LOG_METHOD = logMethod;
         root = of(Logger.ROOT_LOGGER_NAME);
-        System.setProperty("PID", Utils.getPid());
+        System.setProperty("PID", getPid());
 //        ILoggerFactory lf = LoggerFactory.getILoggerFactory();
 //        if ("ch.qos.logback.classic.LoggerContext".equals(lf.getClass().getName())) {
 //            Method m = findMethod(lf.getClass(), "putProperty", String.class, String.class);
@@ -117,7 +119,7 @@ public class Log {
         while (matcher.find()) {
             Object indexMappedObject = null;
             try {
-                int index = Utils.toInteger(matcher.group(2), -1);
+                int index = toInteger(matcher.group(2), -1);
                 if (index < 0) {
                     continue;
                 }
@@ -262,6 +264,19 @@ public class Log {
         return LocationAwareLogger.TRACE_INT;
     }
 
+
+    public void setLevel(String level) {
+        // 如果是 logback
+        if ("ch.qos.logback.classic.Logger".equals(logger.getName())) {
+            try {
+                Method setLevel = findMethod(Class.forName("ch.qos.logback.classic.Logger"), "setLevel", Class.forName("ch.qos.logback.classic.Level"));
+                Method toLevel = findMethod(Class.forName("ch.qos.logback.classic.Level"), "toLevel", String.class);
+                invoke(setLevel, logger, invoke(toLevel, level));
+            } catch (ClassNotFoundException e) {
+                e.printStackTrace();
+            }
+        }
+    }
 
     // ====================log method ==============
 

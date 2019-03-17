@@ -13,12 +13,15 @@ import java.io.File;
 import java.io.FileInputStream;
 import java.lang.management.ManagementFactory;
 import java.lang.reflect.Array;
+import java.lang.reflect.Field;
 import java.lang.reflect.Method;
 import java.math.BigDecimal;
 import java.net.*;
 import java.security.cert.CertificateException;
 import java.security.cert.X509Certificate;
 import java.util.*;
+import java.util.function.Consumer;
+import java.util.stream.Stream;
 
 /**
  * 常用工具方法集
@@ -30,14 +33,11 @@ public class Utils {
 
     /**
      * 不想写 异常
-     * @param millis
+     * @param fn
      */
-    public static void sleep(long millis) {
-        try {
-            Thread.sleep(millis);
-        } catch (InterruptedException e) {
-            log.error(e);
-        }
+    public static void tryRun(Runnable fn) {
+        try { fn.run(); }
+        catch (Exception e) { log.error(e); }
     }
 
 
@@ -250,6 +250,36 @@ public class Utils {
 
 
     /**
+     * 遍历所有方法并处理
+     * @param clz
+     * @param fns
+     */
+    public static void iterateMethod(final Class clz, Consumer<Method>... fns) {
+        if (fns == null || fns.length < 1) return;
+        Class c = clz;
+        do {
+            for (Method m : c.getDeclaredMethods()) for (Consumer<Method> fn : fns) fn.accept(m);
+            c = c.getSuperclass();
+        } while (c != null);
+    }
+
+
+    /**
+     * 遍历所有字段并处理
+     * @param clz
+     * @param fns
+     */
+    public static void iterateField(final Class clz, Consumer<Field>... fns) {
+        if (fns == null || fns.length < 1) return;
+        Class c = clz;
+        do {
+            for (Field f : c.getDeclaredFields()) for (Consumer<Field> fn : fns) fn.accept(f);
+            c = c.getSuperclass();
+        } while (c != null);
+    }
+
+
+    /**
      * 查找方法
      * @param clz
      * @param mName
@@ -279,8 +309,7 @@ public class Utils {
      */
     public static Object invoke(Method m, Object target, Object...args) {
         try {
-            m.setAccessible(true);
-            return m.invoke(target, args);
+            m.setAccessible(true); return m.invoke(target, args);
         } catch (Exception e) {}
         return null;
     }

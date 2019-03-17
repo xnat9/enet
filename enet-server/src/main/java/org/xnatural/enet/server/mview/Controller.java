@@ -13,9 +13,7 @@ import javax.ws.rs.core.Response;
 import java.io.File;
 import java.io.FileInputStream;
 import java.net.URL;
-import java.util.HashMap;
-import java.util.Map;
-import java.util.Objects;
+import java.util.*;
 
 @Path("/")
 public class Controller {
@@ -32,19 +30,9 @@ public class Controller {
     }
 
 
-//    @GET
-//    @Path("")
-//    public Response index() throws Exception {
-//        return Response.ok()
-//                .header("location", "/" + server.getPath() + "/index")
-//                .status(301).build();
-//    }
-
-
-    @GET
-    @Path("/")
-    public Response index0() throws Exception {
-        Map<String, Object> model = new HashMap<>();
+    @GET @Path("/")
+    public Response index() throws Exception {
+        Map<String, Object> model = new TreeMap<>(Comparator.naturalOrder());
         model.put("rootPath", server.getPath());
         ep.fire("sys.info", EC.of(this).sync(), ec -> {
             ((Map<String, Object>) ec.result).forEach((k, v) -> model.put(k, JSON.toJSONString(v)));
@@ -56,8 +44,7 @@ public class Controller {
     }
 
 
-    @GET
-    @Path("server/{sName}")
+    @GET @Path("server/{sName}")
     public Response server(@PathParam("sName") String sName) throws Exception {
         // 1. _this: 模块对象本身
         // 2. properties: [{name: 'attr1',set: true, desc: '说明'}]
@@ -79,8 +66,7 @@ public class Controller {
     }
 
 
-    @GET
-    @Path("js/{fName:.*}")
+    @GET @Path("js/{fName:.*}")
     public Response js(@PathParam("fName") String fName) {
         File f = findViewFile("js/" + fName);
         if (f == null) return Response.status(404).build();
@@ -91,8 +77,7 @@ public class Controller {
     }
 
 
-    @GET
-    @Path("css/{fName:.*}")
+    @GET @Path("css/{fName:.*}")
     public Response css(@PathParam("fName") String fName) {
         File f = findViewFile("css/" + fName);
         if (f == null) return Response.status(404).build();

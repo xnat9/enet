@@ -204,8 +204,8 @@ public class AppContext {
 
     @EL(name = "sys.info")
     protected Object info(EC ec) {
-        Map<String, Object> info = new HashMap<>(2);
-        info.put("modules", sourceMap.keySet());
+        Map<String, Object> info = new HashMap<>();
+        info.put("modules", new TreeSet<>(sourceMap.keySet()));
         return info;
     }
 

@@ -10,8 +10,8 @@ import javax.ws.rs.GET;
 import javax.ws.rs.Path;
 import javax.ws.rs.PathParam;
 import javax.ws.rs.core.Response;
-import java.io.File;
-import java.io.FileInputStream;
+import java.io.IOException;
+import java.io.InputStream;
 import java.net.URL;
 import java.util.*;
 
@@ -37,7 +37,7 @@ public class Controller {
         ep.fire("sys.info", EC.of(this).sync(), ec -> {
             ((Map<String, Object>) ec.result).forEach((k, v) -> model.put(k, JSON.toJSONString(v)));
         });
-        return Response.ok(render(IOUtils.toString(new FileInputStream(findViewFile("index.html")), "utf-8"), model))
+        return Response.ok(render(IOUtils.toString(findViewFile("index.html"), "utf-8"), model))
                 .type("text/html; charset=utf-8")
                 // .header("Cache-Control", "max-age=1")
                 .build();
@@ -60,7 +60,7 @@ public class Controller {
                 model.put("methods", JSON.toJSONString(m.get("methods")));
             }
         });
-        return Response.ok(render(IOUtils.toString(new FileInputStream(findViewFile("serverTpl.html")), "utf-8"), model))
+        return Response.ok(render(IOUtils.toString(findViewFile("serverTpl.html"), "utf-8"), model))
                 .type("text/html; charset=utf-8")
                 .build();
     }
@@ -68,7 +68,7 @@ public class Controller {
 
     @GET @Path("js/{fName:.*}")
     public Response js(@PathParam("fName") String fName) {
-        File f = findViewFile("js/" + fName);
+        InputStream f = findViewFile("js/" + fName);
         if (f == null) return Response.status(404).build();
         return Response.ok(f)
                 .type("application/javascript; charset=utf-8")
@@ -79,7 +79,7 @@ public class Controller {
 
     @GET @Path("css/{fName:.*}")
     public Response css(@PathParam("fName") String fName) {
-        File f = findViewFile("css/" + fName);
+        InputStream f = findViewFile("css/" + fName);
         if (f == null) return Response.status(404).build();
         return Response.ok(f)
                 .type("text/css; charset=utf-8")
@@ -97,8 +97,12 @@ public class Controller {
     }
 
 
-    private File findViewFile(String fPath) {
+    private InputStream findViewFile(String fPath) {
         URL r = getClass().getClassLoader().getResource(getClass().getPackage().getName().replaceAll("\\.", "/") + "/ui/" + fPath);
-        return r == null ? null : new File(r.getFile());
+        try {
+            return r == null ? null : r.openStream();
+        } catch (IOException e) {
+            return null;
+        }
     }
 }

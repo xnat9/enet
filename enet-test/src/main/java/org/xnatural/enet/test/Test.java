@@ -4,6 +4,7 @@ import javassist.bytecode.analysis.Executor;
 import org.xnatural.enet.common.Log;
 import org.xnatural.enet.common.Utils;
 
+import java.time.Duration;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
@@ -15,8 +16,6 @@ public class Test {
         Log.init(null);
     }
     public static void main(String[] args) {
-        System.out.println(650/30*12 - 550/30*12);
-        if (true) return;
         Utils.Http h = Utils.http();
         long start = System.currentTimeMillis();
         System.out.println(h.get("http://localhost:8080/tpl/dao").execute());

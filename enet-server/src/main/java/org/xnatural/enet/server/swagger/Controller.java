@@ -13,7 +13,8 @@ import javax.ws.rs.Produces;
 import javax.ws.rs.container.AsyncResponse;
 import javax.ws.rs.container.Suspended;
 import javax.ws.rs.core.Response;
-import java.io.File;
+import java.io.IOException;
+import java.io.InputStream;
 import java.net.URL;
 import java.util.LinkedList;
 import java.util.List;
@@ -66,7 +67,7 @@ public class Controller {
     @GET
     @Path("{fName:.*}")
     public Response file(@PathParam("fName") String fName) {
-        File f = findViewFile("" + fName);
+        InputStream f = findViewFile("" + fName);
         if (f == null) return Response.status(404).build();
         String type = null;
         if (fName.endsWith(".js")) type = "application/javascript; charset=utf-8";
@@ -79,8 +80,12 @@ public class Controller {
     }
 
 
-    private File findViewFile(String fPath) {
+    protected InputStream findViewFile(String fPath) {
         URL r = getClass().getClassLoader().getResource(getClass().getPackage().getName().replaceAll("\\.", "/") + "/ui/" + fPath);
-        return r == null ? null : new File(r.getFile());
+        try {
+            return r == null ? null : r.openStream();
+        } catch (IOException e) {
+            return null;
+        }
     }
 }

@@ -27,22 +27,21 @@ public class AppContext {
      */
     protected       String              name;
     /**
-     * 系统运行线程池.
-     * {@link #wrapExecForSource(Object)}
+     * 系统运行线程池. {@link #initExecutor()}}
      */
     protected       ThreadPoolExecutor  exec;
     /**
-     * 事件中心
-     * {@link #wrapEpForSource(Object)}
+     * 事件中心 {@link #initEp()}}
      */
     protected       EP                  ep;
+    /**
+     * 系统环境配置
+     */
     protected       Environment         env;
-    protected       Map<String, Object> sourceMap = new HashMap() {
-        @Override
-        public Object remove(Object key) {
-            throw new UnsupportedOperationException("Not allow remove operate");
-        }
-    };
+    /**
+     * 服务对象源
+     */
+    protected       Map<String, Object> sourceMap = new HashMap();
     /**
      * 启动时间
      */
@@ -218,14 +217,10 @@ public class AppContext {
     protected void setForSource(Object s) {
         List<Field> epFs = new LinkedList<>();
         List<Field> execFs = new LinkedList<>();
-        Class<? extends Object> c = s.getClass();
-        do {
-            for (Field f : c.getDeclaredFields()) {
-                if (EP.class.isAssignableFrom(f.getType())) epFs.add(f);
-                else if (Executor.class.isAssignableFrom(f.getType())) execFs.add(f);
-            }
-            c = c.getSuperclass();
-        } while (c != null);
+        iterateField(s.getClass(), f -> {
+            if (EP.class.isAssignableFrom(f.getType())) epFs.add(f);
+            else if (Executor.class.isAssignableFrom(f.getType())) execFs.add(f);
+        });
 
         // 1. 为source设置公用 EP
         EP ep = wrapEpForSource(s); // 为了安全

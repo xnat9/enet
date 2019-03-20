@@ -1,5 +1,6 @@
 package org.xnatural.enet.server.mview;
 
+import org.xnatural.enet.event.EL;
 import org.xnatural.enet.event.EP;
 import org.xnatural.enet.server.ServerTpl;
 
@@ -23,7 +24,7 @@ public class MViewServer extends ServerTpl {
     }
 
 
-    @Override
+    @EL(name = "sys.starting")
     public void start() {
         if (!running.compareAndSet(false, true)) {
             log.warn("{} Server is running", getName()); return;

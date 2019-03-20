@@ -20,7 +20,7 @@ import java.util.concurrent.ExecutorService;
 /**
  *
  */
-public class UndertowResteasySever extends ServerTpl {
+public class UndertowResteasy extends ServerTpl {
     /**
      * http 服务监听端口
      */
@@ -37,7 +37,7 @@ public class UndertowResteasySever extends ServerTpl {
     private ResteasyDeployment  deployment;
 
 
-    public UndertowResteasySever() {
+    public UndertowResteasy() {
         setName("resteasy-undertow");
         setPort(8080);
         setHostname("localhost");
@@ -93,7 +93,7 @@ public class UndertowResteasySever extends ServerTpl {
      * 服务启动后自动扫描此类所在包下的 Handler({@link Path} 注解的类)
      * @param clz
      */
-    public UndertowResteasySever scan(Class clz) {
+    public UndertowResteasy scan(Class clz) {
         if (running.get()) throw new IllegalArgumentException("服务正在运行不允许更改");
         scan.add(clz);
         return this;
@@ -106,7 +106,7 @@ public class UndertowResteasySever extends ServerTpl {
      * @return
      */
     @EL(name = "${name}.addResource")
-    public UndertowResteasySever addResource(Object o) {
+    public UndertowResteasy addResource(Object o) {
         if (o instanceof Class) return this;
         if (o instanceof EC) {
             if (deployment.getRegistry() == null) deployment.start();
@@ -168,7 +168,7 @@ public class UndertowResteasySever extends ServerTpl {
     }
 
 
-    public UndertowResteasySever setHostname(String hostname) {
+    public UndertowResteasy setHostname(String hostname) {
         if (running.get()) throw new RuntimeException("服务正在运行.不允许更新主机名");
         attrs.put("hostname", hostname); this.hostname = hostname;
         return this;
@@ -180,7 +180,7 @@ public class UndertowResteasySever extends ServerTpl {
     }
 
 
-    public UndertowResteasySever setPort(int port) {
+    public UndertowResteasy setPort(int port) {
         if (running.get()) throw new RuntimeException("服务正在运行.不允许更新端口");
         attrs.put("port", port); this.port = port;
         return this;

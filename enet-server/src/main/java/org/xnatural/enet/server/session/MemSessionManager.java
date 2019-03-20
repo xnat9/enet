@@ -25,7 +25,7 @@ public class MemSessionManager extends ServerTpl {
     }
 
 
-    @Override
+    @EL(name = "sys.starting")
     public void start() {
         if (!running.compareAndSet(false, true)) {
             log.warn("{} Server is running", getName()); return;
@@ -102,6 +102,7 @@ public class MemSessionManager extends ServerTpl {
     public MemSessionManager setExpire(Integer expire) {
         if (expire == null) throw new NullPointerException("参数为空");
         this.expire = expire;
+        attr("expire", expire);
         return this;
     }
 

@@ -10,9 +10,11 @@ import org.xnatural.enet.server.cache.ehcache.EhcacheServer;
 import org.xnatural.enet.server.dao.hibernate.Hibernate;
 import org.xnatural.enet.server.http.netty.Netty4Http;
 import org.xnatural.enet.server.mview.MViewServer;
+import org.xnatural.enet.server.redis.RedisServer;
 import org.xnatural.enet.server.resteasy.Netty4Resteasy;
 import org.xnatural.enet.server.sched.SchedServer;
 import org.xnatural.enet.server.session.MemSessionManager;
+import org.xnatural.enet.server.session.RedisSessionManager;
 import org.xnatural.enet.server.swagger.SwaggerServer;
 
 import java.lang.reflect.Field;
@@ -34,7 +36,7 @@ public class Launcher extends ServerTpl {
         app.addSource(new Hibernate().scanEntity(TestEntity.class).scanRepo(TestRepo.class));
         app.addSource(new SchedServer());
         app.addSource(new EhcacheServer());
-        // app.addSource(new RedisServer());
+        app.addSource(new RedisServer());
         // app.addSource(new XMemcached());
         app.addSource(new Launcher(app));
         app.start();
@@ -59,6 +61,7 @@ public class Launcher extends ServerTpl {
         String t = env.getString("session.type", "memory");
         // 动态启动服务
         if ("memory".equalsIgnoreCase(t)) coreEp.fire("sys.addSource", new MemSessionManager());
+        else if ("redis".equalsIgnoreCase(t)) coreEp.fire("sys.addSource", new RedisSessionManager());
     }
 
 

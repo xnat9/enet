@@ -59,19 +59,18 @@ public class ServerTpl {
     /**
      * Server start
      */
-    @EL(name = "sys.starting")
-    public void start() {
-        if (!running.compareAndSet(false, true)) {
-            log.warn("{} Server is running", getName()); return;
-        }
-        if (coreExec == null) initExecutor();
-        if (coreEp == null) coreEp = new EP(coreExec);
-        coreEp.fire(getName() + ".starting");
-        // 先从核心取配置, 然后再启动
-        attrs.putAll((Map) coreEp.fire("env.ns", getName()));
-        coreEp.fire(getName() + ".started");
-        log.info("Started {} Server", getName());
-    }
+//    public void start() {
+//        if (!running.compareAndSet(false, true)) {
+//            log.warn("{} Server is running", getName()); return;
+//        }
+//        if (coreExec == null) initExecutor();
+//        if (coreEp == null) coreEp = new EP(coreExec);
+//        coreEp.fire(getName() + ".starting");
+//        // 先从核心取配置, 然后再启动
+//        attrs.putAll((Map) coreEp.fire("env.ns", getName()));
+//        coreEp.fire(getName() + ".started");
+//        log.info("Started {} Server", getName());
+//    }
 
 
     /**
@@ -96,10 +95,10 @@ public class ServerTpl {
     /**
      * 子类应该重新定义自己的重启逻辑
      */
-    @EL(name = "sys.restart")
-    protected void restart() {
-        stop(); start();
-    }
+//    @EL(name = "sys.restart")
+//    protected void restart() {
+//        stop(); start();
+//    }
 
 
     /**

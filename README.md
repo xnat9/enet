@@ -120,7 +120,7 @@ public class Launcher extends ServerTpl {
     log.level.org.xnatural.enet.event.EP: trace
 
 
-## enet-server内置可用多模块说明
+## enet-server提供的模块说明
 1. ServerTpl: 服务模块模板. 推荐所有功能模块及业务逻辑service都继承ServerTpl, 并添加到 AppContext中
 
 2. 约定: 所有Server的配置属性前缀以Server的name开头
@@ -137,7 +137,7 @@ public class Launcher extends ServerTpl {
         2. 调节netty io处理的线程个数. http-netty.threads-boos:1
         3. http.port/http-netty.port 属性设置端口.(注: 以http-netty 为前缀的属性值优先级比以http为前缀的属性高)
 
-        例: new Netty4HttpServer().setPort(8080).start();
+        例: new Netty4Http().setPort(8080).start();
 
 
    ### Netty4Resteasy: mvc 层
@@ -146,8 +146,8 @@ public class Launcher extends ServerTpl {
         3. mvc.sessionCookieName: sId. 设置控制session的cookie名字叫sId
         4. mvc.enableSession: true. 设置是否启用session功能
         例:    AppContext app = new AppContext();
-               app.addSource(new Netty4HttpServer().setPort(8080));
-               app.addSource(new Netty4ResteasyServer().scan(RestTpl.class));
+               app.addSource(new Netty4Http().setPort(8080));
+               app.addSource(new Netty4Resteasy().scan(RestTpl.class));
                app.start();
               
 
@@ -168,8 +168,8 @@ public class Launcher extends ServerTpl {
         1. 暴露对象: EntityManagerFactory/SessionFactory, TransWrapper(事务包装器)
             EntityManagerFactory emf = (EntityManagerFactory) ep.fire("dao.bean.get", EntityManagerFactory.class);
             TransWrapper tm = (TransWrapper) ep.fire("dao.bean.get", TransWrapper.class);
-        2. 添加实体对象扫描: app.addSource(new HibernateServer().scanEntity(TestEntity.class) 会扫描TestEntity这个类所在的包下边的所有实体
-        3. 添加dao(数据访问)对象扫描: app.addSource(new HibernateServer().scanRepo(TestRepo.class)) 会扫描TestRepo这个类所在的包下边的所有dao对象
+        2. 添加实体对象扫描: app.addSource(new Hibernate().scanEntity(TestEntity.class) 会扫描TestEntity这个类所在的包下边的所有实体
+        3. 添加dao(数据访问)对象扫描: app.addSource(new Hibernate().scanRepo(TestRepo.class)) 会扫描TestRepo这个类所在的包下边的所有dao对象
         4. 建议所有dao对象 都继承自BaseRepo
         5. 可单独取出 SessionFactory 进行数据库操作
 
@@ -188,7 +188,7 @@ public class Launcher extends ServerTpl {
             例: ep.fire("cache.clear", "缓存名")
 
 
-   ### Memcached: memcached 缓存
+   ### XMemcached: memcached 缓存
         配置
             a. 配置服务器连接: memecached.hosts: localhost:11211
             b. 某个缓存的过期时间: cache.expire.缓存名: 3600. (单位秒)
@@ -216,14 +216,14 @@ public class Launcher extends ServerTpl {
             最大连接数: redis.maxTotal: 2
             最大等待时间: redis.maxWaitMillis: 2
        
-       1. cache.set: 设置缓存
-           例: ep.fire("redis.hset", "缓存名", "key1", "qqqqqqqqqq");
-       2. cache.get: 获取缓存
+       1. cache.set: 设置hash数据
+           例: ep.fire("redis.hset", "缓存名", "key1", "qqqqqqqqqq", "过期时间(秒)");
+       2. cache.get: 获取hash某个key的数据
            例: ep.fire("redis.hget", "缓存名", "key1")
-       3. 使某个缓存key过期
-           例: ep.fire("cache.evict", "缓存名", "key1")
+       3. 删除某个hash key
+           例: ep.fire("cache.hdel", "缓存名", "key1")
        4. 清理某个缓存
-           例: ep.fire("cache.clear", "缓存名")
+           例: ep.fire("cache.del", "缓存名")
        5. 获取一个Jedis对象, 执行自定义操作
            例: ep.fire("redis.exec", (Function<Jedis, Object>) (c, o) -> {return null;})
 
@@ -244,6 +244,14 @@ public class Launcher extends ServerTpl {
         2. 从session中取属性. 
             ep.fire("session.get", "sessionId", "key1")
 
+   ### RedisSessionManager: session管理(redis)
+        * 需要配置 session.type: redis 才能生效
+        * 服务依赖 RedisServer
+        * 配置sesson过期时间: session.expire: 30. 单位分钟
+        * 保存属性到session. 
+            ep.fire("session.set", "sessionId", "key1", "value1")
+        * 从session中取属性. 
+            ep.fire("session.get", "sessionId", "key1")
 ## 参与贡献
 
 xnatural@msn.cn

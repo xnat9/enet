@@ -1,4 +1,4 @@
-package org.xnatural.enet.server.cache.redis;
+package org.xnatural.enet.server.redis;
 
 import org.xnatural.enet.event.EL;
 import org.xnatural.enet.event.EP;
@@ -18,12 +18,10 @@ import java.util.function.Function;
 public class RedisServer extends ServerTpl {
     protected JedisPool pool;
 
-    public RedisServer() {
-        setName("redis");
-    }
+    public RedisServer() { setName("redis"); }
 
 
-    @Override
+    @EL(name = "sys.starting")
     public void start() {
         if (!running.compareAndSet(false, true)) {
             log.warn("{} Server is running", getName()); return;
@@ -61,30 +59,30 @@ public class RedisServer extends ServerTpl {
     }
 
 
-    @EL(name = {"${name}.hset", "cache.set"})
-    protected void set(String cName, String key, String value) {
+    @EL(name = {"${name}.hset"})
+    protected void hset(String cName, String key, Object value, Integer seconds) {
         execute(c -> {
-            c.hset(cName, key, value);
-            c.expire(cName, getInteger("expire." + cName, 60 * 30));
+            c.hset(cName, key, value.toString());
+            c.expire(cName, seconds == null ? getInteger("expire." + cName, 60 * 30) : seconds);
             return null;
         });
     }
 
 
-    @EL(name = {"${name}.hget", "cache.get"}, async = false)
-    protected Object get(String cName, String key) {
+    @EL(name = {"${name}.hget"}, async = false)
+    protected Object hget(String cName, String key) {
         return execute(c -> c.hget(cName, key));
     }
 
 
-    @EL(name = {"${name}.evict", "cache.evict"}, async = false)
-    protected void evict(String cName, String key) {
+    @EL(name = {"${name}.hdel"}, async = false)
+    protected void hdel(String cName, String key) {
         execute(c -> c.hdel(cName, key));
     }
 
 
-    @EL(name = {"${name}.clear", "cache.clear"})
-    protected void clear(String cName) {
+    @EL(name = {"${name}.del"})
+    protected void del(String cName) {
         execute(c -> c.del(cName));
     }
 

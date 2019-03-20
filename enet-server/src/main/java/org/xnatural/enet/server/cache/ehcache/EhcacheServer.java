@@ -31,7 +31,7 @@ public class EhcacheServer extends ServerTpl {
     }
 
 
-    @Override
+    @EL(name = "sys.starting")
     public void start() {
         if (!running.compareAndSet(false, true)) {
             log.warn("{} Server is running", getName()); return;

@@ -39,9 +39,7 @@ public class EhcacheServer extends ServerTpl {
         if (coreExec == null) initExecutor();
         if (coreEp == null) coreEp = new EP(coreExec);
         coreEp.fire(getName() + ".starting");
-        // 先从核心取配置, 然后再启动
-        Map<String, String> r = (Map) coreEp.fire("env.ns", getName() + ".ds");
-        attrs.putAll(r);
+        attrs.putAll((Map) coreEp.fire("env.ns", "cache", getName()));
 
         cm = CacheManagerBuilder.newCacheManagerBuilder().build(true);
         exposeBean(cm, "ehcacheManager");
@@ -59,14 +57,6 @@ public class EhcacheServer extends ServerTpl {
     }
 
 
-    @EL(name = {"${name}.add", "cache.add"})
-    protected void addCache(String cName, Object key, Object value) {
-        Cache<Object, Object> cache = cm.getCache(cName, Object.class, Object.class);
-        if (cache == null) cache = createCache(cName, null, null, 20);
-        cache.put(key, value);
-    }
-
-
     @EL(name = {"${name}.create"}, async = false)
     protected Cache<Object, Object> createCache(String cName, Duration expire, Integer heapOfEntries, Integer heapOfMB) {
         Cache<Object, Object> cache = cm.getCache(cName, Object.class, Object.class);
@@ -79,7 +69,7 @@ public class EhcacheServer extends ServerTpl {
                     else if (heapOfEntries != null) b = b.heap(heapOfEntries, ENTRIES);
                     else if (heapOfMB != null) b = b.heap(heapOfMB, MB);
                     cache = cm.createCache(cName, newCacheConfigurationBuilder(Object.class, Object.class, b.build())
-                            .withExpiry(ExpiryPolicyBuilder.timeToLiveExpiration(expire == null ? Duration.ofMinutes(20) : expire))
+                        .withExpiry(ExpiryPolicyBuilder.timeToLiveExpiration(expire == null ? Duration.ofSeconds(getInteger("expire." + cName, 60 * 30)) : expire))
                     );
                 }
             }
@@ -88,8 +78,16 @@ public class EhcacheServer extends ServerTpl {
     }
 
 
+    @EL(name = {"${name}.set", "cache.set"})
+    protected void set(String cName, Object key, Object value) {
+        Cache<Object, Object> cache = cm.getCache(cName, Object.class, Object.class);
+        if (cache == null) cache = createCache(cName, null, getInteger("heapOfEntries", 1000), null);
+        cache.put(key, value);
+    }
+
+
     @EL(name = {"${name}.get", "cache.get"}, async = false)
-    protected Object getCache(String cName, Object key) {
+    protected Object get(String cName, Object key) {
         Cache<Object, Object> cache = cm.getCache(cName, Object.class, Object.class);
         return (cache == null ? null : cache.get(key));
     }
@@ -103,7 +101,7 @@ public class EhcacheServer extends ServerTpl {
 
 
     @EL(name = {"${name}.clear", "cache.clear"})
-    protected void evict(String cName) {
+    protected void clear(String cName) {
         Cache<Object, Object> cache = cm.getCache(cName, Object.class, Object.class);
         if (cache != null) cache.clear();
     }

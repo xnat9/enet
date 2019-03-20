@@ -8,7 +8,6 @@ import io.swagger.v3.oas.integration.SwaggerConfiguration;
 import io.swagger.v3.oas.models.OpenAPI;
 import io.swagger.v3.oas.models.PathItem;
 import io.swagger.v3.oas.models.tags.Tag;
-import org.xnatural.enet.common.Utils;
 import org.xnatural.enet.event.EL;
 import org.xnatural.enet.event.EP;
 import org.xnatural.enet.server.ServerTpl;
@@ -17,8 +16,8 @@ import java.lang.reflect.Field;
 import java.util.*;
 import java.util.concurrent.ExecutorService;
 
-import static java.util.Collections.*;
-import static org.xnatural.enet.common.Utils.*;
+import static java.util.Collections.singletonList;
+import static org.xnatural.enet.common.Utils.isEmpty;
 
 public class SwaggerServer extends ServerTpl {
 
@@ -29,7 +28,6 @@ public class SwaggerServer extends ServerTpl {
 
     public SwaggerServer() {
         setName("swagger");
-        setRoot("api-doc");
     }
 
 
@@ -41,10 +39,8 @@ public class SwaggerServer extends ServerTpl {
         if (coreExec == null) initExecutor();
         if (coreEp == null) coreEp = new EP(coreExec);
         coreEp.fire(getName() + ".starting");
-        // 先从核心取配置, 然后再启动
-        Map<String, String> r = (Map) coreEp.fire("env.ns", getName());
-        root = r.getOrDefault("root", getRoot());
-        attrs.putAll(r);
+        attrs.putAll((Map) coreEp.fire("env.ns", getName()));
+        root = getStr("root", "api-doc");
 
         ctl = new Controller(this);
         coreEp.fire("resteasy.addResource", ctl, getRoot()); // addJaxrsDoc(ctl, getRoot(), getName(), null);
@@ -106,7 +102,6 @@ public class SwaggerServer extends ServerTpl {
     public SwaggerServer setRoot(String root) {
         if (running.get()) throw new RuntimeException("服务正在运行不能更改");
         this.root = root;
-        attrs.put("root", root);
         return this;
     }
 

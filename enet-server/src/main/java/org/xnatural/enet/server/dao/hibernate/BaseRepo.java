@@ -21,20 +21,20 @@ import java.util.Date;
 import java.util.Objects;
 
 public class BaseRepo<T extends IEntity, ID extends Serializable> {
-    protected Log             log = Log.of(getClass());
-    protected SessionFactory  sf;
-    protected HibernateServer hs;
-    protected TransWrapper    tm;
-    protected Class<T>        entityType;
-    protected Class<ID>       idType;
+    protected Log            log = Log.of(getClass());
+    protected SessionFactory sf;
+    protected Hibernate      hs;
+    protected TransWrapper   tm;
+    protected Class<T>       entityType;
+    protected Class<ID>      idType;
     /**
      * 分页时, 每页最大条数
      */
-    protected int             maxPageSize;
+    protected int            maxPageSize;
     /**
      * 默认pageSize
      */
-    protected int             defaultPageSize;
+    protected int            defaultPageSize;
 
 
     @PostConstruct

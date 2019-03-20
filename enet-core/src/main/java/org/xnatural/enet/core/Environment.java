@@ -272,7 +272,7 @@ public class Environment {
         if (keys == null) return group;
         BiConsumer<String, String> fn = (k, v) -> {
             for (String key : keys) {
-                if (!k.startsWith(key)) return;
+                if (!k.startsWith(key)) continue;
                 if (k.equals(key)) group.put(k, v);
                 else group.put(k.substring(key.length() + 1), v);
             }

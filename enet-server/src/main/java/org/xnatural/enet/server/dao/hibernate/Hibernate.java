@@ -31,7 +31,7 @@ import static org.xnatural.enet.common.Utils.invoke;
  * hibernate 服务
  * 暴露出 {@link EntityManagerFactory} 实例(所有的数据库操作入口)
  */
-public class HibernateServer extends ServerTpl {
+public class Hibernate extends ServerTpl {
     protected DataSource     ds;
     protected SessionFactory sf;
     protected TransWrapper   tm;
@@ -49,7 +49,7 @@ public class HibernateServer extends ServerTpl {
     protected List<String>   entities   = new LinkedList<>();
 
 
-    public HibernateServer() {
+    public Hibernate() {
         setName("dao");
     }
 
@@ -65,29 +65,24 @@ public class HibernateServer extends ServerTpl {
         attrs.put("hibernate.physical_naming_strategy", "org.xnatural.enet.server.dao.hibernate.SpringPhysicalNamingStrategy");
         attrs.put("hibernate.implicit_naming_strategy", "org.xnatural.enet.server.dao.hibernate.SpringImplicitNamingStrategy");
         attrs.put("hibernate.current_session_context_class", "thread");
-        // 先从核心取配置, 然后再启动
-        Map<String, String> r = (Map) coreEp.fire("env.ns", getName());
-        if (r.containsKey("entity-scan")) {
-            for (String s : r.get("entity-scan").split(",")) {
-                if (s == null || s.trim().isEmpty()) continue;
-                try {
-                    entityScan.add(Class.forName(s.trim()));
-                } catch (ClassNotFoundException e) {
-                    log.error("not found class: " + s);
-                }
+        attrs.putAll((Map) coreEp.fire("env.ns", getName()));
+
+        for (String s : getStr("entity-scan", "").split(",")) { // 扫描entity
+            if (s == null || s.trim().isEmpty()) continue;
+            try {
+                entityScan.add(Class.forName(s.trim()));
+            } catch (ClassNotFoundException e) {
+                log.error("not found class: " + s);
             }
         }
-        if (r.containsKey("repo-scan")) {
-            for (String s : r.get("repo-scan").split(",")) {
-                if (s == null || s.trim().isEmpty()) continue;
-                try {
-                    repoScan.add(Class.forName(s.trim()));
-                } catch (ClassNotFoundException e) {
-                    log.error("not found class: " + s);
-                }
+        for (String s : getStr("repo-scan", "").split(",")) { // 扫描repo
+            if (s == null || s.trim().isEmpty()) continue;
+            try {
+                repoScan.add(Class.forName(s.trim()));
+            } catch (ClassNotFoundException e) {
+                log.error("not found class: " + s);
             }
         }
-        attrs.putAll(r);
 
         sf = (SessionFactory) new HibernatePersistenceProvider().createContainerEntityManagerFactory(createPersistenceUnit(), attrs);
         exposeBean(sf, "entityManagerFactory", "sessionFactory");
@@ -182,7 +177,7 @@ public class HibernateServer extends ServerTpl {
 
             @Override
             public ClassLoader getClassLoader() {
-                return HibernateServer.this.getClass().getClassLoader();
+                return Hibernate.this.getClass().getClassLoader();
             }
 
             @Override
@@ -198,7 +193,7 @@ public class HibernateServer extends ServerTpl {
     }
 
 
-    public HibernateServer scanEntity(Class... clzs) {
+    public Hibernate scanEntity(Class... clzs) {
         if (running.get()) throw new IllegalArgumentException("Server is running, not allow change");
         if (clzs == null || clzs.length == 0) {
             log.warn("参数错误"); return this;
@@ -208,7 +203,7 @@ public class HibernateServer extends ServerTpl {
     }
 
 
-    public HibernateServer scanRepo(Class clz) {
+    public Hibernate scanRepo(Class clz) {
         if (running.get()) throw new IllegalArgumentException("Server is running, not allow change");
         repoScan.add(clz);
         return this;
@@ -269,7 +264,7 @@ public class HibernateServer extends ServerTpl {
                 Class c = clz;
                 do {
                     for (Field field : c.getDeclaredFields()) {
-                        if (HibernateServer.class.isAssignableFrom(field.getType())) {
+                        if (Hibernate.class.isAssignableFrom(field.getType())) {
                             field.setAccessible(true); field.set(o, this);
                         } else if (EP.class.isAssignableFrom(field.getType())) {
                             field.setAccessible(true); field.set(o, getCoreEp());

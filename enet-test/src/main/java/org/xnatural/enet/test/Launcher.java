@@ -7,10 +7,10 @@ import org.xnatural.enet.event.EC;
 import org.xnatural.enet.event.EL;
 import org.xnatural.enet.server.ServerTpl;
 import org.xnatural.enet.server.cache.ehcache.EhcacheServer;
-import org.xnatural.enet.server.dao.hibernate.HibernateServer;
-import org.xnatural.enet.server.http.netty.Netty4HttpServer;
+import org.xnatural.enet.server.dao.hibernate.Hibernate;
+import org.xnatural.enet.server.http.netty.Netty4Http;
 import org.xnatural.enet.server.mview.MViewServer;
-import org.xnatural.enet.server.resteasy.Netty4ResteasyServer;
+import org.xnatural.enet.server.resteasy.Netty4Resteasy;
 import org.xnatural.enet.server.sched.SchedServer;
 import org.xnatural.enet.server.session.MemSessionManager;
 import org.xnatural.enet.server.swagger.SwaggerServer;
@@ -27,13 +27,15 @@ public class Launcher extends ServerTpl {
 
     public static void main(String[] args) {
         AppContext app = new AppContext();
-        app.addSource(new Netty4HttpServer());
-        app.addSource(new Netty4ResteasyServer().scan(RestTpl.class));
+        app.addSource(new Netty4Http());
+        app.addSource(new Netty4Resteasy().scan(RestTpl.class));
         app.addSource(new MViewServer());
         app.addSource(new SwaggerServer());
-        app.addSource(new HibernateServer().scanEntity(TestEntity.class).scanRepo(TestRepo.class));
-        app.addSource(new EhcacheServer());
+        app.addSource(new Hibernate().scanEntity(TestEntity.class).scanRepo(TestRepo.class));
         app.addSource(new SchedServer());
+        app.addSource(new EhcacheServer());
+        // app.addSource(new RedisServer());
+        // app.addSource(new XMemcached());
         app.addSource(new Launcher(app));
         app.start();
     }

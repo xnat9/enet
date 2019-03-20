@@ -12,7 +12,6 @@ import io.netty.handler.codec.http.HttpServerCodec;
 import io.netty.handler.codec.http.HttpServerKeepAliveHandler;
 import io.netty.handler.stream.ChunkedWriteHandler;
 import io.netty.handler.timeout.IdleStateHandler;
-import org.xnatural.enet.common.Utils;
 import org.xnatural.enet.event.EP;
 import org.xnatural.enet.server.ServerTpl;
 
@@ -24,7 +23,7 @@ import java.util.concurrent.TimeUnit;
 /**
  * 用 netty 实现的 http server
  */
-public class Netty4HttpServer extends ServerTpl {
+public class Netty4Http extends ServerTpl {
     /**
      * http 服务监听端口
      */
@@ -37,7 +36,7 @@ public class Netty4HttpServer extends ServerTpl {
     protected NioEventLoopGroup workerGroup;
 
 
-    public Netty4HttpServer() {
+    public Netty4Http() {
         setName("http-netty");
         setPort(8080);
         setHostname("localhost");
@@ -53,10 +52,9 @@ public class Netty4HttpServer extends ServerTpl {
         if (coreEp == null) coreEp = new EP(coreExec);
         coreEp.fire(getName() + ".starting");
         // 先从核心取配置, 然后再启动
-        Map<String, String> r = (Map) coreEp.fire("env.ns", "http", getName());
-        port = Utils.toInteger(r.get("port"), getPort());
-        hostname = r.getOrDefault("hostname", getHostname());
-        attrs.putAll(r);
+        attrs.putAll((Map) coreEp.fire("env.ns", "http", getName()));
+        port = getInteger("port", getPort());
+        hostname = getStr("hostname", getHostname());
         createServer();
         coreEp.fire(getName() + ".started");
     }
@@ -123,7 +121,7 @@ public class Netty4HttpServer extends ServerTpl {
     }
 
 
-    public Netty4HttpServer setHostname(String hostname) {
+    public Netty4Http setHostname(String hostname) {
         if (running.get()) throw new RuntimeException("服务正在运行.不允许更新主机名");
         attrs.put("hostname", hostname); this.hostname = hostname;
         return this;
@@ -135,7 +133,7 @@ public class Netty4HttpServer extends ServerTpl {
     }
 
 
-    public Netty4HttpServer setPort(int port) {
+    public Netty4Http setPort(int port) {
         if (running.get()) throw new RuntimeException("服务正在运行.不允许更新端口");
         attrs.put("port", port); this.port = port;
         return this;

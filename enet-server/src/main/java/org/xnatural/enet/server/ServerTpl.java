@@ -68,8 +68,7 @@ public class ServerTpl {
         if (coreEp == null) coreEp = new EP(coreExec);
         coreEp.fire(getName() + ".starting");
         // 先从核心取配置, 然后再启动
-        Map<String, String> r = (Map) coreEp.fire("env.ns", getName());
-        attrs.putAll(r);
+        attrs.putAll((Map) coreEp.fire("env.ns", getName()));
         coreEp.fire(getName() + ".started");
         log.info("Started {} Server", getName());
     }
@@ -307,6 +306,11 @@ public class ServerTpl {
     }
 
 
+    public String getStr(String name, String defaultValue) {
+        return Objects.toString(attrs.get(name), defaultValue);
+    }
+
+
     public Boolean getBoolean(String name, Boolean defaultValue) {
         return Utils.toBoolean(attrs.get(name), defaultValue);
     }
@@ -314,5 +318,11 @@ public class ServerTpl {
 
     public Object getAttr(String name, Object defaultValue) {
         return attrs.getOrDefault(name, defaultValue);
+    }
+
+
+    public ServerTpl attr(String key, Object value) {
+        attrs.put(key, value);
+        return this;
     }
 }

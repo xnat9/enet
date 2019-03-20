@@ -22,14 +22,37 @@
 <dependency>
     <groupId>org.xnatural.enet</groupId>
     <artifactId>enet-core</artifactId>
-    <version>0.0.7</version>
+    <version>0.0.8</version>
 </dependency>
 <dependency>
     <groupId>org.xnatural.enet</groupId>
     <artifactId>enet-server</artifactId>
-    <version>0.0.7</version>
+    <version>0.0.8</version>
 </dependency>
 ```
+
+
+## 事件驱动
+```
+    public class TestEP {
+        public static void main(String[] args) {
+            //1. 创建一个事件中心(解析对象中的所有事件方法, 和触发发布事件)
+            EP ep = new EP();
+            //2. 解析对象中的事件方法. 此步骤会解析出对象中所有包含@EL的方法, 并加入到 ep(事件中心)去
+            ep.addListenerSource(new TestEP());
+            //3. 触发并发布事件. 触发hello事件, "enet"参数会被传到hello事件所指向的方法的参数
+            ep.fire("hello", "enet");
+        }
+        
+        // 此方法被标注为一个名叫hello的事件方法.
+        @EL(name = "hello")
+        private void hello(String name) {
+            System.out.println("hello " + name);
+        }
+    }
+```
+    1. 事件方法可默认是异步执行, @EL 中的属性async = false 可设置为同步执行
+
 
 ## 用例
 可参照模块: enet-test 中的 Launcher 类
@@ -38,10 +61,10 @@ public class Launcher extends ServerTpl {
 
     public static void main(String[] args) {
         AppContext app = new AppContext();
-        app.addSource(new Netty4HttpServer());
-        app.addSource(new Netty4ResteasyServer().scan(RestTpl.class));
+        app.addSource(new Netty4Http());
+        app.addSource(new Netty4Resteasy().scan(RestTpl.class));
         app.addSource(new SwaggerServer());
-        app.addSource(new HibernateServer().scanEntity(TestEntity.class).scanRepo(TestRepo.class));
+        app.addSource(new Hibernate().scanEntity(TestEntity.class).scanRepo(TestRepo.class));
         app.addSource(new EhcacheServer());
         app.addSource(new SchedServer());
         app.addSource(new Launcher(app));
@@ -71,6 +94,7 @@ public class Launcher extends ServerTpl {
 }
 
 ```
+
 
 ## 事件说明
     sys.starting: 系统启动. 各服务接收到启动事件后各自并行启动
@@ -108,14 +132,15 @@ public class Launcher extends ServerTpl {
     例2: 指定Server dao中获取: EntityManagerFactory emf = (EntityManagerFactory) ep.fire("dao.bean.get", EntityManagerFactory.class);
 
 
-   ### Netty4HttpServer: http服务
+   ### Netty4Http: http服务
         1. netty4 实现的
         2. 调节netty io处理的线程个数. http-netty.threads-boos:1
         3. http.port/http-netty.port 属性设置端口.(注: 以http-netty 为前缀的属性值优先级比以http为前缀的属性高)
 
         例: new Netty4HttpServer().setPort(8080).start();
-        
-   ### Netty4ResteasyServer: mvc 层
+
+
+   ### Netty4Resteasy: mvc 层
         1. 基于resteasy实现的mvc功能
         2. 只接收netty4提供的http请求
         3. mvc.sessionCookieName: sId. 设置控制session的cookie名字叫sId
@@ -125,7 +150,7 @@ public class Launcher extends ServerTpl {
                app.addSource(new Netty4ResteasyServer().scan(RestTpl.class));
                app.start();
               
-        
+
    ### MViewServer: 一个系统管理界面(待完善)
    
    ### SwaggerServer: swagger api 文档服务
@@ -137,8 +162,9 @@ public class Launcher extends ServerTpl {
                app.addSource(new SwaggerServer());
                app.start();
                然后访问: http://localhost:8080/api-doc/
-               
-   ### HibernateServer: dao 层 hibernate 实现
+
+
+   ### Hibernate: dao 层 hibernate 实现
         1. 暴露对象: EntityManagerFactory/SessionFactory, TransWrapper(事务包装器)
             EntityManagerFactory emf = (EntityManagerFactory) ep.fire("dao.bean.get", EntityManagerFactory.class);
             TransWrapper tm = (TransWrapper) ep.fire("dao.bean.get", TransWrapper.class);
@@ -146,10 +172,12 @@ public class Launcher extends ServerTpl {
         3. 添加dao(数据访问)对象扫描: app.addSource(new HibernateServer().scanRepo(TestRepo.class)) 会扫描TestRepo这个类所在的包下边的所有dao对象
         4. 建议所有dao对象 都继承自BaseRepo
         5. 可单独取出 SessionFactory 进行数据库操作
-            
+
+     
    ### EhcacheServer: ehcache 缓存
-        1. cache.add: 添加缓存
-            例: ep.fire("cache.add", "缓存名", "key1", "qqqqqqqqqq");
+        配置某个缓存的过期时间: cache.expire.缓存名: 3600. (单位秒)  
+        1. cache.set: 设置缓存
+            例: ep.fire("cache.set", "缓存名", "key1", "qqqqqqqqqq");
         2. cache.get: 获取缓存
             例: ep.fire("cache.get", "缓存名", "key1")
         3. 创建自定义缓存
@@ -159,6 +187,47 @@ public class Launcher extends ServerTpl {
         5. 清理某个缓存
             例: ep.fire("cache.clear", "缓存名")
 
+
+   ### Memcached: memcached 缓存
+        配置
+            a. 配置服务器连接: memecached.hosts: localhost:11211
+            b. 某个缓存的过期时间: cache.expire.缓存名: 3600. (单位秒)
+            c. 配置连接池大小: memcahced.poolSize: 7
+            
+        1. cache.set: 设置缓存
+            例: ep.fire("cache.set", "缓存名", "key1", "qqqqqqqqqq");
+        2. cache.get: 获取缓存
+            例: ep.fire("cache.get", "缓存名", "key1")
+        3. 使某个缓存key过期
+            例: ep.fire("cache.evict", "缓存名", "key1")
+        4. 清理某个缓存
+            例: ep.fire("cache.clear", "缓存名")
+   
+   
+   ### RedisServer: redis 缓存
+        配置
+            连接主机: redis.host: localhost
+            连接主机端口: redis.port: 6379
+            连接密码: redis.password: xxx
+            连接库: redis.database: 0
+            连接超时: redis.timeout: 2000
+            最小空闲连接数: redis.minIdle: 2
+            最大空闲连接数: redis.maxIdle: 2
+            最大连接数: redis.maxTotal: 2
+            最大等待时间: redis.maxWaitMillis: 2
+       
+       1. cache.set: 设置缓存
+           例: ep.fire("redis.hset", "缓存名", "key1", "qqqqqqqqqq");
+       2. cache.get: 获取缓存
+           例: ep.fire("redis.hget", "缓存名", "key1")
+       3. 使某个缓存key过期
+           例: ep.fire("cache.evict", "缓存名", "key1")
+       4. 清理某个缓存
+           例: ep.fire("cache.clear", "缓存名")
+       5. 获取一个Jedis对象, 执行自定义操作
+           例: ep.fire("redis.exec", (Function<Jedis, Object>) (c, o) -> {return null;})
+
+
    ### SchedServer: quartz 时间任务调度器
         1. sched.cron: cron表达式 来调度任务执行
             例: ep.fire("sched.cron", "31 */2 * * * ? 2019", (Runnable) () -> {// TODO});
@@ -166,7 +235,8 @@ public class Launcher extends ServerTpl {
             例: ep.fire("sched.after", 45, TimeUnit.SECONDS, (Runnable) () -> {// TODO});
         3. sched.time: 在将来的某个时间点执行
             例: ep.time("sched.time", new Date(new Date().getTime() + 5000), (Runnable) () -> {// TODO});
-            
+
+
    ### MemSessionManager: session管理(内存session)
         1. 配置sesson过期时间: session.expire: 30. 单位分钟
         2. 保存属性到session. 

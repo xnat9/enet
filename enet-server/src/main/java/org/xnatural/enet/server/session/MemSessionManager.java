@@ -1,6 +1,5 @@
 package org.xnatural.enet.server.session;
 
-import org.xnatural.enet.common.Utils;
 import org.xnatural.enet.event.EL;
 import org.xnatural.enet.event.EP;
 import org.xnatural.enet.server.ServerTpl;
@@ -17,7 +16,7 @@ public class MemSessionManager extends ServerTpl {
     /**
      * 过期时间(单位: 分钟)
      */
-    protected Integer expire = 30;
+    protected Integer expire;
 
     protected Map<String, SessionData> sMap;
 
@@ -34,12 +33,8 @@ public class MemSessionManager extends ServerTpl {
         if (coreExec == null) initExecutor();
         if (coreEp == null) coreEp = new EP(coreExec);
         coreEp.fire(getName() + ".starting");
-        // 先从核心取配置, 然后再启动
-        Map<String, String> r = (Map) coreEp.fire("env.ns", "session", getName());
-        if (r.containsKey("expire")) {
-            setExpire(Utils.toInteger(r.get("expire"), getExpire()));
-        }
-        attrs.putAll(r);
+        attrs.putAll((Map) coreEp.fire("env.ns", "session", getName()));
+        expire = getInteger("expire", 30);
         sMap = new ConcurrentHashMap<>();
         coreEp.fire(getName() + ".started");
         log.info("Started {} Server", getName());

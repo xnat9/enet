@@ -15,7 +15,7 @@ public class MViewServer extends ServerTpl {
     /**
      * mview http path前缀. 默认为: mview
      */
-    protected String path = "mview";
+    protected String path;
     protected Controller ctl;
 
     public MViewServer() {
@@ -31,10 +31,8 @@ public class MViewServer extends ServerTpl {
         if (coreExec == null) initExecutor();
         if (coreEp == null) coreEp = new EP(coreExec);
         coreEp.fire(getName() + ".starting");
-        // 先从核心取配置, 然后再启动
-        Map<String, String> r = (Map) coreEp.fire("env.ns", getName());
-        if (r.containsKey("path")) path = r.get("path");
-        attrs.putAll(r);
+        attrs.putAll((Map) coreEp.fire("env.ns", getName()));
+        path = getStr("path", "mview");
 
         ctl = new Controller(this);
         log.info("Started {} Server. pathPrefix: {}", getName(), ("/" + getPath() + "/").replace("//", "/"));

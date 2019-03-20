@@ -80,8 +80,14 @@ public class RestTpl {
     @GET @Path("cache")
     @Produces("application/json")
     public ApiResp cache() {
+//        Object r = ep.fire("ehcache.get", "test", "key1");
+//        if (r == null) ep.fire("ehcache.set", "test", "key1", "qqqqqqqqqq");
+
+//        ep.fire("redis.hset", "test", "key1", "xxxxxxxxxxxxx");
+//        return ok(ep.fire("redis.hget", "test", "key1"));
+
         Object r = ep.fire("cache.get", "test", "key1");
-        if (r == null) ep.fire("cache.add", "test", "key1", "qqqqqqqqqq");
+        if (r == null) ep.fire("cache.set", "test", "key1", "mem");
         return ok(r);
     }
 

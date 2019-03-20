@@ -32,7 +32,7 @@ import static org.jboss.resteasy.util.FindAnnotation.findAnnotation;
 /**
  * netty4 和 resteasy 结合
  */
-public class Netty4ResteasyServer extends ServerTpl {
+public class Netty4Resteasy extends ServerTpl {
     /**
      * 根 path 前缀
      */
@@ -40,7 +40,7 @@ public class Netty4ResteasyServer extends ServerTpl {
     /**
      * 表示 session 的 cookie 名字
      */
-    protected String sessionCookieName = "sId";
+    protected String sessionCookieName;
     /**
      * 是否启用session
      */
@@ -53,7 +53,7 @@ public class Netty4ResteasyServer extends ServerTpl {
     protected RequestDispatcher  dispatcher;
 
 
-    public Netty4ResteasyServer() { setName("resteasy-netty"); }
+    public Netty4Resteasy() { setName("resteasy-netty"); }
 
 
     @Override
@@ -64,20 +64,16 @@ public class Netty4ResteasyServer extends ServerTpl {
         if (coreExec == null) initExecutor();
         if (coreEp == null) coreEp = new EP(coreExec);
         coreEp.fire(getName() + ".starting");
-        // 先从核心取配置, 然后再启动
-        Map<String, String> r = (Map) coreEp.fire("env.ns", "mvc", getName());
-        rootPath = r.getOrDefault("rootPath", "/");
-        if (r.containsKey("scan")) {
-            for (String c : ((String) attrs.get("scan")).split(",")) {
-                try {
-                    if (c != null && !c.trim().isEmpty()) scan.add(Class.forName(c.trim()));
-                } catch (ClassNotFoundException e) {
-                    log.error(e);
-                }
+        attrs.putAll((Map) coreEp.fire("env.ns", "mvc", getName()));
+        rootPath = getStr("rootPath", "/");
+        sessionCookieName = getStr("sessionCookieName", "sId");
+        for (String c : getStr("scan", "").split(",")) {
+            try {
+                if (c != null && !c.trim().isEmpty()) scan.add(Class.forName(c.trim()));
+            } catch (ClassNotFoundException e) {
+                log.error(e);
             }
         }
-        if (r.containsKey("sessionCookieName")) { sessionCookieName = r.get("sessionCookieName"); }
-        attrs.putAll(r);
 
         startDeployment(); initDispatcher(); collect();
         coreEp.fire(getName() + ".started");
@@ -161,7 +157,7 @@ public class Netty4ResteasyServer extends ServerTpl {
      * @return
      */
     @EL(name = {"resteasy.addResource"})
-    public Netty4ResteasyServer addResource(Object source, String path) {
+    public Netty4Resteasy addResource(Object source, String path) {
         if (source instanceof Class) return this;
         startDeployment();
         if (path != null) deployment.getRegistry().addSingletonResource(source, path);
@@ -220,7 +216,7 @@ public class Netty4ResteasyServer extends ServerTpl {
      * 服务启动后自动扫描此类所在包下的 Handler({@link Path} 注解的类)
      * @param clz
      */
-    public Netty4ResteasyServer scan(Class clz) {
+    public Netty4Resteasy scan(Class clz) {
         if (running.get()) throw new IllegalArgumentException("服务正在运行不允许更改");
         scan.add(clz);
         return this;
@@ -293,7 +289,7 @@ public class Netty4ResteasyServer extends ServerTpl {
     }
 
 
-    public Netty4ResteasyServer setRootPath(String rootPath) {
+    public Netty4Resteasy setRootPath(String rootPath) {
         if (running.get()) throw new RuntimeException("服务正在运行, 不充许更改");
         this.rootPath = rootPath;
         return this;
@@ -305,7 +301,7 @@ public class Netty4ResteasyServer extends ServerTpl {
     }
 
 
-    public Netty4ResteasyServer setSessionCookieName(String sessionCookieName) {
+    public Netty4Resteasy setSessionCookieName(String sessionCookieName) {
         if (running.get()) throw new RuntimeException("不允许运行时更改");
         if (sessionCookieName == null || sessionCookieName.isEmpty()) throw new NullPointerException("参数为空");
         this.sessionCookieName = sessionCookieName;
@@ -313,7 +309,7 @@ public class Netty4ResteasyServer extends ServerTpl {
     }
 
 
-    public Netty4ResteasyServer setEnableSession(boolean enableSession) {
+    public Netty4Resteasy setEnableSession(boolean enableSession) {
         if (running.get()) throw new RuntimeException("运行时不允许更改");
         this.enableSession = enableSession;
         return this;

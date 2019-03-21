@@ -174,7 +174,7 @@ public class AppContext {
         // 如果 maximumPoolSize 小于 corePoolSize 则设置为相等
         if (exec.getCorePoolSize() > exec.getMaximumPoolSize()) exec.setMaximumPoolSize(exec.getCorePoolSize());
         Long k = env.getLong("sys.exec.keepAliveTime", null);
-        if (k != null) exec.setKeepAliveTime(k, TimeUnit.MILLISECONDS);
+        if (k != null) exec.setKeepAliveTime(k, TimeUnit.SECONDS);
 
         // 添加 ep 跟踪事件
         ep.addTrackEvent(env.getString("ep.track", "").split(","));
@@ -195,7 +195,7 @@ public class AppContext {
             } else if ("sys.exec.keepAliveTime".equals(k)) {
                 Long l = toLong(v, null);
                 if (l == null) throw new IllegalArgumentException("sys.exec.keepAliveTime属性值只能是整数");
-                exec.setKeepAliveTime(l, TimeUnit.MILLISECONDS);
+                exec.setKeepAliveTime(l, TimeUnit.SECONDS);
             } else log.warn("not allow change property '{}'", k);
         }
     }

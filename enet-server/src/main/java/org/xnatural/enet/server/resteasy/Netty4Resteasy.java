@@ -25,7 +25,6 @@ import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
-import java.util.concurrent.ExecutorService;
 import java.util.concurrent.TimeUnit;
 
 import static org.jboss.resteasy.util.FindAnnotation.findAnnotation;
@@ -82,11 +81,10 @@ public class Netty4Resteasy extends ServerTpl {
     }
 
 
-    @Override
+    @EL(name = "sys.stopping")
     public void stop() {
         log.debug("Shutdown '{}' Server", getName());
         dispatcher = null; deployment.stop(); deployment = null;
-        if (coreExec instanceof ExecutorService) ((ExecutorService) coreExec).shutdown();
     }
 
 

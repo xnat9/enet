@@ -9,7 +9,6 @@ import redis.clients.jedis.JedisPoolConfig;
 import redis.clients.jedis.Protocol;
 
 import java.util.Map;
-import java.util.concurrent.ExecutorService;
 import java.util.function.Function;
 
 /**
@@ -51,11 +50,10 @@ public class RedisServer extends ServerTpl {
     }
 
 
-    @Override
+    @EL(name = "sys.stopping")
     public void stop() {
         log.info("Shutdown '{}' Server", getName());
         pool.close();
-        if (coreExec instanceof ExecutorService) ((ExecutorService) coreExec).shutdown();
     }
 
 

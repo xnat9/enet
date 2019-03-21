@@ -13,7 +13,6 @@ import java.util.Date;
 import java.util.Map;
 import java.util.Properties;
 import java.util.concurrent.Executor;
-import java.util.concurrent.ExecutorService;
 import java.util.concurrent.TimeUnit;
 
 /**
@@ -53,7 +52,7 @@ public class SchedServer extends ServerTpl {
     }
 
 
-    @Override
+    @EL(name = "sys.stopping")
     public void stop() {
         log.info("Shutdown '{}(Quartz)' Server", getName());
         try {
@@ -62,7 +61,6 @@ public class SchedServer extends ServerTpl {
             log.error(e);
         }
         AgentThreadPool.exec = null;
-        if (coreExec instanceof ExecutorService) ((ExecutorService) coreExec).shutdown();
     }
 
 

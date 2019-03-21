@@ -9,12 +9,9 @@
  * 高效: 事件网络到各个模块异步执行任务充分利用线程资源
     ### 系统运行上下文 AppContext
         1. 环境系统(Environment). 为系统本身和各模块提供环境配置
-        2. 事件中心(EP)
-            * 事件中心包含了整个系统中的所有监听器, 每个监听器代表一个功能点
-            * 每个模块被加入到系统中时, 系统会自动搜索模块所提供的监听器(即: 有注解@EL的方法)
-            * 各模块的功能调用, 只需要触发事件(@EL提供的)就行. ep.fire方法
+        2. 事件中心(EP). 包含事件的注册(addListenerSource),发布(doPublish),执行(invoke)
         3. 执行器(线程池). 系统的所有执行最终会扔到这个线程池
-        4. 各模块引用
+        4. 模块管理
 
 
 ## 安装教程
@@ -31,30 +28,7 @@
 </dependency>
 ```
 
-
-## 事件驱动
-```
-    public class TestEP {
-        public static void main(String[] args) {
-            //1. 创建一个事件中心(解析对象中的所有事件方法, 和触发发布事件)
-            EP ep = new EP();
-            //2. 解析对象中的事件方法. 此步骤会解析出对象中所有包含@EL的方法, 并加入到 ep(事件中心)去
-            ep.addListenerSource(new TestEP());
-            //3. 触发并发布事件. 触发hello事件, "enet"参数会被传到hello事件所指向的方法的参数
-            ep.fire("hello", "enet");
-        }
-        
-        // 此方法被标注为一个名叫hello的事件方法.
-        @EL(name = "hello")
-        private void hello(String name) {
-            System.out.println("hello " + name);
-        }
-    }
-```
-    1. 事件方法可默认是异步执行, @EL 中的属性async = false 可设置为同步执行
-
-
-## 用例
+## 简单用例
 可参照模块: enet-test 中的 Launcher 类
 ```
 public class Launcher extends ServerTpl {
@@ -65,35 +39,85 @@ public class Launcher extends ServerTpl {
         app.addSource(new Netty4Resteasy().scan(RestTpl.class));
         app.addSource(new SwaggerServer());
         app.addSource(new Hibernate().scanEntity(TestEntity.class).scanRepo(TestRepo.class));
-        app.addSource(new EhcacheServer());
-        app.addSource(new SchedServer());
         app.addSource(new Launcher(app));
         // TODO 添加其它服务()
         app.start();
     }
 
-
     AppContext ctx;
-    public Launcher(AppContext ctx) {
-        setName("launcher");
-        this.ctx = ctx;
-    }
+    public Launcher(AppContext ctx) { setName("launcher"); this.ctx = ctx; }
 
-
-    /**
-     * 环境配置完成后执行
-     * @param ec
-     */
+    // 环境配置完成后执行
     @EL(name = "env.configured", async = false)
     private void envConfigured(EC ec) {
         Environment env = ((Environment) ec.source());
         String t = env.getString("session.type", "memory");
-        // 动态启动服务
+        // 根据配置来启动用什么session管理
         if ("memory".equalsIgnoreCase(t)) ec.ep().fire("sys.addSource", new MemSessionManager());
+        else if ("redis".equalsIgnoreCase(t)) coreEp.fire("sys.addSource", new RedisSessionManager());
     }
 }
 
 ```
+
+## Environment 环境配置
+    1. 只支持 Properties 文件配置.(因为感觉有这个就够了)
+    2. 常用配置
+        env.profiles.active: dev // 启动哪一套配置(和spring boot一样): 
+        核心线程池配置: 
+            sys.exec.corePoolSize: 4
+            sys.exec.maximumPoolSize: 8
+            sys.exec.keepAliveTime: 120 (秒)
+        事件中心的配置:
+            debug事件的执行: ep.track: sys.starting // 事件名(多个以逗号分割)
+        日志:
+            log.level.日志名: trace/debug/info/warn/error
+            debug所有事件的执行: log.level.org.xnatural.enet.event.EP: trace
+    3. 取所有以http为前缀的属性集
+        Map<String, String> m = (Map) ep.fire("env.ns", "http");
+        此时就可以配置: http.hostname, http.port 等属性了 
+
+
+## 事件驱动
+```
+    public class TestEP {
+        public static void main(String[] args) {
+            //1. 创建一个事件中心(解析对象中的所有事件方法, 和触发发布事件)
+            EP ep = new EP();
+            //2. 解析对象中的事件方法. 此步骤会解析出对象中所有包含@EL的方法, 并加入到 ep(事件中心)去
+            ep.addListenerSource(new TestEP());
+            
+            // 触发并发布事件. 触发hello事件, "enet"参数会被传到hello事件所指向的方法的参数
+            ep.fire("hello", "enet");
+            // 开启debug模式
+            ep.fire("hello", EC.of(this).debug(), "enet")
+            // 同步执行
+                1. ep.fire("hello", EC.of(this).sync(), "enet")
+                2. @EL async 设置为false
+            // 默认填充参数为null
+            ep.fire("hello"); // 此时会打印 hello null
+            
+            // 每次触发一个事件 都会有一个 EC 对象(事件执行上下文)
+            ec.fire("ec"); // 自动创建EC对象
+            ec.fire("ec", EC.of(this).attr("key1", "value1")); // 手动创建EC对象
+        }
+        
+        // 此方法被标注为一个名叫hello的事件方法.
+        @EL(name = "hello")
+        private void hello(String name) {
+            System.out.println("hello " + name);
+        }
+        
+        @EL(name = "ec")
+        private void ec(EC ec) {
+            // 事件源
+            Object s = ec.source();
+            // 取下文中的属性
+            String value1 = ec.getAttr("key1", String.class);
+        }
+    }
+```
+
 
 
 ## 事件说明
@@ -103,21 +127,6 @@ public class Launcher extends ServerTpl {
     env.configured: 环境已配置完成. 即各配置属性已可取得
     env.updateAttr: 有属性改变. 可在运行时改变某属性
 
-
-## 配置
-1. 线程池配置
-    
-    sys.exec.corePoolSize: 4
-    
-    sys.exec.maximumPoolSize: 8
-    
-2. 事件中心
-    
-    ep.track: sys.starting. 要跟踪执行的事件
-
-3. 日志配置
-    
-    log.level.org.xnatural.enet.event.EP: trace
 
 
 ## enet-server提供的模块说明

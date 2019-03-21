@@ -60,7 +60,7 @@ public class XMemcached extends ServerTpl {
     }
 
 
-    @Override
+    @EL(name = "sys.stopping")
     public void stop() {
         log.info("Shutdown '{}' Server", getName());
         try {

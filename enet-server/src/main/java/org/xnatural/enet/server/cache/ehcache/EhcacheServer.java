@@ -49,11 +49,10 @@ public class EhcacheServer extends ServerTpl {
     }
 
 
-    @Override
+    @EL(name = "sys.stopping")
     public void stop() {
         log.info("Shutdown '{}' Server", getName());
         if (cm != null) cm.close();
-        if (coreExec instanceof ExecutorService) ((ExecutorService) coreExec).shutdown();
     }
 
 

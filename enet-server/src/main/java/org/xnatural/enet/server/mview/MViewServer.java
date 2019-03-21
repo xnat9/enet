@@ -5,7 +5,6 @@ import org.xnatural.enet.event.EP;
 import org.xnatural.enet.server.ServerTpl;
 
 import java.util.Map;
-import java.util.concurrent.ExecutorService;
 
 /**
  * mview web界面管理模块
@@ -38,13 +37,6 @@ public class MViewServer extends ServerTpl {
         ctl = new Controller(this);
         log.info("Started {} Server. pathPrefix: {}", getName(), ("/" + getPath() + "/").replace("//", "/"));
         coreEp.fire("resteasy.addResource", ctl, getPath());
-    }
-
-    @Override
-    public void stop() {
-        log.debug("Shutdown '{}' Server", getName());
-        if (coreExec instanceof ExecutorService) ((ExecutorService) coreExec).shutdown();
-        // TODO
     }
 
 

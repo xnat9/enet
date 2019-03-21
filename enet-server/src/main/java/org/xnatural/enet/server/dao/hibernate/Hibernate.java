@@ -94,7 +94,7 @@ public class Hibernate extends ServerTpl {
     }
 
 
-    @Override
+    @EL(name = "sys.stopping")
     public void stop() {
         log.info("Shutdown '{}(Hibernate)' Server", getName());
         sf.close(); closeDs();

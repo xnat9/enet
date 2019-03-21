@@ -73,32 +73,6 @@ public class ServerTpl {
 //    }
 
 
-    /**
-     * Server stop
-     */
-    @EL(name = "sys.stopping")
-    public void stop() {
-        log.info("Shutdown '{}' Server", getName());
-        if (coreExec instanceof ExecutorService) ((ExecutorService) coreExec).shutdown();
-    }
-
-
-    /**
-     * 注册Server本身
-     */
-    @EL(name = "${name}.started")
-    protected void started() {
-        exposeBean(this, getName());
-    }
-
-
-    /**
-     * 子类应该重新定义自己的重启逻辑
-     */
-//    @EL(name = "sys.restart")
-//    protected void restart() {
-//        stop(); start();
-//    }
 
 
     /**
@@ -117,7 +91,8 @@ public class ServerTpl {
         } else if (beanName != null && beanType == null) {
             bean = beanCtx.getAttr(beanName);
         } else if (beanName == null && beanType != null) {
-            bean = beanCtx.getValue(beanType);
+            if (beanType.isAssignableFrom(getClass())) bean = this;
+            else bean = beanCtx.getValue(beanType);
         }
         return bean;
     }
@@ -225,31 +200,24 @@ public class ServerTpl {
 
 
     /**
-     * 属性更新触发器
-     * @param k
-     * @param v
-     */
-    @EL(name = "env.updateAttr")
-    protected void updateAttr(String k, String v) {}
-
-
-    /**
      * 初始化一个内部 {@link Executor}
      */
     protected void initExecutor() {
         if (coreEp instanceof ExecutorService) {
-            log.warn("关闭之前的线程池"); ((ExecutorService) coreEp).shutdown();
+            log.warn("close previous executor"); ((ExecutorService) coreEp).shutdown();
         }
-        log.debug("为服务({})创建私有线程池. ", getName());
+        log.info("create private executor for '{}'.", getName());
         ThreadPoolExecutor e = new ThreadPoolExecutor(
-                4, 4, 10, TimeUnit.MINUTES, new LinkedBlockingQueue<>(100000),
-                new ThreadFactory() {
-                    final AtomicInteger count = new AtomicInteger(1);
-                    @Override
-                    public Thread newThread(Runnable r) {
-                        return new Thread(r, getName() + "-" + count.getAndIncrement());
-                    }
+            getInteger("exec.corePoolSize", 4), getInteger("exec.maximumPoolSize", 8),
+            getInteger("exec.keepAliveTime", 20), TimeUnit.MINUTES,
+            new LinkedBlockingQueue<>(100000),
+            new ThreadFactory() {
+                final AtomicInteger i = new AtomicInteger(1);
+                @Override
+                public Thread newThread(Runnable r) {
+                    return new Thread(r, getName() + "-" + i.getAndIncrement());
                 }
+            }
         );
         e.allowCoreThreadTimeOut(true);
         coreExec = e;

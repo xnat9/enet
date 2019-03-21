@@ -28,7 +28,6 @@ public class RedisSessionManager extends ServerTpl {
         }
         if (coreExec == null) initExecutor();
         if (coreEp == null) coreEp = new EP(coreExec);
-        coreEp.fire(getName() + ".starting");
         attrs.putAll((Map) coreEp.fire("env.ns", getName()));
 
         expire = getInteger("expire", 30);

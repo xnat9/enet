@@ -61,7 +61,10 @@ public class Netty4Http extends ServerTpl {
     }
 
 
-    @Override
+    /**
+     * async 为false是为了保证 此服务最先被关闭.(先断掉新的请求, 再关闭其它服务)
+     */
+    @EL(name = "sys.stopping", async = false)
     public void stop() {
         log.info("Shutdown '{}' Server. hostname: {}, port: {}", getName(), getHostname(), getPort());
         if (boosGroup != null) boosGroup.shutdownGracefully();

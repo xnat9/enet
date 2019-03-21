@@ -6,7 +6,6 @@ import org.xnatural.enet.server.ServerTpl;
 
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
-import java.util.concurrent.ExecutorService;
 import java.util.concurrent.TimeUnit;
 
 /**
@@ -38,13 +37,6 @@ public class MemSessionManager extends ServerTpl {
         sMap = new ConcurrentHashMap<>();
         coreEp.fire(getName() + ".started");
         log.info("Started {} Server", getName());
-    }
-
-
-    @Override
-    public void stop() {
-        sMap = null;
-        if (coreExec instanceof ExecutorService) ((ExecutorService) coreExec).shutdown();
     }
 
 

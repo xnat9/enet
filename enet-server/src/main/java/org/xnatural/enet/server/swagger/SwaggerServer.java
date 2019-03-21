@@ -14,7 +14,6 @@ import org.xnatural.enet.server.ServerTpl;
 
 import java.lang.reflect.Field;
 import java.util.*;
-import java.util.concurrent.ExecutorService;
 
 import static java.util.Collections.singletonList;
 import static org.xnatural.enet.common.Utils.isEmpty;
@@ -49,7 +48,7 @@ public class SwaggerServer extends ServerTpl {
     }
 
 
-    @Override
+    @EL(name = "sys.stopping")
     public void stop() {
         log.debug("Shutdown '{}' Server", getName());
         try {
@@ -59,7 +58,6 @@ public class SwaggerServer extends ServerTpl {
         } catch (Exception e) {
             log.warn(e, "");
         }
-        if (coreExec instanceof ExecutorService) ((ExecutorService) coreExec).shutdown();
     }
 
 

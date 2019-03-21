@@ -155,11 +155,11 @@ public class EP {
                             if (ec.track) log.info("end executing listener chain for event name '{}'. id: {}, result: {}", eName, ec.id, ec.result);
                         }
                     };
-                    asyncLs.forEach(l -> exec.execute(() -> {l.invoke(ec); i.decrementAndGet(); fn.run();}));
                     syncLs.forEach(l -> {l.invoke(ec); i.decrementAndGet(); fn.run();});
+                    asyncLs.forEach(l -> exec.execute(() -> {l.invoke(ec); i.decrementAndGet(); fn.run();}));
                 } else {
-                    asyncLs.forEach(l -> exec.execute(() -> l.invoke(ec)));
                     syncLs.forEach(l -> l.invoke(ec));
+                    asyncLs.forEach(l -> exec.execute(() -> l.invoke(ec)));
                 }
             } else {
                 AtomicInteger i = new AtomicInteger(ls.size());
@@ -170,8 +170,8 @@ public class EP {
                         completeFn.accept(ec);
                     }
                 };
-                asyncLs.forEach(l -> exec.execute(() -> {l.invoke(ec); i.decrementAndGet(); fn.run();}));
                 syncLs.forEach(l -> {l.invoke(ec); i.decrementAndGet(); fn.run();});
+                asyncLs.forEach(l -> exec.execute(() -> {l.invoke(ec); i.decrementAndGet(); fn.run();}));
             }
         }
         return ec.result;

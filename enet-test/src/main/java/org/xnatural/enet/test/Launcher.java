@@ -8,6 +8,7 @@ import org.xnatural.enet.event.EL;
 import org.xnatural.enet.server.ServerTpl;
 import org.xnatural.enet.server.cache.ehcache.EhcacheServer;
 import org.xnatural.enet.server.dao.hibernate.Hibernate;
+import org.xnatural.enet.server.dao.mongo.MongoServer;
 import org.xnatural.enet.server.http.netty.Netty4Http;
 import org.xnatural.enet.server.mview.MViewServer;
 import org.xnatural.enet.server.redis.RedisServer;
@@ -38,6 +39,7 @@ public class Launcher extends ServerTpl {
         app.addSource(new EhcacheServer());
         app.addSource(new RedisServer());
         // app.addSource(new XMemcached());
+        app.addSource(new MongoServer());
         app.addSource(new Launcher(app));
         app.start();
     }

@@ -96,56 +96,64 @@ public class Netty4Resteasy extends ServerTpl {
         cp.addLast(new RestEasyHttpResponseEncoder());
         cp.addLast(new RequestHandler(dispatcher) {
             @Override
-            protected void channelRead0(ChannelHandlerContext ctx, Object msg) throws Exception {
-                coreExec.execute(() -> {
-                    if (msg instanceof NettyHttpRequest) {
-                        NettyHttpRequest request = (NettyHttpRequest) msg;
-                        NettyHttpResponse response = request.getResponse();
-                        try {
-                            if (isEnableSession()) { // 添加session控制
-                                Cookie c = request.getHttpHeaders().getCookies().get(getSessionCookieName());
-                                String sId;
-                                if (c == null || Utils.isEmpty(c.getValue())) {
-                                    sId = UUID.randomUUID().toString().replace("-", "");
-                                    ((NettyHttpRequest) msg).getResponse().addNewCookie(
-                                        new NewCookie(
-                                            getSessionCookieName(), sId, "/", (String) null, 1, (String) null,
-                                            (int) TimeUnit.MINUTES.toSeconds((Integer) coreEp.fire("session.getExpire") + 10)
-                                            , null, false, false
-                                        )
-                                    );
-                                } else sId = c.getValue();
-                                coreEp.fire("session.access", sId);
-                                ((NettyHttpRequest) msg).setAttribute(getSessionCookieName(), sId);
-                            }
-
-                            dispatcher.service(ctx, request, response, true);
-                        } catch (Failure e1) {
-                            response.reset();
-                            response.setStatus(e1.getErrorCode());
-                        } catch (UnhandledException e) {
-                            response.reset();
-                            response.setStatus(500);
-                            if (e.getCause() != null) log.error(e.getCause());
-                            else log.error(e);
-                        } catch (Exception ex) {
-                            response.reset();
-                            response.setStatus(500);
-                            log.error(ex);
-                        } finally {
-                            if (!request.getAsyncContext().isSuspended()) {
-                                try {
-                                    response.finish();
-                                } catch (IOException e) {
-                                    log.error(e);
-                                }
-                            }
-                            request.releaseContentBuffer();
-                        }
-                    }
-                });
+            protected void channelRead0(ChannelHandlerContext ctx, Object msg) {
+                coreExec.execute(() -> process(ctx, msg));
             }
         });
+    }
+
+
+    /**
+     * 处理请求
+     * @param ctx
+     * @param msg
+     */
+    protected void process(ChannelHandlerContext ctx, Object msg) {
+        if (msg instanceof NettyHttpRequest) {
+            NettyHttpRequest request = (NettyHttpRequest) msg;
+            NettyHttpResponse response = request.getResponse();
+            try {
+                if (isEnableSession()) { // 添加session控制
+                    Cookie c = request.getHttpHeaders().getCookies().get(getSessionCookieName());
+                    String sId;
+                    if (c == null || Utils.isEmpty(c.getValue())) {
+                        sId = UUID.randomUUID().toString().replace("-", "");
+                        ((NettyHttpRequest) msg).getResponse().addNewCookie(
+                            new NewCookie(
+                                getSessionCookieName(), sId, "/", (String) null, 1, (String) null,
+                                (int) TimeUnit.MINUTES.toSeconds((Integer) coreEp.fire("session.getExpire") + 10)
+                                , null, false, false
+                            )
+                        );
+                    } else sId = c.getValue();
+                    coreEp.fire("session.access", sId);
+                    ((NettyHttpRequest) msg).setAttribute(getSessionCookieName(), sId);
+                }
+
+                dispatcher.service(ctx, request, response, true);
+            } catch (Failure e1) {
+                response.reset();
+                response.setStatus(e1.getErrorCode());
+            } catch (UnhandledException e) {
+                response.reset();
+                response.setStatus(500);
+                if (e.getCause() != null) log.error(e.getCause());
+                else log.error(e);
+            } catch (Exception ex) {
+                response.reset();
+                response.setStatus(500);
+                log.error(ex);
+            } finally {
+                if (!request.getAsyncContext().isSuspended()) {
+                    try {
+                        response.finish();
+                    } catch (IOException e) {
+                        log.error(e);
+                    }
+                }
+                request.releaseContentBuffer();
+            }
+        }
     }
 
 

@@ -78,11 +78,7 @@ public class Log {
         LOG_METHOD = logMethod;
         root = of(Logger.ROOT_LOGGER_NAME);
         System.setProperty("PID", getPid());
-//        ILoggerFactory lf = LoggerFactory.getILoggerFactory();
-//        if ("ch.qos.logback.classic.LoggerContext".equals(lf.getClass().getName())) {
-//            Method m = findMethod(lf.getClass(), "putProperty", String.class, String.class);
-//            invoke(m, lf, "PID", Utils.getPid());
-//        }
+        if ("true".equalsIgnoreCase(System.getProperty("enet.log.init", "false"))) init(null);
     }
 
     /**

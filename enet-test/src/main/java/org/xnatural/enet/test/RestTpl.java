@@ -1,7 +1,9 @@
 package org.xnatural.enet.test;
 
+import com.mongodb.MongoClient;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
+import org.apache.commons.io.IOUtils;
 import org.xnatural.enet.common.Log;
 import org.xnatural.enet.event.EL;
 import org.xnatural.enet.event.EP;
@@ -12,6 +14,8 @@ import org.xnatural.enet.server.resteasy.SessionId;
 import javax.ws.rs.*;
 import javax.ws.rs.core.Response;
 import java.io.File;
+import java.io.FileInputStream;
+import java.io.IOException;
 import java.text.SimpleDateFormat;
 import java.util.Date;
 import java.util.concurrent.CompletableFuture;
@@ -88,7 +92,22 @@ public class RestTpl {
 
         Object r = ep.fire("cache.get", "test", "key1");
         if (r == null) ep.fire("cache.set", "test", "key1", "mem");
+//        try {
+//            IOUtils.readLines(new FileInputStream("E:\\tmp\\idNo.txt")).forEach(l -> {
+//                ep.fire("redis.del", "overmind:PBOC:P01:"+l);
+//            });
+//        } catch (IOException e) {
+//            e.printStackTrace();
+//        }
         return ok(r);
+    }
+
+
+    @GET
+    @Path("mongo")
+    public Object mongo() {
+        MongoClient c = (MongoClient) ep.fire("bean.get", MongoClient.class);
+        return c.getDatabase("cenarius").getCollection("config_list").find().first().toJson();
     }
 
 

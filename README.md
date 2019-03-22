@@ -45,14 +45,16 @@ public class Launcher extends ServerTpl {
     }
 
     AppContext ctx;
-    public Launcher(AppContext ctx) { setName("launcher"); this.ctx = ctx; }
+    public Launcher(AppContext ctx) {
+        setName("launcher"); this.ctx = ctx; 
+    }
 
     // 环境配置完成后执行
     @EL(name = "env.configured", async = false)
     private void envConfigured(EC ec) {
         Environment env = ((Environment) ec.source());
         String t = env.getString("session.type", "memory");
-        // 根据配置来启动用什么session管理
+        // 根据配置来启动用哪一种session管理
         if ("memory".equalsIgnoreCase(t)) ec.ep().fire("sys.addSource", new MemSessionManager());
         else if ("redis".equalsIgnoreCase(t)) coreEp.fire("sys.addSource", new RedisSessionManager());
     }
@@ -63,7 +65,7 @@ public class Launcher extends ServerTpl {
 ## Environment 环境配置
     1. 只支持 Properties 文件配置.(因为感觉有这个就够了)
     2. 常用配置
-        env.profiles.active: dev // 启动哪一套配置(和spring boot一样): 
+        env.profiles.active: dev // 启动哪一套配置(和spring boot一样)
         核心线程池配置: 
             sys.exec.corePoolSize: 4
             sys.exec.maximumPoolSize: 8
@@ -74,8 +76,8 @@ public class Launcher extends ServerTpl {
             log.level.日志名: trace/debug/info/warn/error
             debug所有事件的执行: log.level.org.xnatural.enet.event.EP: trace
     3. 取所有以http为前缀的属性集
-        Map<String, String> m = (Map) ep.fire("env.ns", "http");
-        此时就可以配置: http.hostname, http.port 等属性了 
+            Map<String, String> m = (Map) ep.fire("env.ns", "http");
+            此时就可以配置: http.hostname, http.port 等属性了 
 
 
 ## 事件驱动
@@ -112,7 +114,7 @@ public class Launcher extends ServerTpl {
         private void ec(EC ec) {
             // 事件源
             Object s = ec.source();
-            // 取下文中的属性
+            // 取事件下文中的属性
             String value1 = ec.getAttr("key1", String.class);
         }
     }
@@ -172,7 +174,6 @@ public class Launcher extends ServerTpl {
                app.start();
                然后访问: http://localhost:8080/api-doc/
 
-
    ### Hibernate: dao 层 hibernate 实现
         1. 暴露对象: EntityManagerFactory/SessionFactory, TransWrapper(事务包装器)
             EntityManagerFactory emf = (EntityManagerFactory) ep.fire("dao.bean.get", EntityManagerFactory.class);
@@ -181,7 +182,16 @@ public class Launcher extends ServerTpl {
         3. 添加dao(数据访问)对象扫描: app.addSource(new Hibernate().scanRepo(TestRepo.class)) 会扫描TestRepo这个类所在的包下边的所有dao对象
         4. 建议所有dao对象 都继承自BaseRepo
         5. 可单独取出 SessionFactory 进行数据库操作
-
+        
+   ### MongoServer: mongo 客户端
+        1. MongoClient client = (MongoClient) ep.fire("bean.get", MongoClient.class);
+        2. mongo.uri: mongodb://localhost:27017/db1
+        3. uri 和 下面的配置不能同时生效
+              mongo.host: localhost
+              mongo.port: 27017
+              mongo.database: db1
+              mongo.username: user1
+              mongo.password: 123456
      
    ### EhcacheServer: ehcache 缓存
         配置某个缓存的过期时间: cache.expire.缓存名: 3600. (单位秒)  

@@ -35,8 +35,8 @@ public class Launcher extends ServerTpl {
 
     public static void main(String[] args) {
         AppContext app = new AppContext();
-        app.addSource(new Netty4Http());
-        app.addSource(new Netty4Resteasy().scan(RestTpl.class));
+        app.addSource(new NettyHttp());
+        app.addSource(new NettyResteasy().scan(RestTpl.class));
         app.addSource(new SwaggerServer());
         app.addSource(new Hibernate().scanEntity(TestEntity.class).scanRepo(TestRepo.class));
         app.addSource(new Launcher(app));
@@ -46,7 +46,8 @@ public class Launcher extends ServerTpl {
 
     AppContext ctx;
     public Launcher(AppContext ctx) {
-        setName("launcher"); this.ctx = ctx; 
+        setName("launcher"); 
+        this.ctx = ctx; 
     }
 
     // 环境配置完成后执行
@@ -121,7 +122,6 @@ public class Launcher extends ServerTpl {
 ```
 
 
-
 ## 事件说明
     sys.starting: 系统启动. 各服务接收到启动事件后各自并行启动
     sys.started: 系统启动完成. 即所有服务都已启动完成
@@ -143,33 +143,30 @@ public class Launcher extends ServerTpl {
     例2: 指定Server dao中获取: EntityManagerFactory emf = (EntityManagerFactory) ep.fire("dao.bean.get", EntityManagerFactory.class);
 
 
-   ### Netty4Http: http服务
+   ### NettyHttp: http服务
         1. netty4 实现的
         2. 调节netty io处理的线程个数. http-netty.threads-boos:1
         3. http.port/http-netty.port 属性设置端口.(注: 以http-netty 为前缀的属性值优先级比以http为前缀的属性高)
 
-        例: new Netty4Http().setPort(8080).start();
+        例: new NettyHttp().setPort(8080).start();
 
 
-   ### Netty4Resteasy: mvc 层
+   ### NettyResteasy: mvc 层
         1. 基于resteasy实现的mvc功能
         2. 只接收netty4提供的http请求
         3. mvc.sessionCookieName: sId. 设置控制session的cookie名字叫sId
         4. mvc.enableSession: true. 设置是否启用session功能
         例:    AppContext app = new AppContext();
-               app.addSource(new Netty4Http().setPort(8080));
-               app.addSource(new Netty4Resteasy().scan(RestTpl.class));
+               app.addSource(new NettyHttp().setPort(8080));
+               app.addSource(new NettyResteasy().scan(RestTpl.class));
                app.start();
-              
-
-   ### MViewServer: 一个系统管理界面(待完善)
    
    ### SwaggerServer: swagger api 文档服务
         1. swagger.openApi: 事件是为收集rest swagger文档.如果需要把某个rest swagger文档显示就得监听此事件(例: 方法SwaggerServer.openApi)
         2. 添加文档. ep.fire("swagger.addJaxrsDoc", this, "路径前缀", "tag(用于分组)", "描述");
         例:    AppContext app = new AppContext();
-               app.addSource(new Netty4HttpServer().setPort(8080));
-               app.addSource(new Netty4ResteasyServer().scan(RestTpl.class));
+               app.addSource(new NettyHttpServer().setPort(8080));
+               app.addSource(new NettyResteasyServer().scan(RestTpl.class));
                app.addSource(new SwaggerServer());
                app.start();
                然后访问: http://localhost:8080/api-doc/
@@ -182,16 +179,7 @@ public class Launcher extends ServerTpl {
         3. 添加dao(数据访问)对象扫描: app.addSource(new Hibernate().scanRepo(TestRepo.class)) 会扫描TestRepo这个类所在的包下边的所有dao对象
         4. 建议所有dao对象 都继承自BaseRepo
         5. 可单独取出 SessionFactory 进行数据库操作
-        
-   ### MongoServer: mongo 客户端
-        1. MongoClient client = (MongoClient) ep.fire("bean.get", MongoClient.class);
-        2. mongo.uri: mongodb://localhost:27017/db1
-        3. uri 和 下面的配置不能同时生效
-              mongo.host: localhost
-              mongo.port: 27017
-              mongo.database: db1
-              mongo.username: user1
-              mongo.password: 123456
+
      
    ### EhcacheServer: ehcache 缓存
         配置某个缓存的过期时间: cache.expire.缓存名: 3600. (单位秒)  

@@ -32,7 +32,7 @@ import static org.jboss.resteasy.util.FindAnnotation.findAnnotation;
 /**
  * netty4 和 resteasy 结合
  */
-public class Netty4Resteasy extends ServerTpl {
+public class NettyResteasy extends ServerTpl {
     /**
      * 根 path 前缀
      */
@@ -53,7 +53,7 @@ public class Netty4Resteasy extends ServerTpl {
     protected RequestDispatcher  dispatcher;
 
 
-    public Netty4Resteasy() { setName("resteasy-netty"); }
+    public NettyResteasy() { setName("resteasy-netty"); }
 
 
     @EL(name = "sys.starting")
@@ -163,7 +163,7 @@ public class Netty4Resteasy extends ServerTpl {
      * @return
      */
     @EL(name = {"resteasy.addResource"})
-    public Netty4Resteasy addResource(Object source, String path) {
+    public NettyResteasy addResource(Object source, String path) {
         if (source instanceof Class) return this;
         startDeployment();
         if (path != null) deployment.getRegistry().addSingletonResource(source, path);
@@ -222,7 +222,7 @@ public class Netty4Resteasy extends ServerTpl {
      * 服务启动后自动扫描此类所在包下的 Handler({@link Path} 注解的类)
      * @param clz
      */
-    public Netty4Resteasy scan(Class clz) {
+    public NettyResteasy scan(Class clz) {
         if (running.get()) throw new IllegalArgumentException("服务正在运行不允许更改");
         scan.add(clz);
         return this;
@@ -295,7 +295,7 @@ public class Netty4Resteasy extends ServerTpl {
     }
 
 
-    public Netty4Resteasy setRootPath(String rootPath) {
+    public NettyResteasy setRootPath(String rootPath) {
         if (running.get()) throw new RuntimeException("服务正在运行, 不充许更改");
         this.rootPath = rootPath;
         return this;
@@ -307,7 +307,7 @@ public class Netty4Resteasy extends ServerTpl {
     }
 
 
-    public Netty4Resteasy setSessionCookieName(String sessionCookieName) {
+    public NettyResteasy setSessionCookieName(String sessionCookieName) {
         if (running.get()) throw new RuntimeException("不允许运行时更改");
         if (sessionCookieName == null || sessionCookieName.isEmpty()) throw new NullPointerException("参数为空");
         this.sessionCookieName = sessionCookieName;
@@ -315,7 +315,7 @@ public class Netty4Resteasy extends ServerTpl {
     }
 
 
-    public Netty4Resteasy setEnableSession(boolean enableSession) {
+    public NettyResteasy setEnableSession(boolean enableSession) {
         if (running.get()) throw new RuntimeException("运行时不允许更改");
         this.enableSession = enableSession;
         return this;

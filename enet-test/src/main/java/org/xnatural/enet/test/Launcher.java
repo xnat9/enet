@@ -1,6 +1,7 @@
 package org.xnatural.enet.test;
 
 
+import com.mongodb.*;
 import org.xnatural.enet.core.AppContext;
 import org.xnatural.enet.core.Environment;
 import org.xnatural.enet.event.EC;
@@ -8,19 +9,21 @@ import org.xnatural.enet.event.EL;
 import org.xnatural.enet.server.ServerTpl;
 import org.xnatural.enet.server.cache.ehcache.EhcacheServer;
 import org.xnatural.enet.server.dao.hibernate.Hibernate;
-import org.xnatural.enet.server.dao.mongo.MongoServer;
-import org.xnatural.enet.server.http.netty.Netty4Http;
+import org.xnatural.enet.server.http.netty.NettyHttp;
 import org.xnatural.enet.server.mview.MViewServer;
 import org.xnatural.enet.server.redis.RedisServer;
-import org.xnatural.enet.server.resteasy.Netty4Resteasy;
+import org.xnatural.enet.server.resteasy.NettyResteasy;
 import org.xnatural.enet.server.sched.SchedServer;
 import org.xnatural.enet.server.session.MemSessionManager;
 import org.xnatural.enet.server.session.RedisSessionManager;
 import org.xnatural.enet.server.swagger.SwaggerServer;
 
 import java.lang.reflect.Field;
+import java.util.Map;
 import java.util.concurrent.ThreadPoolExecutor;
 import java.util.concurrent.TimeUnit;
+
+import static org.xnatural.enet.common.Utils.toInteger;
 
 /**
  * @author xiangxb, 2018-12-22
@@ -30,8 +33,8 @@ public class Launcher extends ServerTpl {
 
     public static void main(String[] args) {
         AppContext app = new AppContext();
-        app.addSource(new Netty4Http());
-        app.addSource(new Netty4Resteasy().scan(RestTpl.class));
+        app.addSource(new NettyHttp());
+        app.addSource(new NettyResteasy().scan(RestTpl.class));
         app.addSource(new MViewServer());
         app.addSource(new SwaggerServer());
         app.addSource(new Hibernate().scanEntity(TestEntity.class).scanRepo(TestRepo.class));
@@ -39,7 +42,7 @@ public class Launcher extends ServerTpl {
         app.addSource(new EhcacheServer());
         app.addSource(new RedisServer());
         // app.addSource(new XMemcached());
-        app.addSource(new MongoServer());
+        // app.addSource(new MongoClient("localhost", 27017));
         app.addSource(new Launcher(app));
         app.start();
     }
@@ -50,6 +53,41 @@ public class Launcher extends ServerTpl {
     public Launcher(AppContext ctx) {
         setName("launcher");
         this.ctx = ctx;
+    }
+
+
+    // @EL(name = "sys.starting")
+    protected void mongoClient() {
+        Map<String, String> attrs = ctx.env().groupAttr("mongo");
+        MongoClient client = null;
+        MongoClientOptions options = MongoClientOptions.builder()
+            .connectTimeout(toInteger(attrs.get("connectTimeout"), 3000))
+            .socketTimeout(toInteger(attrs.get("socketTimeout"), 3000))
+            .maxWaitTime(toInteger(attrs.get("maxWaitTime"), 5000))
+            .heartbeatFrequency(toInteger(attrs.get("heartbeatFrequency"), 5000))
+            .minConnectionsPerHost(toInteger(attrs.get("minConnectionsPerHost"), 1))
+            .connectionsPerHost(toInteger(attrs.get("connectionsPerHost"), 4))
+            .build();
+
+        String uri = attrs.getOrDefault("uri", "");
+        if (!uri.isEmpty()) {
+            client = new MongoClient(new MongoClientURI(uri, MongoClientOptions.builder(options)));
+        } else {
+            MongoCredential credential = null;
+            if (attrs.containsKey("username")) {
+                credential = MongoCredential.createCredential(attrs.getOrDefault("username", ""), attrs.getOrDefault("database", ""), attrs.getOrDefault("password", "").toCharArray());
+            }
+            if (credential == null) {
+                client = new MongoClient(
+                    new ServerAddress(attrs.getOrDefault("host", "localhost"), toInteger(attrs.get("port"), 27017)), options
+                );
+            } else {
+                client = new MongoClient(
+                    new ServerAddress(attrs.getOrDefault("host", "localhost"), toInteger(attrs.get("port"), 27017)), credential, options
+                );
+            }
+        }
+        ctx.addSource(client);
     }
 
 

@@ -40,7 +40,7 @@ public class RestTpl {
     public void init() {
         ep.fire("swagger.addJaxrsDoc", this, null, "tpl", "tpl rest doc");
         testRepo = (TestRepo) ep.fire("dao.bean.get", TestRepo.class);
-        tm = (TransWrapper) ep.fire("dao.bean.get", TransWrapper.class);
+        tm = (TransWrapper) ep.fire("bean.get", TransWrapper.class);
     }
 
 
@@ -105,9 +105,11 @@ public class RestTpl {
 
     @GET
     @Path("mongo")
+    @Produces("application/json")
     public Object mongo() {
         MongoClient c = (MongoClient) ep.fire("bean.get", MongoClient.class);
-        return c.getDatabase("cenarius").getCollection("config_list").find().first().toJson();
+        // return c == null ? "" : c.getDatabase("cenarius").getCollection("config_list").find().first().toJson();
+        return c == null ? "" : c.getDatabase("gsis").getCollection("cidtb").find().first().toJson();
     }
 
 

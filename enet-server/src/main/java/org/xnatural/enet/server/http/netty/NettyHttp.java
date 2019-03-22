@@ -24,7 +24,7 @@ import java.util.concurrent.TimeUnit;
 /**
  * 用 netty 实现的 http server
  */
-public class Netty4Http extends ServerTpl {
+public class NettyHttp extends ServerTpl {
     /**
      * http 服务监听端口
      */
@@ -37,7 +37,7 @@ public class Netty4Http extends ServerTpl {
     protected NioEventLoopGroup workerGroup;
 
 
-    public Netty4Http() {
+    public NettyHttp() {
         setName("http-netty");
         setPort(8080);
         setHostname("localhost");
@@ -125,7 +125,7 @@ public class Netty4Http extends ServerTpl {
     }
 
 
-    public Netty4Http setHostname(String hostname) {
+    public NettyHttp setHostname(String hostname) {
         if (running.get()) throw new RuntimeException("服务正在运行.不允许更新主机名");
         attrs.put("hostname", hostname); this.hostname = hostname;
         return this;
@@ -137,7 +137,7 @@ public class Netty4Http extends ServerTpl {
     }
 
 
-    public Netty4Http setPort(int port) {
+    public NettyHttp setPort(int port) {
         if (running.get()) throw new RuntimeException("服务正在运行.不允许更新端口");
         attrs.put("port", port); this.port = port;
         return this;

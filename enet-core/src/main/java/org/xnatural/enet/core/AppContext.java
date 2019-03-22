@@ -10,6 +10,7 @@ import org.xnatural.enet.event.EP;
 import java.lang.management.ManagementFactory;
 import java.lang.reflect.Field;
 import java.lang.reflect.Method;
+import java.lang.reflect.Modifier;
 import java.util.*;
 import java.util.concurrent.*;
 import java.util.concurrent.atomic.AtomicInteger;
@@ -96,9 +97,10 @@ public class AppContext {
     public void addSource(Object source) {
         if (source == null) return;
         if (source instanceof Class) return;
-        Method m = findMethod(source.getClass(), "getName"); // 每个source对象都必须有一个name属性并且唯一
-        if (m == null) { log.warn("Source '{}' must have name property", source); return; }
-        String name = (String) invoke(m, source);
+        Method m = findMethod(source.getClass(), "getName");
+        String name;
+        if (m == null) { name = getClass().getName() + "@" + Integer.toHexString(source.hashCode()); }
+        else name = (String) invoke(m, source);
         if (Utils.isEmpty(name)) { log.warn("Get name property is empty from '{}'", source); return; }
         if ("sys".equalsIgnoreCase(name) || "env".equalsIgnoreCase(name) || "log".equalsIgnoreCase(name)) {
             log.warn("name property cannot equal 'sys', 'env' or 'log' . source: {}", source); return;
@@ -108,6 +110,30 @@ public class AppContext {
         }
         sourceMap.put(name, source);
         if (ep != null) { setForSource(source); ep.addListenerSource(source); }
+    }
+
+
+    @EL(name = {"bean.get", "sys.bean.get"}, async = false, order = 1)
+    protected Object findBean(EC ec, Class beanType, String beanName) {
+        if (ec.result != null) return ec.result; // 已经找到结果了, 就直接返回
+
+        Object bean = null;
+        if (beanName != null && beanType != null) {
+            bean = sourceMap.get(beanName);
+            if (bean != null && !beanType.isAssignableFrom(bean.getClass())) bean = null;
+        } else if (beanName != null && beanType == null) {
+            bean = sourceMap.get(beanName);
+        } else if (beanName == null && beanType != null) {
+            if (beanType.isAssignableFrom(getClass())) bean = this;
+            else {
+                for (Map.Entry<String, Object> entry : sourceMap.entrySet()) {
+                    if (beanType.isAssignableFrom(entry.getValue().getClass())) {
+                        bean = entry.getValue(); break;
+                    }
+                }
+            }
+        }
+        return bean;
     }
 
 
@@ -218,6 +244,7 @@ public class AppContext {
         List<Field> epFs = new LinkedList<>();
         List<Field> execFs = new LinkedList<>();
         iterateField(s.getClass(), f -> {
+            if (Modifier.isFinal(f.getModifiers())) return;
             if (EP.class.isAssignableFrom(f.getType())) epFs.add(f);
             else if (Executor.class.isAssignableFrom(f.getType())) execFs.add(f);
         });

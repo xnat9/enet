@@ -40,6 +40,7 @@ public class Launcher extends ServerTpl {
         app.addSource(new SwaggerServer());
         app.addSource(new Hibernate().scanEntity(TestEntity.class).scanRepo(TestRepo.class));
         app.addSource(new Launcher(app));
+        // app.addSource(new MongoClient("localhost", 27017));
         // TODO 添加其它服务()
         app.start();
     }
@@ -64,7 +65,7 @@ public class Launcher extends ServerTpl {
 ```
 
 ## Environment 环境配置
-    1. 只支持 Properties 文件配置.(因为感觉有这个就够了)
+    1. 只支持 Properties 文件配置.(因为感觉有这个就够了). 支持 ${attr} 替换
     2. 常用配置
         env.profiles.active: dev // 启动哪一套配置(和spring boot一样)
         核心线程池配置: 

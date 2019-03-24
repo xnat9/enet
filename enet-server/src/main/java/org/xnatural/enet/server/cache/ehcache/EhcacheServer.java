@@ -11,7 +11,6 @@ import org.xnatural.enet.server.ServerTpl;
 
 import java.time.Duration;
 import java.util.Map;
-import java.util.concurrent.ExecutorService;
 
 import static org.ehcache.config.builders.CacheConfigurationBuilder.newCacheConfigurationBuilder;
 import static org.ehcache.config.builders.ResourcePoolsBuilder.newResourcePoolsBuilder;
@@ -51,7 +50,7 @@ public class EhcacheServer extends ServerTpl {
 
     @EL(name = "sys.stopping")
     public void stop() {
-        log.info("Shutdown '{}' Server", getName());
+        log.debug("Shutdown '{}' Server", getName());
         if (cm != null) cm.close();
     }
 

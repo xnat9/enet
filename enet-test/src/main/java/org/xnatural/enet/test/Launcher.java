@@ -2,6 +2,11 @@ package org.xnatural.enet.test;
 
 
 import com.mongodb.*;
+import com.netflix.appinfo.ApplicationInfoManager;
+import com.netflix.appinfo.InstanceInfo;
+import com.netflix.appinfo.MyDataCenterInstanceConfig;
+import com.netflix.discovery.DefaultEurekaClientConfig;
+import com.netflix.discovery.DiscoveryClient;
 import org.xnatural.enet.core.AppContext;
 import org.xnatural.enet.core.Environment;
 import org.xnatural.enet.event.EC;
@@ -56,6 +61,20 @@ public class Launcher extends ServerTpl {
     }
 
 
+    /**
+     * 环境配置完成后执行
+     * @param ec
+     */
+    @EL(name = "env.configured", async = false)
+    private void envConfigured(EC ec) {
+        Environment env = ((Environment) ec.source());
+        String t = env.getString("session.type", "memory");
+        // 根据配置来启动用什么session管理
+        if ("memory".equalsIgnoreCase(t)) coreEp.fire("sys.addSource", new MemSessionManager());
+        else if ("redis".equalsIgnoreCase(t)) coreEp.fire("sys.addSource", new RedisSessionManager());
+    }
+
+
     // @EL(name = "sys.starting")
     protected void mongoClient() {
         Map<String, String> attrs = ctx.env().groupAttr("mongo");
@@ -91,17 +110,20 @@ public class Launcher extends ServerTpl {
     }
 
 
-    /**
-     * 环境配置完成后执行
-     * @param ec
-     */
-    @EL(name = "env.configured", async = false)
-    private void envConfigured(EC ec) {
-        Environment env = ((Environment) ec.source());
-        String t = env.getString("session.type", "memory");
-        // 根据配置来启动用什么session管理
-        if ("memory".equalsIgnoreCase(t)) coreEp.fire("sys.addSource", new MemSessionManager());
-        else if ("redis".equalsIgnoreCase(t)) coreEp.fire("sys.addSource", new RedisSessionManager());
+    // @EL(name = "sys.starting")
+    protected void eurekaClient() {
+        MyDataCenterInstanceConfig instanceCfg = new MyDataCenterInstanceConfig();
+        ApplicationInfoManager manager = new ApplicationInfoManager(instanceCfg,
+            InstanceInfo.Builder.newBuilder()
+                .setInstanceId("enet").setVIPAddress("39.104.28.131").setPort(8761)
+                .build()
+        );
+        manager.setInstanceStatus(InstanceInfo.InstanceStatus.UP);
+        DefaultEurekaClientConfig cfg = new DefaultEurekaClientConfig();
+        DiscoveryClient client = new DiscoveryClient(manager, cfg);
+
+        ctx.addSource(client);
+
     }
 
 

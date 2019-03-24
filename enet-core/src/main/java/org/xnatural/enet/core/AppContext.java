@@ -22,7 +22,7 @@ import static org.xnatural.enet.common.Utils.*;
  * 系统运行上下文
  */
 public class AppContext {
-    protected       Log                 log       = Log.of(AppContext.class);
+    protected       Log                 log          = Log.of(AppContext.class);
     /**
      * 系统名字. 用于多个系统启动区别
      */
@@ -42,11 +42,15 @@ public class AppContext {
     /**
      * 服务对象源
      */
-    protected       Map<String, Object> sourceMap = new HashMap();
+    protected       Map<String, Object> sourceMap    = new HashMap();
     /**
      * 启动时间
      */
-    protected final Date                startup   = new Date();
+    protected final Date                startup      = new Date();
+    /**
+     * jvm关闭钩子
+     */
+    protected       Thread              shutdownHook = new Thread(() -> stop());
 
 
     /**
@@ -66,6 +70,7 @@ public class AppContext {
                     (System.currentTimeMillis() - startup.getTime()) / 1000.0,
                     ManagementFactory.getRuntimeMXBean().getUptime() / 1000.0
             );
+            if (shutdownHook != null) Runtime.getRuntime().addShutdownHook(shutdownHook);
             ep.fire("sys.started", EC.of(this));
         });
     }
@@ -76,7 +81,10 @@ public class AppContext {
      */
     public void stop() {
         // 通知各个模块服务关闭
-        ep.fire("sys.stopping", EC.of(this), (ce) -> exec.shutdown());
+        ep.fire("sys.stopping", EC.of(this), (ce) -> {
+            exec.shutdown();
+            if (shutdownHook != null) Runtime.getRuntime().removeShutdownHook(shutdownHook);
+        });
     }
 
 

@@ -14,7 +14,10 @@ import java.lang.reflect.Method;
 import java.net.URL;
 import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.atomic.AtomicInteger;
 import java.util.function.BiConsumer;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 import java.util.stream.Collectors;
 
 import static org.xnatural.enet.common.Utils.findMethod;
@@ -121,6 +124,8 @@ public class Environment {
             if (profileSources.containsKey(p)) finalAttrs.putAll(profileSources.get(p));
         }
         finalAttrs.put(PROP_ACTIVE, activeProfiles.stream().collect(Collectors.joining(",")));
+        parseValue(finalAttrs, new AtomicInteger(0));
+        log.info("final attrs: {}", finalAttrs);
         log.info("The following profiles are active: {}", finalAttrs.get(PROP_ACTIVE));
         // 初始化日志相关
         Log.init(() -> initLog());
@@ -201,6 +206,24 @@ public class Environment {
             }
             allProfiles.addAll(activeProfiles);
         }
+    }
+
+
+    protected Pattern p = Pattern.compile("(\\$\\{(?<attr>[\\w\\._]+)\\})+");
+    /**
+     * 替换 值包含 ${attr}的字符串
+     * @param attrs
+     */
+    protected void parseValue(Map<String, String> attrs, AtomicInteger count) {
+        if (count.get() >= 3) return;
+        boolean f = false; count.getAndIncrement();
+        for (Map.Entry<String, String> e : attrs.entrySet()) {
+            Matcher m = p.matcher(e.getValue());
+            if (!m.find()) continue;
+            f = true;
+            attrs.put(e.getKey(), e.getValue().replace(m.group(0), attrs.getOrDefault(m.group("attr"), "")));
+        }
+        if (f) parseValue(attrs, count); // 一直解析直到所有值都被替换完成;
     }
 
 

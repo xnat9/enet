@@ -372,8 +372,8 @@ public class EP {
                         ec.id, ec.result
                 );
             } catch (Throwable e) {
-                ec.ex = e;
-                log.error(e, "Listener execute error! name: {}, id: {}, method: {}, event source: {}",
+                ec.ex = e.getCause() == null ? e : e.getCause();
+                log.error(ec.ex, "Listener execute error! name: {}, id: {}, method: {}, event source: {}",
                         name, ec.id, (m == null ? "" : source.getClass().getSimpleName() + "." + m.getName()),
                         (ec.source() == null ? null : ec.source().getClass().getSimpleName())
                 );

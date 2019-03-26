@@ -2,11 +2,10 @@ package org.xnatural.enet.test;
 
 
 import com.mongodb.*;
-import com.netflix.appinfo.ApplicationInfoManager;
-import com.netflix.appinfo.InstanceInfo;
-import com.netflix.appinfo.MyDataCenterInstanceConfig;
+import com.netflix.appinfo.*;
 import com.netflix.discovery.DefaultEurekaClientConfig;
 import com.netflix.discovery.DiscoveryClient;
+import org.xnatural.enet.common.Utils;
 import org.xnatural.enet.core.AppContext;
 import org.xnatural.enet.core.Environment;
 import org.xnatural.enet.event.EC;
@@ -24,10 +23,18 @@ import org.xnatural.enet.server.session.RedisSessionManager;
 import org.xnatural.enet.server.swagger.SwaggerServer;
 
 import java.lang.reflect.Field;
+import java.net.InetAddress;
+import java.net.UnknownHostException;
+import java.util.Arrays;
+import java.util.List;
 import java.util.Map;
 import java.util.concurrent.ThreadPoolExecutor;
 import java.util.concurrent.TimeUnit;
+import java.util.stream.Collectors;
 
+import static com.netflix.appinfo.DataCenterInfo.Name.MyOwn;
+import static org.xnatural.enet.common.Utils.*;
+import static org.xnatural.enet.common.Utils.isEmpty;
 import static org.xnatural.enet.common.Utils.toInteger;
 
 /**
@@ -75,10 +82,10 @@ public class Launcher extends ServerTpl {
     }
 
 
+    MongoClient mongoClient;
     // @EL(name = "sys.starting")
     protected void mongoClient() {
         Map<String, String> attrs = ctx.env().groupAttr("mongo");
-        MongoClient client = null;
         MongoClientOptions options = MongoClientOptions.builder()
             .connectTimeout(toInteger(attrs.get("connectTimeout"), 3000))
             .socketTimeout(toInteger(attrs.get("socketTimeout"), 3000))
@@ -90,40 +97,74 @@ public class Launcher extends ServerTpl {
 
         String uri = attrs.getOrDefault("uri", "");
         if (!uri.isEmpty()) {
-            client = new MongoClient(new MongoClientURI(uri, MongoClientOptions.builder(options)));
+            mongoClient = new MongoClient(new MongoClientURI(uri, MongoClientOptions.builder(options)));
         } else {
             MongoCredential credential = null;
             if (attrs.containsKey("username")) {
                 credential = MongoCredential.createCredential(attrs.getOrDefault("username", ""), attrs.getOrDefault("database", ""), attrs.getOrDefault("password", "").toCharArray());
             }
             if (credential == null) {
-                client = new MongoClient(
+                mongoClient = new MongoClient(
                     new ServerAddress(attrs.getOrDefault("host", "localhost"), toInteger(attrs.get("port"), 27017)), options
                 );
             } else {
-                client = new MongoClient(
+                mongoClient = new MongoClient(
                     new ServerAddress(attrs.getOrDefault("host", "localhost"), toInteger(attrs.get("port"), 27017)), credential, options
                 );
             }
         }
-        ctx.addSource(client);
+        ctx.addSource(mongoClient);
     }
 
 
-    // @EL(name = "sys.starting")
+    DiscoveryClient discoveryClient;
+    @EL(name = "sys.starting")
     protected void eurekaClient() {
-        MyDataCenterInstanceConfig instanceCfg = new MyDataCenterInstanceConfig();
+        Map<String, String> attrs = ctx.env().groupAttr("eureka");
+        MyDataCenterInstanceConfig instanceCfg = new MyDataCenterInstanceConfig() {
+            @Override
+            public String getHostName(boolean refresh) {
+                try {
+                    return InetAddress.getLocalHost().getHostAddress();
+                } catch (UnknownHostException e) {
+                    e.printStackTrace();
+                }
+                return null;
+            }
+        };
         ApplicationInfoManager manager = new ApplicationInfoManager(instanceCfg,
             InstanceInfo.Builder.newBuilder()
-                .setInstanceId("enet").setVIPAddress("39.104.28.131").setPort(8761)
+                .setDataCenterInfo(new MyDataCenterInfo(MyOwn))
+                .setLeaseInfo(LeaseInfo.Builder.newBuilder().setDurationInSecs(90).setRenewalIntervalInSecs(20).build())
+                .setInstanceId(getHostname() + ":8080")
+                .setAppName(isEmpty(ctx.getName()) ? "enet" : ctx.getName())
+                .setVIPAddress("enet-service").setPort(8080)
                 .build()
         );
         manager.setInstanceStatus(InstanceInfo.InstanceStatus.UP);
-        DefaultEurekaClientConfig cfg = new DefaultEurekaClientConfig();
-        DiscoveryClient client = new DiscoveryClient(manager, cfg);
+        DefaultEurekaClientConfig cfg = new DefaultEurekaClientConfig() {
+            @Override
+            public int getRegistryFetchIntervalSeconds() {
+                return toInteger(attrs.get("registryFetchIntervalSeconds"), 30);
+            }
+            @Override
+            public boolean shouldRegisterWithEureka() {
+                return toBoolean(attrs.get("registerWithEureka"), true);
+            }
+            @Override
+            public List<String> getEurekaServerServiceUrls(String myZone) {
+                return Arrays.stream(attrs.get("client.serviceUrl." + myZone).split(",")).filter(s -> s != null && !s.trim().isEmpty()).collect(Collectors.toList());
+            }
+        };
+        discoveryClient = new DiscoveryClient(manager, cfg);
+        ctx.addSource(discoveryClient);
+    }
 
-        ctx.addSource(client);
 
+    @EL(name = "sys.stopping")
+    protected void stop() {
+        if (mongoClient != null) mongoClient.close();
+        if (discoveryClient != null) discoveryClient.shutdown();
     }
 
 

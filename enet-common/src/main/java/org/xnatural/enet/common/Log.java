@@ -5,6 +5,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.slf4j.event.Level;
 import org.slf4j.helpers.MessageFormatter;
+import org.slf4j.helpers.SubstituteLogger;
 import org.slf4j.spi.LocationAwareLogger;
 
 import java.lang.reflect.InvocationTargetException;
@@ -32,32 +33,32 @@ import static org.xnatural.enet.common.Utils.*;
  * @author hubert
  */
 public class Log {
-    private static boolean early = true;
-    private static final Pattern             PATTERN_PARAM = Pattern.compile("\\{(([0-9]+).([\\w]+))\\}");
-    private static final Pattern             PATTERN_INDEX = Pattern.compile("\\{([0-9]+)\\}");
-    private static final Pattern             PATTERN_BRACE = Pattern.compile("\\{\\}");
+    private static       boolean early         = true;
+    private static final Pattern PATTERN_PARAM = Pattern.compile("\\{(([0-9]+).([\\w]+))\\}");
+    private static final Pattern PATTERN_INDEX = Pattern.compile("\\{([0-9]+)\\}");
+    private static final Pattern PATTERN_BRACE = Pattern.compile("\\{\\}");
 
     /**
      * delegate logger.
      */
-    private        LocationAwareLogger    logger;
+    private              LocationAwareLogger logger;
     /**
      * 日志名
      */
-    private String                        name;
+    private              String              name;
     /**
      * 日志前缀提供器
      */
-    private              Supplier<String> prefixSupplier;
+    private              Supplier<String>    prefixSupplier;
     /**
      * 日志后缀提供器
      */
-    private              Supplier<String> suffixSupplier;
-    private static final Object[]         EMPTY         = new Object[0];
-    private static final boolean          POST_1_6;
-    private static final Method           LOG_METHOD;
-    private static final String           FQCN = Log.class.getName();
-    private static Log                    root;
+    private              Supplier<String>    suffixSupplier;
+    private static final Object[]            EMPTY = new Object[0];
+    private static final boolean             POST_1_6;
+    private static final Method              LOG_METHOD;
+    private static final String              FQCN  = Log.class.getName();
+    private static       Log                 root;
 
     static {
         Method[] methods = LocationAwareLogger.class.getDeclaredMethods();
@@ -166,6 +167,7 @@ public class Log {
      * @param cfgFn 配置函数
      */
     public static void init(Runnable cfgFn) {
+        LoggerFactory.getILoggerFactory(); // 必须先执行
         if (early) {
             synchronized (Log.class) {
                 if (early) {
@@ -214,6 +216,9 @@ public class Log {
         }
 
         if (logger == null) {
+//            if (LoggerFactory.getLogger(name) instanceof SubstituteLogger) {
+//                System.out.println("xxxx");
+//            }
             logger = (LocationAwareLogger) LoggerFactory.getLogger(name); name = null;
         }
 

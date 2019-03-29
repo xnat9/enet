@@ -99,6 +99,12 @@
             <artifactId>quartz</artifactId>
             <version>2.3.0</version>
             <scope>provided</scope>
+            <exclusions>
+                <exclusion>
+                    <groupId>org.slf4j</groupId>
+                    <artifactId>slf4j-api</artifactId>
+                </exclusion>
+            </exclusions>
         </dependency>
 
         <dependency>
@@ -125,6 +131,12 @@
             <artifactId>jedis</artifactId>
             <version>3.0.1</version>
             <scope>provided</scope>
+            <exclusions>
+                <exclusion>
+                    <groupId>org.slf4j</groupId>
+                    <artifactId>slf4j-api</artifactId>
+                </exclusion>
+            </exclusions>
         </dependency>
 
         <dependency>
@@ -132,13 +144,12 @@
             <artifactId>xmemcached</artifactId>
             <version>2.4.6</version>
             <scope>provided</scope>
-        </dependency>
-
-        <dependency>
-            <groupId>org.apache.kafka</groupId>
-            <artifactId>kafka-clients</artifactId>
-            <version>2.1.1</version>
-            <scope>provided</scope>
+            <exclusions>
+                <exclusion>
+                    <groupId>org.slf4j</groupId>
+                    <artifactId>slf4j-api</artifactId>
+                </exclusion>
+            </exclusions>
         </dependency>
     </dependencies>
 

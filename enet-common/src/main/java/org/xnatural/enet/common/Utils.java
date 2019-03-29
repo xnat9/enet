@@ -27,7 +27,7 @@ import java.util.function.Consumer;
  */
 public class Utils {
 
-    static final Log log = Log.of(Utils.class);
+    static Log log = Log.of(Utils.class);
 
 
     /**
@@ -98,6 +98,13 @@ public class Utils {
             cookies.put(name, value);
             return this;
         }
+        public Http cookies(Map<String, Object> cookies) {
+            if (cookies == null || cookies.isEmpty()) return this;
+            if (this.cookies == null) this.cookies = new HashMap<>(7);
+            this.cookies.putAll(cookies);
+            return this;
+        }
+        public Map<String, Object> cookies() {return cookies;}
 
         /**
          * 执行 http 请求

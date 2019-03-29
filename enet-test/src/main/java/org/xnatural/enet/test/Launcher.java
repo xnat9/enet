@@ -40,7 +40,7 @@ public class Launcher extends ServerTpl {
 
     public static void main(String[] args) {
         AppContext app = new AppContext();
-        app.addSource(new NettyHttp().setHostname("192.168.42.10"));
+        app.addSource(new NettyHttp());
         app.addSource(new NettyResteasy().scan(RestTpl.class));
         app.addSource(new MViewServer());
         app.addSource(new SwaggerServer());
@@ -113,7 +113,7 @@ public class Launcher extends ServerTpl {
 
 
     DiscoveryClient discoveryClient;
-    @EL(name = "sys.starting")
+    // @EL(name = "sys.starting")
     protected void eurekaClient() {
         Map<String, String> attrs = ctx.env().groupAttr("eureka");
         MyDataCenterInstanceConfig instanceCfg = new MyDataCenterInstanceConfig();
@@ -197,36 +197,37 @@ public class Launcher extends ServerTpl {
      * @param e
      */
     private void monitorExec(ThreadPoolExecutor e) {
-        if (e.getQueue().size() > e.getCorePoolSize() * 100) {
+        int size = e.getQueue().size();
+        if (size > e.getCorePoolSize() * 100) {
             log.warn("system is very heavy load running!. {}", "[" + e.toString().split("\\[")[1]);
-        } else if (e.getQueue().size() > e.getCorePoolSize() * 80) {
+        } else if (size > e.getCorePoolSize() * 80) {
             log.warn("system is heavy load running. {}", "[" + e.toString().split("\\[")[1]);
             coreEp.fire("sched.after", 45, TimeUnit.SECONDS, (Runnable) () -> {
-                if (e.getQueue().size() > e.getCorePoolSize() * 80) {
+                if (e.getQueue().size() > size) {
                     log.warn("system is heavy(up) load running. {}", "[" + e.toString().split("\\[")[1]);
                 } else {
                     log.warn("system is heavy(down) load running. {}", "[" + e.toString().split("\\[")[1]);
                 }
             });
-        } else if (e.getQueue().size() > e.getCorePoolSize() * 50) {
+        } else if (size > e.getCorePoolSize() * 50) {
             log.warn("system will heavy load running. {}", "[" + e.toString().split("\\[")[1]);
             coreEp.fire("sched.after", 30, TimeUnit.SECONDS, (Runnable) () -> {
-                if (e.getQueue().size() > e.getCorePoolSize() * 50) {
+                if (e.getQueue().size() > size) {
                     log.warn("system will heavy(up) load running. {}", "[" + e.toString().split("\\[")[1]);
                 } else {
                     log.warn("system will heavy(down) load running. {}", "[" + e.toString().split("\\[")[1]);
                 }
             });
-        } else if (e.getQueue().size() > e.getCorePoolSize() * 20) {
+        } else if (size > e.getCorePoolSize() * 20) {
             log.warn("system is litter heavy load running. {}", "[" + e.toString().split("\\[")[1]);
             coreEp.fire("sched.after", 25, TimeUnit.SECONDS, (Runnable) () -> {
-                if (e.getQueue().size() > e.getCorePoolSize() * 20) {
+                if (e.getQueue().size() > size) {
                     log.warn("system is litter heavy(up) load running. {}", "[" + e.toString().split("\\[")[1]);
                 } else {
                     log.warn("system is litter heavy(down) load running. {}", "[" + e.toString().split("\\[")[1]);
                 }
             });
-        } else if (e.getQueue().size() > e.getCorePoolSize() * 5) {
+        } else if (size > e.getCorePoolSize() * 5) {
             log.info("system executor: {}", "[" + e.toString().split("\\[")[1]);
         }
     }

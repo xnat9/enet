@@ -51,6 +51,12 @@
             <groupId>org.quartz-scheduler</groupId>
             <artifactId>quartz</artifactId>
             <version>2.3.0</version>
+            <exclusions>
+                <exclusion>
+                    <groupId>org.slf4j</groupId>
+                    <artifactId>slf4j-api</artifactId>
+                </exclusion>
+            </exclusions>
         </dependency>
 
         <dependency>
@@ -63,18 +69,36 @@
             <groupId>redis.clients</groupId>
             <artifactId>jedis</artifactId>
             <version>3.0.1</version>
+            <exclusions>
+                <exclusion>
+                    <groupId>org.slf4j</groupId>
+                    <artifactId>slf4j-api</artifactId>
+                </exclusion>
+            </exclusions>
         </dependency>
 
         <dependency>
             <groupId>com.googlecode.xmemcached</groupId>
             <artifactId>xmemcached</artifactId>
             <version>2.4.6</version>
+            <exclusions>
+                <exclusion>
+                    <groupId>org.slf4j</groupId>
+                    <artifactId>slf4j-api</artifactId>
+                </exclusion>
+            </exclusions>
         </dependency>
 
         <dependency>
             <groupId>org.mongodb</groupId>
             <artifactId>mongo-java-driver</artifactId>
             <version>3.10.1</version>
+            <exclusions>
+                <exclusion>
+                    <groupId>org.slf4j</groupId>
+                    <artifactId>slf4j-api</artifactId>
+                </exclusion>
+            </exclusions>
         </dependency>
 
         <dependency>
@@ -85,6 +109,10 @@
                 <exclusion>
                     <groupId>javax.servlet</groupId>
                     <artifactId>servlet-api</artifactId>
+                </exclusion>
+                <exclusion>
+                    <groupId>org.slf4j</groupId>
+                    <artifactId>slf4j-api</artifactId>
                 </exclusion>
             </exclusions>
         </dependency>

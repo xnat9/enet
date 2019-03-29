@@ -1,14 +1,14 @@
 package org.xnatural.enet.test;
 
-import javassist.bytecode.analysis.Executor;
 import org.xnatural.enet.common.Log;
-import org.xnatural.enet.common.Utils;
 
-import java.time.Duration;
-import java.util.concurrent.CountDownLatch;
+import java.util.Map;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.atomic.AtomicInteger;
+
+import static org.xnatural.enet.common.Utils.Http;
+import static org.xnatural.enet.common.Utils.http;
 
 public class Test {
 
@@ -16,9 +16,11 @@ public class Test {
         Log.init(null);
     }
     public static void main(String[] args) {
-        Utils.Http h = Utils.http();
+        Http http = http();
         long start = System.currentTimeMillis();
-        System.out.println(h.get("http://localhost:8080/tpl/dao").execute());
+        System.out.println(http.get("http://localhost:8080/tpl/dao").execute());
+        Map<String, Object> cookies = http.cookies();
+
         int threadCunt = 100;
         ExecutorService exec = Executors.newFixedThreadPool(threadCunt);
         AtomicInteger count = new AtomicInteger(threadCunt);
@@ -31,7 +33,7 @@ public class Test {
         for (int i = 0; i < threadCunt; i++) {
             exec.execute(() -> {
                 for (int j = 0; j < 100; j++) {
-                    System.out.println(h.get("http://localhost:8080/tpl/dao").execute());
+                    System.out.println(http().timeout(5000).header("Connection", "close").cookies(cookies).get("http://localhost:8080/tpl/dao").execute());
                 }
                 count.decrementAndGet(); fn.run();
             });

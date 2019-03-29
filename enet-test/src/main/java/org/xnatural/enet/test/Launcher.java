@@ -5,7 +5,6 @@ import com.mongodb.*;
 import com.netflix.appinfo.*;
 import com.netflix.discovery.DefaultEurekaClientConfig;
 import com.netflix.discovery.DiscoveryClient;
-import org.xnatural.enet.common.Utils;
 import org.xnatural.enet.core.AppContext;
 import org.xnatural.enet.core.Environment;
 import org.xnatural.enet.event.EC;
@@ -23,8 +22,6 @@ import org.xnatural.enet.server.session.RedisSessionManager;
 import org.xnatural.enet.server.swagger.SwaggerServer;
 
 import java.lang.reflect.Field;
-import java.net.InetAddress;
-import java.net.UnknownHostException;
 import java.util.Arrays;
 import java.util.List;
 import java.util.Map;
@@ -32,10 +29,8 @@ import java.util.concurrent.ThreadPoolExecutor;
 import java.util.concurrent.TimeUnit;
 import java.util.stream.Collectors;
 
-import static com.netflix.appinfo.DataCenterInfo.Name.MyOwn;
+import static com.netflix.appinfo.DataCenterInfo.Name.Netflix;
 import static org.xnatural.enet.common.Utils.*;
-import static org.xnatural.enet.common.Utils.isEmpty;
-import static org.xnatural.enet.common.Utils.toInteger;
 
 /**
  * @author xiangxb, 2018-12-22
@@ -45,7 +40,7 @@ public class Launcher extends ServerTpl {
 
     public static void main(String[] args) {
         AppContext app = new AppContext();
-        app.addSource(new NettyHttp());
+        app.addSource(new NettyHttp().setHostname("192.168.42.10"));
         app.addSource(new NettyResteasy().scan(RestTpl.class));
         app.addSource(new MViewServer());
         app.addSource(new SwaggerServer());
@@ -121,28 +116,23 @@ public class Launcher extends ServerTpl {
     @EL(name = "sys.starting")
     protected void eurekaClient() {
         Map<String, String> attrs = ctx.env().groupAttr("eureka");
-        MyDataCenterInstanceConfig instanceCfg = new MyDataCenterInstanceConfig() {
-            @Override
-            public String getHostName(boolean refresh) {
-                try {
-                    return InetAddress.getLocalHost().getHostAddress();
-                } catch (UnknownHostException e) {
-                    e.printStackTrace();
-                }
-                return null;
-            }
-        };
+        MyDataCenterInstanceConfig instanceCfg = new MyDataCenterInstanceConfig();
         ApplicationInfoManager manager = new ApplicationInfoManager(instanceCfg,
             InstanceInfo.Builder.newBuilder()
-                .setDataCenterInfo(new MyDataCenterInfo(MyOwn))
-                .setLeaseInfo(LeaseInfo.Builder.newBuilder().setDurationInSecs(90).setRenewalIntervalInSecs(20).build())
-                .setInstanceId(getHostname() + ":8080")
+                .setDataCenterInfo(new MyDataCenterInfo(Netflix))
+                .setLeaseInfo(LeaseInfo.Builder.newBuilder().setDurationInSecs(90).setRenewalIntervalInSecs(30).build())
+                .setInstanceId("192.168.42.10:enet:8080")
                 .setAppName(isEmpty(ctx.getName()) ? "enet" : ctx.getName())
-                .setVIPAddress("enet-service").setPort(8080)
+                .setVIPAddress("enet").setPort(8080)
+                .setHostName("192.168.42.10")
                 .build()
         );
         manager.setInstanceStatus(InstanceInfo.InstanceStatus.UP);
         DefaultEurekaClientConfig cfg = new DefaultEurekaClientConfig() {
+            @Override
+            public boolean shouldFetchRegistry() {
+                return toBoolean(attrs.get("fetchRegistry"), false);
+            }
             @Override
             public int getRegistryFetchIntervalSeconds() {
                 return toInteger(attrs.get("registryFetchIntervalSeconds"), 30);
@@ -163,8 +153,8 @@ public class Launcher extends ServerTpl {
 
     @EL(name = "sys.stopping")
     protected void stop() {
-        if (mongoClient != null) mongoClient.close();
         if (discoveryClient != null) discoveryClient.shutdown();
+        if (mongoClient != null) mongoClient.close();
     }
 
 
@@ -173,7 +163,7 @@ public class Launcher extends ServerTpl {
      */
     @EL(name = "sys.started")
     private void sysStarted() {
-        // ctx.stop();
+        // ctx.stop(); // 测试关闭
     }
 
 
@@ -207,36 +197,36 @@ public class Launcher extends ServerTpl {
      * @param e
      */
     private void monitorExec(ThreadPoolExecutor e) {
-        if (e.getQueue().size() > 10000) {
+        if (e.getQueue().size() > e.getCorePoolSize() * 100) {
             log.warn("system is very heavy load running!. {}", "[" + e.toString().split("\\[")[1]);
-        } else if (e.getQueue().size() > 7000) {
+        } else if (e.getQueue().size() > e.getCorePoolSize() * 80) {
             log.warn("system is heavy load running. {}", "[" + e.toString().split("\\[")[1]);
             coreEp.fire("sched.after", 45, TimeUnit.SECONDS, (Runnable) () -> {
-                if (e.getQueue().size() > 7000) {
+                if (e.getQueue().size() > e.getCorePoolSize() * 80) {
                     log.warn("system is heavy(up) load running. {}", "[" + e.toString().split("\\[")[1]);
                 } else {
                     log.warn("system is heavy(down) load running. {}", "[" + e.toString().split("\\[")[1]);
                 }
             });
-        } else if (e.getQueue().size() > 3000) {
+        } else if (e.getQueue().size() > e.getCorePoolSize() * 50) {
             log.warn("system will heavy load running. {}", "[" + e.toString().split("\\[")[1]);
             coreEp.fire("sched.after", 30, TimeUnit.SECONDS, (Runnable) () -> {
-                if (e.getQueue().size() > 3000) {
+                if (e.getQueue().size() > e.getCorePoolSize() * 50) {
                     log.warn("system will heavy(up) load running. {}", "[" + e.toString().split("\\[")[1]);
                 } else {
                     log.warn("system will heavy(down) load running. {}", "[" + e.toString().split("\\[")[1]);
                 }
             });
-        } else if (e.getQueue().size() > 500) {
+        } else if (e.getQueue().size() > e.getCorePoolSize() * 20) {
             log.warn("system is litter heavy load running. {}", "[" + e.toString().split("\\[")[1]);
             coreEp.fire("sched.after", 25, TimeUnit.SECONDS, (Runnable) () -> {
-                if (e.getQueue().size() > 500) {
+                if (e.getQueue().size() > e.getCorePoolSize() * 20) {
                     log.warn("system is litter heavy(up) load running. {}", "[" + e.toString().split("\\[")[1]);
                 } else {
                     log.warn("system is litter heavy(down) load running. {}", "[" + e.toString().split("\\[")[1]);
                 }
             });
-        } else if (e.getQueue().size() > e.getCorePoolSize() * 2) {
+        } else if (e.getQueue().size() > e.getCorePoolSize() * 5) {
             log.info("system executor: {}", "[" + e.toString().split("\\[")[1]);
         }
     }

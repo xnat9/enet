@@ -116,6 +116,13 @@ public class EC {
     public EC sync() { async = false; return this; }
 
 
+    /**
+     * 异步执行
+     * @return
+     */
+    public EC async() { async = true; return this; }
+
+
     public EC debug() { track = true; return this; }
 
 

@@ -65,7 +65,7 @@ public class AppContext {
         // 2. 设置系统环境
         env = new Environment(); env.setEp(ep); env.loadCfg();
         // 3. 通知所有服务启动
-        ep.fire("sys.starting", EC.of(this), (ce) -> {
+        ep.fire("sys.starting", EC.of(this), (ec) -> {
             log.info("Started Application in {} seconds (JVM running for {})",
                     (System.currentTimeMillis() - startup.getTime()) / 1000.0,
                     ManagementFactory.getRuntimeMXBean().getUptime() / 1000.0
@@ -82,20 +82,14 @@ public class AppContext {
     public void stop() {
         // 通知各个模块服务关闭
         ep.fire("sys.stopping", EC.of(this), (ce) -> {
-            exec.shutdown();
             if (shutdownHook != null) Runtime.getRuntime().removeShutdownHook(shutdownHook);
+            exec.shutdown();
         });
     }
 
 
     /**
-     * 启动完成调用
-     */
-    @EL(name = "sys.started")
-    protected void started() {}
-
-
-    /**
+     * 添加对象源
      * {@link #ep} 会找出source对象中所有其暴露的功能. 即: 用 @EL 标注的方法
      * 注: 每个对象源都必须有一个 name 属性标识
      * @param source 不能是一个 Class
@@ -121,6 +115,13 @@ public class AppContext {
     }
 
 
+    /**
+     * 查找对象
+     * @param ec
+     * @param beanType
+     * @param beanName
+     * @return
+     */
     @EL(name = {"bean.get", "sys.bean.get"}, async = false, order = 1)
     protected Object findBean(EC ec, Class beanType, String beanName) {
         if (ec.result != null) return ec.result; // 已经找到结果了, 就直接返回

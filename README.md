@@ -29,7 +29,7 @@
 ```
 
 ## 简单用例
-可参照模块: enet-test 中的 Launcher 类
+可参照模块: enet-test 中的 [Launcher](https://gitee.com/xnat/enet/blob/master/enet-test/src/main/java/org/xnatural/enet/test/Launcher.java) 类
 ```
 public class Launcher extends ServerTpl {
 
@@ -42,7 +42,7 @@ public class Launcher extends ServerTpl {
         app.addSource(new Launcher(app));
         // app.addSource(new MongoClient("localhost", 27017));
         // TODO 添加其它服务()
-        app.start();
+        app.start(); // 并发启动各模块服务
     }
 
     AppContext ctx;
@@ -73,10 +73,10 @@ public class Launcher extends ServerTpl {
             sys.exec.maximumPoolSize: 8
             sys.exec.keepAliveTime: 120 (秒)
         事件中心的配置:
-            debug事件的执行: ep.track: sys.starting // 事件名(多个以逗号分割)
+            ep.track: sys.starting // 跟踪事件的执行(多个以逗号分割)
         日志:
             log.level.日志名: trace/debug/info/warn/error
-            debug所有事件的执行: log.level.org.xnatural.enet.event.EP: trace
+            跟踪所有事件的执行: log.level.org.xnatural.enet.event.EP: trace
     3. 取所有以http为前缀的属性集
             Map<String, String> m = (Map) ep.fire("env.ns", "http");
             此时就可以配置: http.hostname, http.port 等属性了 
@@ -93,8 +93,13 @@ public class Launcher extends ServerTpl {
             
             // 触发并发布事件. 触发hello事件, "enet"参数会被传到hello事件所指向的方法的参数
             ep.fire("hello", "enet");
+            // 事件执行完 回调
+            ep.fire("hello", "enet", (ec) -> {// TODO});
             // 开启debug模式
             ep.fire("hello", EC.of(this).debug(), "enet")
+            // 同步执行的事件, 可以直接取返回值
+            Object r = ep.fire("get");
+            
             // 同步执行
                 1. ep.fire("hello", EC.of(this).sync(), "enet")
                 2. @EL async 设置为false
@@ -110,6 +115,11 @@ public class Launcher extends ServerTpl {
         @EL(name = "hello")
         private void hello(String name) {
             System.out.println("hello " + name);
+        }
+        
+        @EL(name = "get", async = false)
+        private String get() {
+            return "xxx";
         }
         
         @EL(name = "ec")
@@ -129,7 +139,6 @@ public class Launcher extends ServerTpl {
     sys.stopping: 系统关闭通知.
     env.configured: 环境已配置完成. 即各配置属性已可取得
     env.updateAttr: 有属性改变. 可在运行时改变某属性
-
 
 
 ## enet-server提供的模块说明
@@ -247,29 +256,103 @@ public class Launcher extends ServerTpl {
 
    ### MemSessionManager: session管理(内存session)
         1. 配置sesson过期时间: session.expire: 30. 单位分钟
-        2. 保存属性到session. 
+        2. 保存属性到session.
             ep.fire("session.set", "sessionId", "key1", "value1")
-        2. 从session中取属性. 
+        3. 从session中取属性.
             ep.fire("session.get", "sessionId", "key1")
 
    ### RedisSessionManager: session管理(redis)
-        * 需要配置 session.type: redis 才能生效
-        * 服务依赖 RedisServer
-        * 配置sesson过期时间: session.expire: 30. 单位分钟
-        * 保存属性到session. 
+        1. 需要配置 session.type: redis 才能生效
+        2. 服务依赖 RedisServer
+        3. 配置sesson过期时间: session.expire: 30. 单位分钟
+        4. 保存属性到session. 
             ep.fire("session.set", "sessionId", "key1", "value1")
-        * 从session中取属性. 
+        5. 从session中取属性. 
             ep.fire("session.get", "sessionId", "key1")
+
+
+## mongo 用法例子
+可参照 [Launcher](https://gitee.com/xnat/enet/blob/master/enet-test/src/main/java/org/xnatural/enet/test/Launcher.java) 类
+```
+        MongoClient mongoClient;
+        @EL(name = "sys.starting")
+        protected void mongoClient() {
+            Map<String, String> attrs = ctx.env().groupAttr("mongo");
+            MongoClientOptions options = MongoClientOptions.builder()
+                .connectTimeout(toInteger(attrs.get("connectTimeout"), 3000))
+                .socketTimeout(toInteger(attrs.get("socketTimeout"), 3000))
+                .maxWaitTime(toInteger(attrs.get("maxWaitTime"), 5000))
+                .heartbeatFrequency(toInteger(attrs.get("heartbeatFrequency"), 5000))
+                .minConnectionsPerHost(toInteger(attrs.get("minConnectionsPerHost"), 1))
+                .connectionsPerHost(toInteger(attrs.get("connectionsPerHost"), 4))
+                .build();
+    
+            String uri = attrs.getOrDefault("uri", "");
+            if (!uri.isEmpty()) {
+                mongoClient = new MongoClient(new MongoClientURI(uri, MongoClientOptions.builder(options)));
+            } else {
+                MongoCredential credential = null;
+                if (attrs.containsKey("username")) {
+                    credential = MongoCredential.createCredential(attrs.getOrDefault("username", ""), attrs.getOrDefault("database", ""), attrs.getOrDefault("password", "").toCharArray());
+                }
+                if (credential == null) {
+                    mongoClient = new MongoClient(
+                        new ServerAddress(attrs.getOrDefault("host", "localhost"), toInteger(attrs.get("port"), 27017)), options
+                    );
+                } else {
+                    mongoClient = new MongoClient(
+                        new ServerAddress(attrs.getOrDefault("host", "localhost"), toInteger(attrs.get("port"), 27017)), credential, options
+                    );
+                }
+            }
+            ctx.addSource(mongoClient);
+        }
+
+```
+
+
+## eureka 注册例子
+可参照 [Launcher](https://gitee.com/xnat/enet/blob/master/enet-test/src/main/java/org/xnatural/enet/test/Launcher.java) 类
+```
+    DiscoveryClient discoveryClient;
+    @EL(name = "sys.starting")
+    protected void eurekaClient() {
+        Map<String, String> attrs = ctx.env().groupAttr("eureka");
+        MyDataCenterInstanceConfig instanceCfg = new MyDataCenterInstanceConfig();
+        ApplicationInfoManager manager = new ApplicationInfoManager(instanceCfg,
+            InstanceInfo.Builder.newBuilder()
+                .setDataCenterInfo(new MyDataCenterInfo(Netflix))
+                .setLeaseInfo(LeaseInfo.Builder.newBuilder().setDurationInSecs(90).setRenewalIntervalInSecs(30).build())
+                .setInstanceId("localhost:enet:8080")
+                .setAppName(isEmpty(ctx.getName()) ? "enet" : ctx.getName())
+                .setVIPAddress("enet").setPort(8080)
+                .setHostName("192.168.42.10")
+                .build()
+        );
+        manager.setInstanceStatus(InstanceInfo.InstanceStatus.UP);
+        DefaultEurekaClientConfig cfg = new DefaultEurekaClientConfig() {
+            @Override
+            public boolean shouldFetchRegistry() {
+                return toBoolean(attrs.get("fetchRegistry"), false);
+            }
+            @Override
+            public int getRegistryFetchIntervalSeconds() {
+                return toInteger(attrs.get("registryFetchIntervalSeconds"), 30);
+            }
+            @Override
+            public boolean shouldRegisterWithEureka() {
+                return toBoolean(attrs.get("registerWithEureka"), true);
+            }
+            @Override
+            public List<String> getEurekaServerServiceUrls(String myZone) {
+                return Arrays.stream(attrs.get("client.serviceUrl." + myZone).split(",")).filter(s -> s != null && !s.trim().isEmpty()).collect(Collectors.toList());
+            }
+        };
+        discoveryClient = new DiscoveryClient(manager, cfg);
+        ctx.addSource(discoveryClient);
+    }
+```
+
 ## 参与贡献
 
 xnatural@msn.cn
-
-
-## 码云特技
-
-1. 使用 Readme\_XXX.md 来支持不同的语言，例如 Readme\_en.md, Readme\_zh.md
-2. 码云官方博客 [blog.gitee.com](https://blog.gitee.com)
-3. 你可以 [https://gitee.com/explore](https://gitee.com/explore) 这个地址来了解码云上的优秀开源项目
-4. [GVP](https://gitee.com/gvp) 全称是码云最有价值开源项目，是码云综合评定出的优秀开源项目
-5. 码云官方提供的使用手册 [https://gitee.com/help](https://gitee.com/help)
-6. 码云封面人物是一档用来展示码云会员风采的栏目 [https://gitee.com/gitee-stars/](https://gitee.com/gitee-stars/)

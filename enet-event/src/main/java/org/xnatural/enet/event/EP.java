@@ -17,7 +17,6 @@ import java.util.regex.Pattern;
 /**
  * event publisher 事件发布器.事件分发中心
  * TODO 事件死锁. 事件执行链
- * TODO 事件等待. 事件b, 需要在事件a执行完后才能执行()
  */
 public class EP {
     protected Log                         log;
@@ -35,6 +34,7 @@ public class EP {
     public EP() { init(null); }
     public EP(Executor exec) { init(exec); }
 
+
     /**
      * 初始化
      * @param exec
@@ -45,6 +45,7 @@ public class EP {
         lsMap = new ConcurrentHashMap<>(7);
         trackEvents = new HashSet<>(7);
     }
+
 
     /**
      * {@link #fire(String, EC, Consumer)}
@@ -117,7 +118,7 @@ public class EP {
      * @return Note: 取返回值时, 要注意是同步执行还是异步执行
      */
     protected Object doPublish(String eName, EC ec, Consumer<EC> completeFn) {
-        List<Listener> ls = lsMap.get(eName);
+        List<Listener> ls = lsMap.get(eName); // 获取需要执行的监听器
         if (ls == null || ls.isEmpty()) {
             log.trace("not found listener for event name: {}", eName);
             if (completeFn != null) completeFn.accept(ec); return ec.result;
@@ -133,7 +134,7 @@ public class EP {
             if (ec.track) log.info("end executing listener chain for event name '{}'. id: {}, result: {}", eName, ec.id, ec.result);
             if (completeFn != null) completeFn.accept(ec);
         } else {
-            // 异步和同步执行的监听器, 分开执行
+            // 异步, 同步执行的监听器, 分开执行
             List<Listener> asyncLs = new LinkedList<>(); // 异步执行的监听器
             List<Listener> syncLs = new LinkedList<>(); // 同步执行的监听器
             if (ec.async == null) {
@@ -285,7 +286,7 @@ public class EP {
         Matcher ma = p.matcher(name);
         if (!ma.find()) return name;
         String attr = ma.group("attr");
-        String getName = "get" + capitalize(attr);
+        String getName = "get" + (attr.substring(0, 1).toUpperCase() + attr.substring(1));
         Class<? extends Object> c = source.getClass();
         do {
             try {
@@ -340,8 +341,8 @@ public class EP {
                 if (fn != null) fn.run();
                 else {
                     Object r = null;
-                    if (m.getParameterCount() == 0) r = m.invoke(source);
-                    else if (m.getParameterCount() == 1) {
+                    if (m.getParameterCount() == 0) r = m.invoke(source); // 没有参数的情况.直接调用
+                    else if (m.getParameterCount() == 1) { // 1个参数的情况
                         Class<?> t = m.getParameterTypes()[0];
                         if (EC.class.isAssignableFrom(t)) r = m.invoke(source, ec);
                         else if (t.isArray()) { // 如果是数组得转下类型
@@ -352,7 +353,7 @@ public class EP {
                             r = m.invoke(source, arr);
                         }
                         else r = m.invoke(source, ec.args);
-                    } else { // m.getParameterCount() > 1 的情况
+                    } else { // 参数个数多于1个的情况
                         Object[] args = new Object[m.getParameterCount()]; // 参数传少了, 补null
                         if (EC.class.isAssignableFrom(m.getParameterTypes()[0])) {
                             args[0] = ec;
@@ -368,36 +369,17 @@ public class EP {
                 }
                 ec.passed(this);
                 if (ec.track) log.info("Passed listener of event '{}'. method: {}, id: {}, result: {}",
-                        name, (m == null ? "" : source.getClass().getSimpleName() + "." + m.getName()),
-                        ec.id, ec.result
+                    name, (m == null ? "" : source.getClass().getSimpleName() + "." + m.getName()),
+                    ec.id, ec.result
                 );
             } catch (Throwable e) {
                 ec.ex = e.getCause() == null ? e : e.getCause();
-                log.error(ec.ex, "Listener execute error! name: {}, id: {}, method: {}, event source: {}",
-                        name, ec.id, (m == null ? "" : source.getClass().getSimpleName() + "." + m.getName()),
-                        (ec.source() == null ? null : ec.source().getClass().getSimpleName())
+                log.error(ec.ex, "Listener invoke error! name: {}, id: {}, method: {}, event source: {}",
+                    name, ec.id,
+                    (m == null ? "" : source.getClass().getSimpleName() + "." + m.getName()),
+                    (ec.source() == null ? null : ec.source().getClass().getSimpleName())
                 );
             }
         }
-    }
-
-
-    protected String capitalize(String str) {
-        int strLen;
-        if (str == null || (strLen = str.length()) == 0) {
-            return str;
-        }
-
-        final char firstChar = str.charAt(0);
-        final char newChar = Character.toTitleCase(firstChar);
-        if (firstChar == newChar) {
-            // already capitalized
-            return str;
-        }
-
-        char[] newChars = new char[strLen];
-        newChars[0] = newChar;
-        str.getChars(1,strLen, newChars, 1);
-        return String.valueOf(newChars);
     }
 }

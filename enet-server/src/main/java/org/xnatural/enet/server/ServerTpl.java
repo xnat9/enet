@@ -35,7 +35,7 @@ public class ServerTpl {
     /**
      * 可配置属性集.
      */
-    protected Map<String, Object> attrs   = new HashMap<>();
+    protected Map<String, Object> attrs   = new HashMap<>(7);
     /**
      * 此服务执行器
      */
@@ -209,7 +209,7 @@ public class ServerTpl {
         }
         log.info("create private executor for '{}'.", getName());
         ThreadPoolExecutor e = new ThreadPoolExecutor(
-            getInteger("exec.corePoolSize", 4), getInteger("exec.maximumPoolSize", 8),
+            getInteger("exec.corePoolSize", 4), getInteger("exec.maximumPoolSize", 4),
             getInteger("exec.keepAliveTime", 20), TimeUnit.MINUTES,
             new LinkedBlockingQueue<>(100000),
             new ThreadFactory() {

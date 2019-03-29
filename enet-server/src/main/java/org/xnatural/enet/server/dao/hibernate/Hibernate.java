@@ -182,9 +182,7 @@ public class Hibernate extends ServerTpl {
             }
 
             @Override
-            public void addTransformer(ClassTransformer transformer) {
-
-            }
+            public void addTransformer(ClassTransformer transformer) {}
 
             @Override
             public ClassLoader getNewTempClassLoader() {

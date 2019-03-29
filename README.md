@@ -272,86 +272,10 @@ public class Launcher extends ServerTpl {
 
 
 ## mongo 用法例子
-可参照 [Launcher](https://gitee.com/xnat/enet/blob/master/enet-test/src/main/java/org/xnatural/enet/test/Launcher.java) 类
-```
-        MongoClient mongoClient;
-        @EL(name = "sys.starting")
-        protected void mongoClient() {
-            Map<String, String> attrs = ctx.env().groupAttr("mongo");
-            MongoClientOptions options = MongoClientOptions.builder()
-                .connectTimeout(toInteger(attrs.get("connectTimeout"), 3000))
-                .socketTimeout(toInteger(attrs.get("socketTimeout"), 3000))
-                .maxWaitTime(toInteger(attrs.get("maxWaitTime"), 5000))
-                .heartbeatFrequency(toInteger(attrs.get("heartbeatFrequency"), 5000))
-                .minConnectionsPerHost(toInteger(attrs.get("minConnectionsPerHost"), 1))
-                .connectionsPerHost(toInteger(attrs.get("connectionsPerHost"), 4))
-                .build();
-    
-            String uri = attrs.getOrDefault("uri", "");
-            if (!uri.isEmpty()) {
-                mongoClient = new MongoClient(new MongoClientURI(uri, MongoClientOptions.builder(options)));
-            } else {
-                MongoCredential credential = null;
-                if (attrs.containsKey("username")) {
-                    credential = MongoCredential.createCredential(attrs.getOrDefault("username", ""), attrs.getOrDefault("database", ""), attrs.getOrDefault("password", "").toCharArray());
-                }
-                if (credential == null) {
-                    mongoClient = new MongoClient(
-                        new ServerAddress(attrs.getOrDefault("host", "localhost"), toInteger(attrs.get("port"), 27017)), options
-                    );
-                } else {
-                    mongoClient = new MongoClient(
-                        new ServerAddress(attrs.getOrDefault("host", "localhost"), toInteger(attrs.get("port"), 27017)), credential, options
-                    );
-                }
-            }
-            ctx.addSource(mongoClient);
-        }
-
-```
-
+[mongo-client](https://gitee.com/xnat/enet/wikis/mongo%E4%BD%BF%E7%94%A8?sort_id=1400974)
 
 ## eureka 注册例子
-可参照 [Launcher](https://gitee.com/xnat/enet/blob/master/enet-test/src/main/java/org/xnatural/enet/test/Launcher.java) 类
-```
-    DiscoveryClient discoveryClient;
-    @EL(name = "sys.starting")
-    protected void eurekaClient() {
-        Map<String, String> attrs = ctx.env().groupAttr("eureka");
-        MyDataCenterInstanceConfig instanceCfg = new MyDataCenterInstanceConfig();
-        ApplicationInfoManager manager = new ApplicationInfoManager(instanceCfg,
-            InstanceInfo.Builder.newBuilder()
-                .setDataCenterInfo(new MyDataCenterInfo(Netflix))
-                .setLeaseInfo(LeaseInfo.Builder.newBuilder().setDurationInSecs(90).setRenewalIntervalInSecs(30).build())
-                .setInstanceId("localhost:enet:8080")
-                .setAppName(isEmpty(ctx.getName()) ? "enet" : ctx.getName())
-                .setVIPAddress("enet").setPort(8080)
-                .setHostName("192.168.42.10")
-                .build()
-        );
-        manager.setInstanceStatus(InstanceInfo.InstanceStatus.UP);
-        DefaultEurekaClientConfig cfg = new DefaultEurekaClientConfig() {
-            @Override
-            public boolean shouldFetchRegistry() {
-                return toBoolean(attrs.get("fetchRegistry"), false);
-            }
-            @Override
-            public int getRegistryFetchIntervalSeconds() {
-                return toInteger(attrs.get("registryFetchIntervalSeconds"), 30);
-            }
-            @Override
-            public boolean shouldRegisterWithEureka() {
-                return toBoolean(attrs.get("registerWithEureka"), true);
-            }
-            @Override
-            public List<String> getEurekaServerServiceUrls(String myZone) {
-                return Arrays.stream(attrs.get("client.serviceUrl." + myZone).split(",")).filter(s -> s != null && !s.trim().isEmpty()).collect(Collectors.toList());
-            }
-        };
-        discoveryClient = new DiscoveryClient(manager, cfg);
-        ctx.addSource(discoveryClient);
-    }
-```
+[eurek-client](https://gitee.com/xnat/enet/wikis/eureka%E6%B3%A8%E5%86%8C?sort_id=1400954)
 
 ## 参与贡献
 

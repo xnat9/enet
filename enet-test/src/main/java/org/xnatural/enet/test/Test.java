@@ -2,6 +2,8 @@ package org.xnatural.enet.test;
 
 import org.xnatural.enet.common.Log;
 
+import java.io.IOException;
+import java.net.SocketTimeoutException;
 import java.util.Map;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
@@ -9,12 +11,14 @@ import java.util.concurrent.atomic.AtomicInteger;
 
 import static org.xnatural.enet.common.Utils.Http;
 import static org.xnatural.enet.common.Utils.http;
+import static org.xnatural.enet.common.Utils.tryRun;
 
 public class Test {
 
     static {
         Log.init(null);
     }
+
     public static void main(String[] args) {
         Http http = http();
         long start = System.currentTimeMillis();
@@ -33,7 +37,20 @@ public class Test {
         for (int i = 0; i < threadCunt; i++) {
             exec.execute(() -> {
                 for (int j = 0; j < 100; j++) {
-                    System.out.println(http().timeout(5000).header("Connection", "close").cookies(cookies).get("http://localhost:8080/tpl/dao").execute());
+                    try {
+                        Http h = http().timeout(10000).header("Connection", "close").cookies(cookies).get("http" + "://localhost:8080/tpl/dao");
+                        h.execute();
+                        // System.out.println(h.execute());
+                        if (h.getResponseCode() == 503) {
+                            System.out.println("server is busy");
+                        }
+                    } catch (Exception ex) {
+                        if (ex instanceof SocketTimeoutException) System.out.println(ex.getMessage());
+                        else {
+                            ex.printStackTrace();
+                        }
+                    }
+
                 }
                 count.decrementAndGet(); fn.run();
             });

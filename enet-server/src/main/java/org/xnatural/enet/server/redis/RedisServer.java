@@ -59,6 +59,7 @@ public class RedisServer extends ServerTpl {
 
     @EL(name = {"${name}.hset"})
     protected void hset(String cName, String key, Object value, Integer seconds) {
+        log.trace("{}.hset. cName: {}, key: {}, value: {}, seconds: {}", getName(), cName, key, value, seconds);
         execute(c -> {
             c.hset(cName, key, value.toString());
             c.expire(cName, seconds == null ? getInteger("expire." + cName, 60 * 30) : seconds);
@@ -75,12 +76,14 @@ public class RedisServer extends ServerTpl {
 
     @EL(name = {"${name}.hdel"}, async = false)
     protected void hdel(String cName, String key) {
+        log.debug("{}.hdel. cName: {}, key: {}", getName(), cName, key);
         execute(c -> c.hdel(cName, key));
     }
 
 
     @EL(name = {"${name}.del"})
     protected void del(String cName) {
+        log.info("{}.del. cName: {}", getName(), cName);
         execute(c -> c.del(cName));
     }
 

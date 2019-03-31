@@ -52,14 +52,10 @@
                     <artifactId>jcip-annotations</artifactId>
                     <groupId>net.jcip</groupId>
                 </exclusion>
-                <!--<exclusion>
-                    <artifactId>javax.mail</artifactId>
-                    <groupId>com.sun.mail</groupId>
-                </exclusion>-->
-                <!--<exclusion>
+                <exclusion>
                     <groupId>org.jboss.logging</groupId>
                     <artifactId>jboss-logging</artifactId>
-                </exclusion>-->
+                </exclusion>
             </exclusions>
         </dependency>
 
@@ -115,6 +111,10 @@
                 <exclusion>
                     <groupId>com.fasterxml.jackson.jaxrs</groupId>
                     <artifactId>jackson-jaxrs-json-provider</artifactId>
+                </exclusion>
+                <exclusion>
+                    <groupId>org.slf4j</groupId>
+                    <artifactId>slf4j-api</artifactId>
                 </exclusion>
             </exclusions>
         </dependency>

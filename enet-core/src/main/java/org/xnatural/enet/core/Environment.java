@@ -125,7 +125,7 @@ public class Environment {
         }
         finalAttrs.put(PROP_ACTIVE, activeProfiles.stream().collect(Collectors.joining(",")));
         parseValue(finalAttrs, new AtomicInteger(0));
-        log.info("final attrs: {}", finalAttrs);
+        log.debug("final attrs: {}", finalAttrs);
         log.info("The following profiles are active: {}", finalAttrs.get(PROP_ACTIVE));
         // 初始化日志相关
         Log.init(() -> initLog());
@@ -201,6 +201,7 @@ public class Environment {
         locationSources.put(f, r);
         profileSources.computeIfAbsent(profile, s -> new LinkedHashMap<>()).putAll(r);
         if (r.containsKey(PROP_ACTIVE)) {
+            activeProfiles.clear();
             for (String p : r.get(PROP_ACTIVE).split(",")) {
                 if (Utils.isNotBlank(p)) activeProfiles.add(p.trim());
             }

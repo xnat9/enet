@@ -57,6 +57,7 @@ public class EhcacheServer extends ServerTpl {
 
     @EL(name = {"${name}.create"}, async = false)
     protected Cache<Object, Object> createCache(String cName, Duration expire, Integer heapOfEntries, Integer heapOfMB) {
+        log.info("{}.create. cName: {}, expire: {}, heapOfEntries: {}, heapOfMB: {}", getName(), cName, expire, heapOfEntries, heapOfMB);
         Cache<Object, Object> cache = cm.getCache(cName, Object.class, Object.class);
         if (cache == null) {
             synchronized (this) {
@@ -78,6 +79,7 @@ public class EhcacheServer extends ServerTpl {
 
     @EL(name = {"${name}.set", "cache.set"})
     protected void set(String cName, Object key, Object value) {
+        log.trace("{}.set. cName: {}, key: {}, value: {}", getName(), cName, key, value);
         Cache<Object, Object> cache = cm.getCache(cName, Object.class, Object.class);
         if (cache == null) cache = createCache(cName, null, getInteger("heapOfEntries", 1000), null);
         cache.put(key, value);
@@ -93,6 +95,7 @@ public class EhcacheServer extends ServerTpl {
 
     @EL(name = {"${name}.evict", "cache.evict"}, async = false)
     protected void evict(String cName, Object key) {
+        log.debug("{}.evict. cName: {}, key: {}", getName(), cName, key);
         Cache<Object, Object> cache = cm.getCache(cName, Object.class, Object.class);
         if (cache != null) cache.remove(key);
     }
@@ -100,6 +103,7 @@ public class EhcacheServer extends ServerTpl {
 
     @EL(name = {"${name}.clear", "cache.clear"})
     protected void clear(String cName) {
+        log.info("{}.clear. cName: {}", getName(), cName);
         Cache<Object, Object> cache = cm.getCache(cName, Object.class, Object.class);
         if (cache != null) cache.clear();
     }

@@ -57,16 +57,8 @@ public class Utils {
         private Map<String, Object> cookies;
         private Map<String, String> headers;
         private int                 timeout = 3000;
+        private int                 responseCode;
 
-        /**
-         * 重置
-         */
-        private void reset() {
-            contentType = "application/x-www-form-urlencoded";
-            urlStr = null; method = null; params = null;
-            headers = null; jsonBody = null;
-            timeout = 3000;
-        }
         public Http get(String url) { this.urlStr = url; this.method = "GET"; return this; }
         public Http post(String url) { this.urlStr = url; this.method = "POST"; return this; }
         /**
@@ -105,6 +97,7 @@ public class Utils {
             return this;
         }
         public Map<String, Object> cookies() {return cookies;}
+        public int getResponseCode() {return responseCode;}
 
         /**
          * 执行 http 请求
@@ -212,6 +205,8 @@ public class Utils {
                         os.flush(); os.close();
                     }
                 }
+                // http 状态码
+                responseCode = conn.getResponseCode();
                 // 保存cookie
                 List<String> cs = conn.getHeaderFields().get("Set-Cookie");
                 if (isNotEmpty(cs)) {
@@ -226,7 +221,6 @@ public class Utils {
                 log.error(e, "http 错误, url: " + urlStr);
             } finally {
                 if (conn != null) conn.disconnect();
-                reset(); // 防止对象被公用而出现错误
             }
             return ret;
         }
@@ -234,7 +228,7 @@ public class Utils {
 
 
     /**
-     * 得到当前运行的进程id
+     * 得到jvm进程号
      * @return
      */
     public static String getPid() {

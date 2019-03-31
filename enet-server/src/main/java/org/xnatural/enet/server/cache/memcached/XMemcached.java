@@ -75,6 +75,7 @@ public class XMemcached extends ServerTpl {
 
     @EL(name = {"${name}.set", "cache.set"})
     protected void set(String cName, String key, Object value) {
+        log.trace("{}.set. cName: {}, key: {}, value: {}", getName(), cName, key, value);
         try {
             client.withNamespace(cName, c -> {
                 c.setWithNoReply(key, getInteger("expire." + cName, 60 * 30), value); return null;
@@ -98,6 +99,7 @@ public class XMemcached extends ServerTpl {
 
     @EL(name = {"${name}.evict", "cache.evict"})
     protected void evict(String cName, String key) {
+        log.debug("{}.evict. cName: {}, key: {}", getName(), cName, key);
         try {
             client.withNamespace(cName, c -> c.delete(key));
         } catch (Exception e) {
@@ -108,6 +110,7 @@ public class XMemcached extends ServerTpl {
 
     @EL(name = {"${name}.clear", "cache.clear"})
     protected void clear(String cName) {
+        log.info("{}.clear. cName: {}", getName(), cName);
         try {
             client.invalidateNamespace(cName, 10 * 1000L);
         } catch (Exception e) {

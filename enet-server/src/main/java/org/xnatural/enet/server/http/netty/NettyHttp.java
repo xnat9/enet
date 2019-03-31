@@ -1,15 +1,13 @@
 package org.xnatural.enet.server.http.netty;
 
 import io.netty.bootstrap.ServerBootstrap;
-import io.netty.channel.ChannelInitializer;
-import io.netty.channel.ChannelOption;
+import io.netty.channel.*;
+import io.netty.channel.epoll.EpollEventLoopGroup;
 import io.netty.channel.epoll.EpollServerSocketChannel;
 import io.netty.channel.nio.NioEventLoopGroup;
 import io.netty.channel.socket.SocketChannel;
 import io.netty.channel.socket.nio.NioServerSocketChannel;
-import io.netty.handler.codec.http.HttpObjectAggregator;
-import io.netty.handler.codec.http.HttpServerCodec;
-import io.netty.handler.codec.http.HttpServerKeepAliveHandler;
+import io.netty.handler.codec.http.*;
 import io.netty.handler.stream.ChunkedWriteHandler;
 import io.netty.handler.timeout.IdleStateHandler;
 import org.xnatural.enet.event.EL;
@@ -21,12 +19,14 @@ import java.util.Map;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.TimeUnit;
 
+import static io.netty.handler.codec.http.HttpResponseStatus.SERVICE_UNAVAILABLE;
+
 /**
  * 用 netty 实现的 http server
  */
 public class NettyHttp extends ServerTpl {
-    protected NioEventLoopGroup boosGroup;
-    protected NioEventLoopGroup workerGroup;
+    protected EventLoopGroup    boosGroup;
+    protected EventLoopGroup workerGroup;
 
 
     public NettyHttp() {
@@ -66,10 +66,10 @@ public class NettyHttp extends ServerTpl {
      * 创建服务
      */
     protected void createServer() {
-        boolean isLinux = isLinux();
-        Boolean shareLoop = getBoolean("shareLoop", true);
-        boosGroup = new NioEventLoopGroup(getInteger("threads-boos", 1), coreExec);
-        workerGroup = shareLoop ? boosGroup : new NioEventLoopGroup(getInteger("threads-worker", 1), coreExec);
+        boolean isLinux = isLinux() && getBoolean("epollEnabled", true);
+        boosGroup = isLinux ? new EpollEventLoopGroup(getInteger("threads-boos", 1), coreExec) : new NioEventLoopGroup(getInteger("threads-boos", 1), coreExec);
+        workerGroup = getBoolean("shareLoop", true) ? boosGroup :
+            (isLinux ? new EpollEventLoopGroup(getInteger("threads-worker", 1)) : new NioEventLoopGroup(getInteger("threads-worker", 1), coreExec));
         ServerBootstrap sb = new ServerBootstrap()
                 .group(boosGroup, workerGroup)
                 .channel(isLinux ? EpollServerSocketChannel.class : NioServerSocketChannel.class)
@@ -78,6 +78,12 @@ public class NettyHttp extends ServerTpl {
                     protected void initChannel(SocketChannel ch) throws Exception {
                         ch.pipeline().addLast(new IdleStateHandler(2, 0, 0, TimeUnit.MINUTES));
                         ch.pipeline().addLast(new HttpServerCodec());
+                        ch.pipeline().addLast(new SimpleChannelInboundHandler<Object>() {
+                            @Override
+                            protected void channelRead0(ChannelHandlerContext ctx, Object msg) throws Exception {
+                                if (!fusing(ctx, msg)) ctx.fireChannelRead(msg);
+                            }
+                        });
                         ch.pipeline().addLast(new HttpServerKeepAliveHandler());
                         ch.pipeline().addLast(new HttpObjectAggregator(getInteger("maxContentLength", 65536)));
                         ch.pipeline().addLast(new ChunkedWriteHandler());
@@ -89,7 +95,7 @@ public class NettyHttp extends ServerTpl {
                         }, ch.pipeline());
                     }
                 })
-                .option(ChannelOption.SO_BACKLOG, getInteger("backlog", 500))
+                .option(ChannelOption.SO_BACKLOG, getInteger("backlog", 200))
                 .childOption(ChannelOption.SO_KEEPALIVE, true);
         try {
             sb.bind(getHostname(), getPort()).sync();
@@ -97,6 +103,34 @@ public class NettyHttp extends ServerTpl {
         } catch (Exception ex) {
             log.error(ex);
         }
+    }
+
+
+
+    protected int sysLoad = 0;
+    /**
+     * 监听系统负载
+     * @param load
+     */
+    @EL(name = "sys.load", async = false)
+    protected void sysLoad(Integer load) { sysLoad = load * 10; }
+
+
+    /**
+     * 熔断: 是否拒绝处理请求
+     * @param ctx
+     * @param msg
+     * @return
+     */
+    protected boolean fusing(ChannelHandlerContext ctx, Object msg) {
+        if (!(msg instanceof DefaultHttpRequest)) return false;
+        if (sysLoad >= 10) { // 当系统负载过高时拒绝处理
+            sysLoad--;
+            DefaultHttpResponse resp = new DefaultHttpResponse(((DefaultHttpRequest) msg).protocolVersion(), SERVICE_UNAVAILABLE);
+            ctx.writeAndFlush(resp); ctx.close();
+            return true;
+        }
+        return false;
     }
 
 

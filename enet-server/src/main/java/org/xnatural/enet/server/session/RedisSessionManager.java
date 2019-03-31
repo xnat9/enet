@@ -10,11 +10,6 @@ import java.util.Map;
  * redis session 管理
  */
 public class RedisSessionManager extends ServerTpl {
-    /**
-     * 过期时间(单位: 分钟)
-     */
-    protected Integer expire;
-    protected String keyPrefix;
 
     public RedisSessionManager() {
         setName("session-redis");
@@ -28,10 +23,10 @@ public class RedisSessionManager extends ServerTpl {
         }
         if (coreExec == null) initExecutor();
         if (coreEp == null) coreEp = new EP(coreExec);
+        // 过期时间(单位: 分钟)
+        attr("expire", 30);
+        attr("keyPrefix", "session-");
         attrs.putAll((Map) coreEp.fire("env.ns", getName()));
-
-        expire = getInteger("expire", 30);
-        keyPrefix = getStr("keyPrefix", "session-");
 
         coreEp.fire(getName() + ".started");
         log.info("Started {} Server", getName());
@@ -44,19 +39,19 @@ public class RedisSessionManager extends ServerTpl {
      */
     @EL(name = {"${name}.access", "session.access"}, async = false)
     protected void access(String sId) {
-        coreEp.fire(getRedisServerName() + ".hset", keyPrefix + sId, "access", System.currentTimeMillis(), getExpire() * 60);
+        coreEp.fire(getRedisServerName() + ".hset", getKeyPrefix() + sId, "access", System.currentTimeMillis(), getExpire() * 60);
     }
 
 
     @EL(name = {"${name}.set", "session.set"})
     protected void set(String sId, String key, String value) {
-        coreEp.fire(getRedisServerName() + ".hset", keyPrefix + sId, key, value, getExpire() * 60);
+        coreEp.fire(getRedisServerName() + ".hset", getKeyPrefix() + sId, key, value, getExpire() * 60);
     }
 
 
     @EL(name = {"${name}.get", "session.get"}, async = false)
     protected Object get(String sId, String key) {
-        return coreEp.fire(getRedisServerName() + ".hget", keyPrefix + sId, key);
+        return coreEp.fire(getRedisServerName() + ".hget", getKeyPrefix() + sId, key);
     }
 
 
@@ -67,14 +62,18 @@ public class RedisSessionManager extends ServerTpl {
 
     @EL(name = "session.getExpire", async = false)
     public Integer getExpire() {
-        return expire;
+        return getInteger("expire", 30);
     }
 
 
     public RedisSessionManager setExpire(Integer expire) {
         if (expire == null) throw new NullPointerException("参数为空");
-        this.expire = expire;
         attr("expire", expire);
         return this;
+    }
+
+
+    public String getKeyPrefix() {
+        return getStr("keyPrefix", "");
     }
 }

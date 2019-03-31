@@ -5,7 +5,6 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.slf4j.event.Level;
 import org.slf4j.helpers.MessageFormatter;
-import org.slf4j.helpers.SubstituteLogger;
 import org.slf4j.spi.LocationAwareLogger;
 
 import java.lang.reflect.InvocationTargetException;
@@ -81,6 +80,7 @@ public class Log {
         System.setProperty("PID", getPid());
         if ("true".equalsIgnoreCase(System.getProperty("enet.log.init", "false"))) init(null);
     }
+
 
     /**
      * format String like "my name: {0.name}" use pArgs.

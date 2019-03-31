@@ -47,7 +47,7 @@ public class Launcher extends ServerTpl {
         app.addSource(new Hibernate().scanEntity(TestEntity.class).scanRepo(TestRepo.class));
         app.addSource(new SchedServer());
         app.addSource(new EhcacheServer());
-        app.addSource(new RedisServer());
+        // app.addSource(new RedisServer());
         // app.addSource(new XMemcached());
         // app.addSource(new MongoClient("localhost", 27017));
         app.addSource(new Launcher(app));
@@ -69,11 +69,12 @@ public class Launcher extends ServerTpl {
      */
     @EL(name = "env.configured", async = false)
     private void envConfigured(EC ec) {
-        Environment env = ((Environment) ec.source());
-        String t = env.getString("session.type", "memory");
-        // 根据配置来启动用什么session管理
-        if ("memory".equalsIgnoreCase(t)) coreEp.fire("sys.addSource", new MemSessionManager());
-        else if ("redis".equalsIgnoreCase(t)) coreEp.fire("sys.addSource", new RedisSessionManager());
+        if (ctx.env().getBoolean("session.enabled", true)) {
+            String t = ctx.env().getString("session.type", "memory");
+            // 根据配置来启动用什么session管理
+            if ("memory".equalsIgnoreCase(t)) coreEp.fire("sys.addSource", new MemSessionManager());
+            else if ("redis".equalsIgnoreCase(t)) coreEp.fire("sys.addSource", new RedisSessionManager());
+        }
     }
 
 
@@ -121,10 +122,10 @@ public class Launcher extends ServerTpl {
             InstanceInfo.Builder.newBuilder()
                 .setDataCenterInfo(new MyDataCenterInfo(Netflix))
                 .setLeaseInfo(LeaseInfo.Builder.newBuilder().setDurationInSecs(90).setRenewalIntervalInSecs(30).build())
-                .setInstanceId("192.168.42.10:enet:8080")
+                .setInstanceId("192.168.2.100:enet:8080")
                 .setAppName(isEmpty(ctx.getName()) ? "enet" : ctx.getName())
                 .setVIPAddress("enet").setPort(8080)
-                .setHostName("192.168.42.10")
+                .setHostName("192.168.2.100")
                 .build()
         );
         manager.setInstanceStatus(InstanceInfo.InstanceStatus.UP);
@@ -182,9 +183,7 @@ public class Launcher extends ServerTpl {
             f.setAccessible(true);
             ThreadPoolExecutor v = (ThreadPoolExecutor) f.get(ctx);
             if (v instanceof ThreadPoolExecutor) {
-                coreEp.fire("sched.cron", "31 */1 * * * ?", (Runnable) () -> {
-                    monitorExec(v);
-                });
+                coreEp.fire("sched.cron", "31 1/1 * * * ?", (Runnable) () -> monitorExec(v));
             }
         } catch (Exception e) {
             log.error(e);
@@ -199,36 +198,49 @@ public class Launcher extends ServerTpl {
     private void monitorExec(ThreadPoolExecutor e) {
         int size = e.getQueue().size();
         if (size > e.getCorePoolSize() * 100) {
+            coreEp.fire("sys.load", 10);
             log.warn("system is very heavy load running!. {}", "[" + e.toString().split("\\[")[1]);
         } else if (size > e.getCorePoolSize() * 80) {
+            coreEp.fire("sys.load", 8);
             log.warn("system is heavy load running. {}", "[" + e.toString().split("\\[")[1]);
             coreEp.fire("sched.after", 45, TimeUnit.SECONDS, (Runnable) () -> {
                 if (e.getQueue().size() > size) {
+                    coreEp.fire("sys.load", 9);
                     log.warn("system is heavy(up) load running. {}", "[" + e.toString().split("\\[")[1]);
-                } else {
+                } else if (e.getQueue().size() < size) {
+                    coreEp.fire("sys.load", 7);
                     log.warn("system is heavy(down) load running. {}", "[" + e.toString().split("\\[")[1]);
                 }
             });
         } else if (size > e.getCorePoolSize() * 50) {
+            coreEp.fire("sys.load", 5);
             log.warn("system will heavy load running. {}", "[" + e.toString().split("\\[")[1]);
             coreEp.fire("sched.after", 30, TimeUnit.SECONDS, (Runnable) () -> {
                 if (e.getQueue().size() > size) {
+                    coreEp.fire("sys.load", 6);
                     log.warn("system will heavy(up) load running. {}", "[" + e.toString().split("\\[")[1]);
-                } else {
+                } else if (e.getQueue().size() < size) {
+                    coreEp.fire("sys.load", 4);
                     log.warn("system will heavy(down) load running. {}", "[" + e.toString().split("\\[")[1]);
                 }
             });
         } else if (size > e.getCorePoolSize() * 20) {
+            coreEp.fire("sys.load", 3);
             log.warn("system is litter heavy load running. {}", "[" + e.toString().split("\\[")[1]);
             coreEp.fire("sched.after", 25, TimeUnit.SECONDS, (Runnable) () -> {
                 if (e.getQueue().size() > size) {
+                    coreEp.fire("sys.load", 4);
                     log.warn("system is litter heavy(up) load running. {}", "[" + e.toString().split("\\[")[1]);
-                } else {
+                } else if (e.getQueue().size() < size) {
+                    coreEp.fire("sys.load", 2);
                     log.warn("system is litter heavy(down) load running. {}", "[" + e.toString().split("\\[")[1]);
                 }
             });
         } else if (size > e.getCorePoolSize() * 5) {
+            coreEp.fire("sys.load", 1);
             log.info("system executor: {}", "[" + e.toString().split("\\[")[1]);
+        } else if (log.isDebugEnabled() || log.isTraceEnabled()) {
+            log.debug("system executor: {}", "[" + e.toString().split("\\[")[1]);
         }
     }
 }

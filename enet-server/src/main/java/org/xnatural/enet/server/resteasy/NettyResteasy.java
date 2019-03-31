@@ -27,7 +27,9 @@ import java.util.Map;
 import java.util.UUID;
 import java.util.concurrent.TimeUnit;
 
+import static org.jboss.resteasy.plugins.server.netty.RestEasyHttpRequestDecoder.Protocol.HTTP;
 import static org.jboss.resteasy.util.FindAnnotation.findAnnotation;
+import static org.xnatural.enet.common.Utils.invoke;
 
 /**
  * netty4 和 resteasy 结合
@@ -42,9 +44,9 @@ public class NettyResteasy extends ServerTpl {
      */
     protected String sessionCookieName;
     /**
-     * 是否启用session
+     * session 是否可用
      */
-    protected boolean enableSession = true;
+    protected boolean enableSession;
     /**
      * see: {@link #collect()}
      */
@@ -65,6 +67,7 @@ public class NettyResteasy extends ServerTpl {
         if (coreEp == null) coreEp = new EP(coreExec);
         coreEp.fire(getName() + ".starting");
         attrs.putAll((Map) coreEp.fire("env.ns", "mvc", getName()));
+        enableSession = Utils.toBoolean(coreEp.fire("env.getAttr", "session.enabled"), true);
         rootPath = getStr("rootPath", "/");
         sessionCookieName = getStr("sessionCookieName", "sId");
         for (String c : getStr("scan", "").split(",")) {
@@ -92,7 +95,7 @@ public class NettyResteasy extends ServerTpl {
     protected void addHandler(ChannelPipeline cp) {
         initDispatcher();
         // 参考 NettyJaxrsServer
-        cp.addLast(new RestEasyHttpRequestDecoder(dispatcher.getDispatcher(), rootPath, RestEasyHttpRequestDecoder.Protocol.HTTP));
+        cp.addLast(new RestEasyHttpRequestDecoder(dispatcher.getDispatcher(), rootPath, HTTP));
         cp.addLast(new RestEasyHttpResponseEncoder());
         cp.addLast(new RequestHandler(dispatcher) {
             @Override
@@ -110,18 +113,18 @@ public class NettyResteasy extends ServerTpl {
      */
     protected void process(ChannelHandlerContext ctx, Object msg) {
         if (msg instanceof NettyHttpRequest) {
-            NettyHttpRequest request = (NettyHttpRequest) msg;
-            NettyHttpResponse response = request.getResponse();
+            NettyHttpRequest req = (NettyHttpRequest) msg;
+            NettyHttpResponse resp = req.getResponse();
             try {
                 if (isEnableSession()) { // 添加session控制
-                    Cookie c = request.getHttpHeaders().getCookies().get(getSessionCookieName());
+                    Cookie c = req.getHttpHeaders().getCookies().get(getSessionCookieName());
                     String sId;
                     if (c == null || Utils.isEmpty(c.getValue())) {
                         sId = UUID.randomUUID().toString().replace("-", "");
                         ((NettyHttpRequest) msg).getResponse().addNewCookie(
                             new NewCookie(
                                 getSessionCookieName(), sId, "/", (String) null, 1, (String) null,
-                                (int) TimeUnit.MINUTES.toSeconds((Integer) coreEp.fire("session.getExpire") + 10)
+                                (int) TimeUnit.MINUTES.toSeconds((Integer) coreEp.fire("session.getExpire") + 5)
                                 , null, false, false
                             )
                         );
@@ -130,28 +133,22 @@ public class NettyResteasy extends ServerTpl {
                     ((NettyHttpRequest) msg).setAttribute(getSessionCookieName(), sId);
                 }
 
-                dispatcher.service(ctx, request, response, true);
+                dispatcher.service(ctx, req, resp, true);
             } catch (Failure e1) {
-                response.reset();
-                response.setStatus(e1.getErrorCode());
+                resp.reset(); resp.setStatus(e1.getErrorCode());
             } catch (UnhandledException e) {
-                response.reset();
-                response.setStatus(500);
+                resp.reset(); resp.setStatus(500);
                 if (e.getCause() != null) log.error(e.getCause());
                 else log.error(e);
             } catch (Exception ex) {
-                response.reset();
-                response.setStatus(500);
+                resp.reset(); resp.setStatus(500);
                 log.error(ex);
             } finally {
-                if (!request.getAsyncContext().isSuspended()) {
-                    try {
-                        response.finish();
-                    } catch (IOException e) {
-                        log.error(e);
-                    }
+                if (!req.getAsyncContext().isSuspended()) {
+                    try { resp.finish(); }
+                    catch (IOException e) { log.error(e); }
                 }
-                request.releaseContentBuffer();
+                req.releaseContentBuffer();
             }
         }
     }
@@ -164,6 +161,7 @@ public class NettyResteasy extends ServerTpl {
      */
     @EL(name = {"resteasy.addResource"})
     public NettyResteasy addResource(Object source, String path) {
+        log.debug("resteasy.addResource. source: {}, path: {}", source, path);
         if (source instanceof Class) return this;
         startDeployment();
         if (path != null) deployment.getRegistry().addSingletonResource(source, path);
@@ -235,6 +233,7 @@ public class NettyResteasy extends ServerTpl {
     protected void collect() {
         if (scan == null || scan.isEmpty()) return;
         try {
+            log.debug("collect resteasy resource. scan: {}", scan);
             for (Class clz : scan) {
                 String pkg = clz.getPackage().getName();
                 File pkgDir = new File(getClass().getClassLoader().getResource(pkg.replaceAll("\\.", "/")).getFile());
@@ -242,7 +241,7 @@ public class NettyResteasy extends ServerTpl {
                 if (arr != null) for (File f : arr) load(pkg, f);
             }
         } catch (Exception e) {
-            log.error(e, "扫描Handler类出错!");
+            log.error(e, "scan resteasy resource error!");
         }
     }
 
@@ -260,28 +259,29 @@ public class NettyResteasy extends ServerTpl {
 
 
     protected Object createAndInitSource(Class clz) throws Exception {
+        log.trace("createAndInitSource. class: {}", clz);
         Object o = clz.newInstance();
-        Class<? extends Object> c = o.getClass();
-        loop: do {
-            for (Field f : c.getDeclaredFields()) {
-                if (EP.class.isAssignableFrom(f.getType())) {
-                    try {
-                        f.setAccessible(true); f.set(o, coreEp);
-                        break loop;
-                    } catch (IllegalAccessException e) {
-                        log.error(e);
+        Class<? extends Object> c = clz;
+        try {
+            loop: do {
+                for (Field f : c.getDeclaredFields()) {
+                    if (EP.class.isAssignableFrom(f.getType())) {
+                            f.setAccessible(true); f.set(o, coreEp);
+                            break loop;
                     }
                 }
-            }
-            c = c.getSuperclass();
-        } while (c != null);
+                c = c.getSuperclass();
+            } while (c != null);
+        } catch (IllegalAccessException e) {
+            log.error(e);
+        }
 
-        c = o.getClass();
+        c = clz;
         loop: do {
             for (Method m : c.getDeclaredMethods()) {
                 PostConstruct an = m.getAnnotation(PostConstruct.class);
                 if (an == null) continue;
-                Utils.invoke(m, o); break loop;
+                invoke(m, o); break loop;
             }
             c = c.getSuperclass();
         } while (c != null);
@@ -311,13 +311,6 @@ public class NettyResteasy extends ServerTpl {
         if (running.get()) throw new RuntimeException("不允许运行时更改");
         if (sessionCookieName == null || sessionCookieName.isEmpty()) throw new NullPointerException("参数为空");
         this.sessionCookieName = sessionCookieName;
-        return this;
-    }
-
-
-    public NettyResteasy setEnableSession(boolean enableSession) {
-        if (running.get()) throw new RuntimeException("运行时不允许更改");
-        this.enableSession = enableSession;
         return this;
     }
 

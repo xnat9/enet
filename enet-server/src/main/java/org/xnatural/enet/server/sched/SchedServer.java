@@ -112,7 +112,7 @@ public class SchedServer extends ServerTpl {
                             .withSchedule(CronScheduleBuilder.cronSchedule(cron))
                             .build()
             );
-            log.info("add after '{}' job will execute at '{}'", id, new SimpleDateFormat("yyyy-MM-dd HH:mm:ss SSS").format(d));
+            log.debug("add after '{}' job will execute at '{}'", id, new SimpleDateFormat("yyyy-MM-dd HH:mm:ss SSS").format(d));
         } catch (SchedulerException e) {
             log.error(e, "add after job error! time: {}, unit: {}", time, unit);
         }

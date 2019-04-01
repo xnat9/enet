@@ -16,18 +16,17 @@ import javax.persistence.spi.PersistenceUnitInfo;
 import javax.persistence.spi.PersistenceUnitTransactionType;
 import javax.sql.DataSource;
 import java.io.File;
-import java.lang.reflect.Field;
 import java.lang.reflect.Method;
 import java.net.URL;
 import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
 import java.util.Properties;
+import java.util.concurrent.Executor;
 import java.util.concurrent.ExecutorService;
 
 import static javax.persistence.SharedCacheMode.UNSPECIFIED;
-import static org.xnatural.enet.common.Utils.invoke;
-import static org.xnatural.enet.common.Utils.iterateClass;
+import static org.xnatural.enet.common.Utils.*;
 
 /**
  * hibernate 服务
@@ -224,42 +223,36 @@ public class Hibernate extends ServerTpl {
 
     protected void repoCollect() {
         if (repoScan == null || repoScan.isEmpty()) return;
-        log.debug("repoCollect. scan: {}", repoScan);
+        log.debug("collect hibernate repo. scan: {}", repoScan);
         for (Class tmpClz : repoScan) {
             iterateClass(tmpClz.getPackage().getName(), getClass().getClassLoader(), clz -> {
                 if (clz.getAnnotation(Repository.class) == null) return;
-                try {
-                    Object o = clz.newInstance();
-                    Class c = clz;
-                    do {
-                        for (Field field : c.getDeclaredFields()) {
-                            if (Hibernate.class.isAssignableFrom(field.getType())) {
-                                field.setAccessible(true); field.set(o, this);
-                            } else if (EP.class.isAssignableFrom(field.getType())) {
-                                field.setAccessible(true); field.set(o, getCoreEp());
-                            } else if (EntityManagerFactory.class.isAssignableFrom(field.getType()) || SessionFactory.class.isAssignableFrom(field.getType())) {
-                                field.setAccessible(true); field.set(o, sf);
-                            } else if (TransWrapper.class.isAssignableFrom(field.getType())) {
-                                field.setAccessible(true); field.set(o, tm);
-                            }
+                Object inst;
+                try { inst = clz.newInstance(); }
+                catch (Exception e) { log.error(e); return; }
+                iterateField(clz, field -> {
+                    try {
+                        if (Hibernate.class.isAssignableFrom(field.getType())) {
+                            field.setAccessible(true); field.set(inst, this);
+                        } else if (EP.class.isAssignableFrom(field.getType())) {
+                            field.setAccessible(true); if (field.get(inst) == null) field.set(inst, getCoreEp());
+                        } else if (Executor.class.isAssignableFrom(field.getType())) {
+                            field.setAccessible(true); if (field.get(inst) == null) field.set(inst, coreExec);
+                        } else if (EntityManagerFactory.class.isAssignableFrom(field.getType()) || SessionFactory.class.isAssignableFrom(field.getType())) {
+                            field.setAccessible(true); field.set(inst, sf);
+                        } else if (TransWrapper.class.isAssignableFrom(field.getType())) {
+                            field.setAccessible(true); field.set(inst, tm);
                         }
-                        c = c.getSuperclass();
-                    } while (c != null);
-                    // init method invoke
-                    c = clz;
-                    loop: do {
-                        for (Method m : c.getDeclaredMethods()) {
-                            PostConstruct an = m.getAnnotation(PostConstruct.class);
-                            if (an == null) continue;
-                            invoke(m, o); break loop;
-                        }
-                        c = c.getSuperclass();
-                    } while (c != null);
-                    log.debug("add hibernate repo object: {}", o);
-                    exposeBean(o, clz.getSimpleName()); // 暴露所有Repo出去
-                } catch (Exception e) {
-                    log.error(e);
-                }
+                    } catch (Exception ex) {
+                        log.error(ex);
+                    }
+                });
+
+                // invoke init method
+                invoke(findMethod(clz, m -> m.getAnnotation(PostConstruct.class) != null), inst);
+
+                log.debug("add hibernate repo object: {}", inst);
+                exposeBean(inst, clz.getSimpleName()); // 暴露所有Repo出去
             });
         }
     }

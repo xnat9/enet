@@ -249,15 +249,15 @@ public class NettyResteasy extends ServerTpl {
         Object o = clz.newInstance();
         iterateField(clz, f -> {
             try {
-                if (EP.class.isAssignableFrom(f.getType()) && f.get(o) == null) {
+                if (EP.class.isAssignableFrom(f.getType())) {
                     f.setAccessible(true);
-                    f.set(o, coreEp);
-                } else if (Executor.class.isAssignableFrom(f.getType()) && f.get(o) == null) {
+                    if (f.get(o) == null) f.set(o, coreEp);
+                } else if (Executor.class.isAssignableFrom(f.getType())) {
                     f.setAccessible(true);
-                    f.set(o, coreExec);
+                    if (f.get(o) == null) f.set(o, coreExec);
                 }
             } catch (IllegalAccessException e) {
-                e.printStackTrace();
+                log.error(e);
             }
         });
 

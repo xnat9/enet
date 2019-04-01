@@ -78,7 +78,7 @@ public class Log {
         LOG_METHOD = logMethod;
         root = of(Logger.ROOT_LOGGER_NAME);
         System.setProperty("PID", getPid());
-        if ("true".equalsIgnoreCase(System.getProperty("enet.log.init", "false"))) init(null);
+        if ("true".equalsIgnoreCase(System.getProperty("enet.initlog", "false"))) init(null);
     }
 
 

@@ -20,19 +20,19 @@ import java.util.concurrent.ExecutorService;
 import java.util.concurrent.TimeUnit;
 
 import static io.netty.handler.codec.http.HttpResponseStatus.SERVICE_UNAVAILABLE;
+import static org.xnatural.enet.common.Utils.isEmpty;
 
 /**
  * 用 netty 实现的 http server
  */
 public class NettyHttp extends ServerTpl {
-    protected EventLoopGroup    boosGroup;
+    protected EventLoopGroup boosGroup;
     protected EventLoopGroup workerGroup;
 
 
     public NettyHttp() {
         setName("http-netty");
         setPort(8080);
-        setHostname("localhost");
     }
 
 
@@ -55,7 +55,7 @@ public class NettyHttp extends ServerTpl {
      */
     @EL(name = "sys.stopping", async = false)
     public void stop() {
-        log.info("Shutdown '{}' Server. hostname: {}, port: {}", getName(), getHostname(), getPort());
+        log.info("Shutdown '{}' Server. hostname: {}, port: {}", getName(), isEmpty(getHostname()) ? "localhost" : getHostname(), getPort());
         if (boosGroup != null) boosGroup.shutdownGracefully();
         if (workerGroup != null && workerGroup != boosGroup) workerGroup.shutdownGracefully();
         if (coreExec instanceof ExecutorService) ((ExecutorService) coreExec).shutdown();
@@ -63,20 +63,19 @@ public class NettyHttp extends ServerTpl {
 
 
     /**
-     * 创建服务
+     * 创建http服务
      */
     protected void createServer() {
-        boolean isLinux = isLinux() && getBoolean("epollEnabled", true);
+        boolean isLinux = isLinux() && getBoolean("epollEnabled", false);
         boosGroup = isLinux ? new EpollEventLoopGroup(getInteger("threads-boos", 1), coreExec) : new NioEventLoopGroup(getInteger("threads-boos", 1), coreExec);
-        workerGroup = getBoolean("shareLoop", true) ? boosGroup :
-            (isLinux ? new EpollEventLoopGroup(getInteger("threads-worker", 1)) : new NioEventLoopGroup(getInteger("threads-worker", 1), coreExec));
+        workerGroup = getBoolean("shareLoop", true) ? boosGroup : (isLinux ? new EpollEventLoopGroup(getInteger("threads-worker", 1)) : new NioEventLoopGroup(getInteger("threads-worker", 1), coreExec));
         ServerBootstrap sb = new ServerBootstrap()
                 .group(boosGroup, workerGroup)
                 .channel(isLinux ? EpollServerSocketChannel.class : NioServerSocketChannel.class)
                 .childHandler(new ChannelInitializer<SocketChannel>() {
                     @Override
                     protected void initChannel(SocketChannel ch) throws Exception {
-                        ch.pipeline().addLast(new IdleStateHandler(2, 0, 0, TimeUnit.MINUTES));
+                        ch.pipeline().addLast(new IdleStateHandler(getLong("readerIdleTime", 2 * 60L), getLong("writerIdleTime", 0L), getLong("allIdleTime", 0L), TimeUnit.SECONDS));
                         ch.pipeline().addLast(new HttpServerCodec());
                         ch.pipeline().addLast(new SimpleChannelInboundHandler<Object>() {
                             @Override
@@ -95,11 +94,12 @@ public class NettyHttp extends ServerTpl {
                         }, ch.pipeline());
                     }
                 })
-                .option(ChannelOption.SO_BACKLOG, getInteger("backlog", 200))
+                .option(ChannelOption.SO_BACKLOG, getInteger("backlog", 128))
                 .childOption(ChannelOption.SO_KEEPALIVE, true);
         try {
-            sb.bind(getHostname(), getPort()).sync();
-            log.info("Started {} Server. hostname: {}, port: {}", getName(), getHostname(), getPort());
+            if (isEmpty(getHostname())) sb.bind(getPort()).sync(); // 默认绑定本地所有地址
+            else sb.bind(getHostname(), getPort()).sync();
+            log.info("Started {} Server. hostname: {}, port: {}", getName(), isEmpty(getHostname()) ? "localhost" : getHostname(), getPort());
         } catch (Exception ex) {
             log.error(ex);
         }
@@ -139,19 +139,12 @@ public class NettyHttp extends ServerTpl {
      * @return
      */
     protected boolean isLinux() {
-        return (System.getProperty("os.name").toLowerCase(Locale.UK).trim().startsWith("linux"));
+        return System.getProperty("os.name").toLowerCase(Locale.UK).trim().startsWith("linux");
     }
 
 
     public String getHostname() {
-        return getStr("hostname", "localhost");
-    }
-
-
-    public NettyHttp setHostname(String hostname) {
-        if (running.get()) throw new RuntimeException("服务正在运行.不允许更新主机名");
-        attrs.put("hostname", hostname);
-        return this;
+        return getStr("hostname", "");
     }
 
 
@@ -162,7 +155,7 @@ public class NettyHttp extends ServerTpl {
 
     public NettyHttp setPort(int port) {
         if (running.get()) throw new RuntimeException("服务正在运行.不允许更新端口");
-        attrs.put("port", port);
+        attr("port", port);
         return this;
     }
 }

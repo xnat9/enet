@@ -21,6 +21,8 @@ import java.security.cert.CertificateException;
 import java.security.cert.X509Certificate;
 import java.util.*;
 import java.util.function.Consumer;
+import java.util.function.Predicate;
+import java.util.jar.JarEntry;
 
 /**
  * 常用工具方法集
@@ -280,6 +282,55 @@ public class Utils {
 
 
     /**
+     * 遍历一个包下边的所有class
+     * @param pkgName 包名
+     * @param cl ClassLoader
+     * @param fns
+     */
+    public static void iterateClass(final String pkgName, ClassLoader cl, Consumer<Class>... fns) {
+        if (isEmpty(pkgName) || fns == null || fns.length == 0) return;
+        cl = (cl == null ? Utils.class.getClassLoader() : cl);
+        String pkgDir = pkgName.replaceAll("\\.", "/");
+        try {
+            Enumeration<URL> resources = cl.getResources(pkgDir);
+            while (resources.hasMoreElements()) {
+                URL resource = resources.nextElement();
+                if ("file".equals(resource.getProtocol())) {
+                    File[] arr = new File(cl.getResource(pkgDir).getFile()).listFiles(f -> f.getName().endsWith(".class"));
+                    if (arr != null) for (File f : arr) {
+                        if (f.isDirectory()) {
+                            for (File ff : f.listFiles(ff -> ff.getName().endsWith(".class"))) {
+                                iterateClass(pkgName + "." + ff.getName(), cl, fns);
+                            }
+                        } else if (f.isFile() && f.getName().endsWith(".class")) {
+                            Class<?> clz = cl.loadClass(pkgName + "." + f.getName().replace(".class", ""));
+                            if (clz != null) for (Consumer<Class> fn : fns) { fn.accept(clz); }
+                        }
+                    }
+                } else if ("jar".equals(resource.getProtocol())) {
+                    Enumeration<JarEntry> es = ((JarURLConnection) resource.openConnection()).getJarFile().entries();
+                    while (es.hasMoreElements()) {
+                        JarEntry e = es.nextElement();
+                        String name = e.getName();
+                        // 如果是以/开头的
+                        if (name.charAt(0) == '/') name = name.substring(1);
+
+                        if (e.isDirectory() || !name.startsWith(pkgDir) || !name.endsWith(".class")) {
+                            continue;
+                        }
+                        //加载类
+                        Class clz = cl.loadClass(name.substring(0, name.length() - 6).replace("/", "."));
+                        if (clz != null) for (Consumer<Class> fn : fns) { fn.accept(clz); }
+                    }
+                }
+            }
+        } catch (Exception e) {
+            log.error(e);
+        }
+    }
+
+
+    /**
      * 查找方法
      * @param clz
      * @param mName
@@ -294,6 +345,22 @@ public class Utils {
                 m = c.getDeclaredMethod(mName, parameterTypes);
             } catch (NoSuchMethodException e) { }
             if (m != null) return m;
+            c = c.getSuperclass();
+        } while (c != null);
+        return null;
+    }
+
+
+    /**
+     * 查找方法
+     * @param clz
+     * @param predicate
+     * @return
+     */
+    public static Method findMethod(final Class clz, Predicate<Method> predicate) {
+        Class c = clz;
+        do {
+            for (Method m : c.getDeclaredMethods()) if (predicate.test(m)) return m;
             c = c.getSuperclass();
         } while (c != null);
         return null;

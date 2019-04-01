@@ -22,7 +22,7 @@ public class Test {
     public static void main(String[] args) {
         Http http = http();
         long start = System.currentTimeMillis();
-        System.out.println(http.get("http://localhost:8080/tpl/dao").execute());
+        System.out.println(http.get("http://39.104.28.131:8080/tpl/dao").execute());
         Map<String, Object> cookies = http.cookies();
 
         int threadCunt = 100;
@@ -38,7 +38,7 @@ public class Test {
             exec.execute(() -> {
                 for (int j = 0; j < 100; j++) {
                     try {
-                        Http h = http().timeout(10000).header("Connection", "close").cookies(cookies).get("http" + "://localhost:8080/tpl/dao");
+                        Http h = http().timeout(10000).header("Connection", "close").cookies(cookies).get("http" + "://39.104.28.131:8080/tpl/dao");
                         h.execute();
                         // System.out.println(h.execute());
                         if (h.getResponseCode() == 503) {

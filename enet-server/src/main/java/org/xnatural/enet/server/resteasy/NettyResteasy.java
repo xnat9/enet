@@ -17,19 +17,17 @@ import javax.annotation.PostConstruct;
 import javax.ws.rs.Path;
 import javax.ws.rs.core.Cookie;
 import javax.ws.rs.core.NewCookie;
-import java.io.File;
 import java.io.IOException;
-import java.lang.reflect.Field;
-import java.lang.reflect.Method;
 import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
+import java.util.concurrent.Executor;
 import java.util.concurrent.TimeUnit;
 
 import static org.jboss.resteasy.plugins.server.netty.RestEasyHttpRequestDecoder.Protocol.HTTP;
 import static org.jboss.resteasy.util.FindAnnotation.findAnnotation;
-import static org.xnatural.enet.common.Utils.invoke;
+import static org.xnatural.enet.common.Utils.*;
 
 /**
  * netty4 和 resteasy 结合
@@ -161,7 +159,7 @@ public class NettyResteasy extends ServerTpl {
      */
     @EL(name = {"resteasy.addResource"})
     public NettyResteasy addResource(Object source, String path) {
-        log.debug("resteasy.addResource. source: {}, path: {}", source, path);
+        log.debug("resteasy add resource {}, path: {}", source, path);
         if (source instanceof Class) return this;
         startDeployment();
         if (path != null) deployment.getRegistry().addSingletonResource(source, path);
@@ -232,59 +230,40 @@ public class NettyResteasy extends ServerTpl {
      */
     protected void collect() {
         if (scan == null || scan.isEmpty()) return;
-        try {
-            log.debug("collect resteasy resource. scan: {}", scan);
-            for (Class clz : scan) {
-                String pkg = clz.getPackage().getName();
-                File pkgDir = new File(getClass().getClassLoader().getResource(pkg.replaceAll("\\.", "/")).getFile());
-                File[] arr = pkgDir.listFiles(f -> f.getName().endsWith(".class"));
-                if (arr != null) for (File f : arr) load(pkg, f);
-            }
-        } catch (Exception e) {
-            log.error(e, "scan resteasy resource error!");
-        }
-    }
-
-
-    protected void load(String pkg, File f) throws Exception {
-        if (f.isDirectory()) {
-            for (File ff : f.listFiles(ff -> ff.getName().endsWith(".class"))) {
-                load(pkg + "." + f.getName(), ff);
-            }
-        } else if (f.isFile() && f.getName().endsWith(".class")) {
-            Class<?> clz = getClass().getClassLoader().loadClass(pkg + "." + f.getName().replace(".class", ""));
-            if (clz.getAnnotation(Path.class) != null) addResource(createAndInitSource(clz), null);
+        log.debug("collect resteasy resource. scan: {}", scan);
+        for (Class tmpClz : scan) {
+            iterateClass(tmpClz.getPackage().getName(), getClass().getClassLoader(), clz -> {
+                if (clz.getAnnotation(Path.class) != null) {
+                    try {
+                        addResource(createAndInitSource(clz), null);
+                    } catch (Exception e) {
+                        log.error(e);
+                    }
+                }
+            });
         }
     }
 
 
     protected Object createAndInitSource(Class clz) throws Exception {
-        log.trace("createAndInitSource. class: {}", clz);
         Object o = clz.newInstance();
-        Class<? extends Object> c = clz;
-        try {
-            loop: do {
-                for (Field f : c.getDeclaredFields()) {
-                    if (EP.class.isAssignableFrom(f.getType())) {
-                            f.setAccessible(true); f.set(o, coreEp);
-                            break loop;
-                    }
+        iterateField(clz, f -> {
+            try {
+                if (EP.class.isAssignableFrom(f.getType()) && f.get(o) == null) {
+                    f.setAccessible(true);
+                    f.set(o, coreEp);
+                } else if (Executor.class.isAssignableFrom(f.getType()) && f.get(o) == null) {
+                    f.setAccessible(true);
+                    f.set(o, coreExec);
                 }
-                c = c.getSuperclass();
-            } while (c != null);
-        } catch (IllegalAccessException e) {
-            log.error(e);
-        }
-
-        c = clz;
-        loop: do {
-            for (Method m : c.getDeclaredMethods()) {
-                PostConstruct an = m.getAnnotation(PostConstruct.class);
-                if (an == null) continue;
-                invoke(m, o); break loop;
+            } catch (IllegalAccessException e) {
+                e.printStackTrace();
             }
-            c = c.getSuperclass();
-        } while (c != null);
+        });
+
+        // 调用 PostConstruct 方法
+        invoke(findMethod(clz, m -> m.getAnnotation(PostConstruct.class) != null), o);
+
         coreEp.addListenerSource(o);
         return o;
     }

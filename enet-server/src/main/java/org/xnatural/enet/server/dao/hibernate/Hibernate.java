@@ -27,6 +27,7 @@ import java.util.concurrent.ExecutorService;
 
 import static javax.persistence.SharedCacheMode.UNSPECIFIED;
 import static org.xnatural.enet.common.Utils.invoke;
+import static org.xnatural.enet.common.Utils.iterateClass;
 
 /**
  * hibernate 服务
@@ -211,42 +212,55 @@ public class Hibernate extends ServerTpl {
 
     protected void entityCollect() {
         if (entityScan == null || entityScan.isEmpty()) return;
-        try {
-            for (Class clz : entityScan) {
-                String pkg = clz.getPackage().getName();
-                File pkgDir = new File(getClass().getClassLoader().getResource(pkg.replaceAll("\\.", "/")).getFile());
-                File[] arr = pkgDir.listFiles(f -> f.getName().endsWith(".class"));
-                if (arr != null) for (File f : arr) entityLoad(pkg, f);
-            }
-        } catch (Exception e) {
-            log.error(e, "扫描Entity类出错!");
+        log.debug("entityCollect. scan: {}", entityScan);
+        for (Class tmpClz : entityScan) {
+            iterateClass(tmpClz.getPackage().getName(), getClass().getClassLoader(), clz -> {
+                if (clz.getAnnotation(Entity.class) != null) entities.add(clz.getName());
+            });
         }
-    }
-
-
-    protected void entityLoad(String pkg, File f) throws Exception {
-        if (f.isDirectory()) {
-            for (File ff : f.listFiles(ff -> ff.getName().endsWith(".class"))) {
-                entityLoad(pkg + "." + f.getName(), ff);
-            }
-        } else if (f.isFile() && f.getName().endsWith(".class")) {
-            Class<?> clz = getClass().getClassLoader().loadClass(pkg + "." + f.getName().replace(".class", ""));
-            if (clz.getAnnotation(Entity.class) != null) entities.add(clz.getName());
-        }
+        log.trace("entities: {}", entities);
     }
 
 
     protected void repoCollect() {
         if (repoScan == null || repoScan.isEmpty()) return;
-        try {
-            for (Class clz : repoScan) {
-                String pkg = clz.getPackage().getName();
-                File pkgDir = new File(getClass().getClassLoader().getResource(pkg.replaceAll("\\.", "/")).getFile());
-                File[] arr = pkgDir.listFiles(f -> f.getName().endsWith(".class"));
-                if (arr != null) for (File f : arr) repoLoad(pkg, f);
-            }
-        } catch (Exception e) {
-            log.error(e, "扫描Repo类出错!");
+        log.debug("repoCollect. scan: {}", repoScan);
+        for (Class tmpClz : repoScan) {
+            iterateClass(tmpClz.getPackage().getName(), getClass().getClassLoader(), clz -> {
+                if (clz.getAnnotation(Repository.class) == null) return;
+                try {
+                    Object o = clz.newInstance();
+                    Class c = clz;
+                    do {
+                        for (Field field : c.getDeclaredFields()) {
+                            if (Hibernate.class.isAssignableFrom(field.getType())) {
+                                field.setAccessible(true); field.set(o, this);
+                            } else if (EP.class.isAssignableFrom(field.getType())) {
+                                field.setAccessible(true); field.set(o, getCoreEp());
+                            } else if (EntityManagerFactory.class.isAssignableFrom(field.getType()) || SessionFactory.class.isAssignableFrom(field.getType())) {
+                                field.setAccessible(true); field.set(o, sf);
+                            } else if (TransWrapper.class.isAssignableFrom(field.getType())) {
+                                field.setAccessible(true); field.set(o, tm);
+                            }
+                        }
+                        c = c.getSuperclass();
+                    } while (c != null);
+                    // init method invoke
+                    c = clz;
+                    loop: do {
+                        for (Method m : c.getDeclaredMethods()) {
+                            PostConstruct an = m.getAnnotation(PostConstruct.class);
+                            if (an == null) continue;
+                            invoke(m, o); break loop;
+                        }
+                        c = c.getSuperclass();
+                    } while (c != null);
+                    log.debug("add hibernate repo object: {}", o);
+                    exposeBean(o, clz.getSimpleName()); // 暴露所有Repo出去
+                } catch (Exception e) {
+                    log.error(e);
+                }
+            });
         }
     }
 
@@ -258,35 +272,7 @@ public class Hibernate extends ServerTpl {
             }
         } else if (f.isFile() && f.getName().endsWith(".class")) {
             Class<?> clz = getClass().getClassLoader().loadClass(pkg + "." + f.getName().replace(".class", ""));
-            if (clz.getAnnotation(Repository.class) != null) {
-                Object o = clz.newInstance();
-                Class c = clz;
-                do {
-                    for (Field field : c.getDeclaredFields()) {
-                        if (Hibernate.class.isAssignableFrom(field.getType())) {
-                            field.setAccessible(true); field.set(o, this);
-                        } else if (EP.class.isAssignableFrom(field.getType())) {
-                            field.setAccessible(true); field.set(o, getCoreEp());
-                        } else if (EntityManagerFactory.class.isAssignableFrom(field.getType()) || SessionFactory.class.isAssignableFrom(field.getType())) {
-                            field.setAccessible(true); field.set(o, sf);
-                        } else if (TransWrapper.class.isAssignableFrom(field.getType())) {
-                            field.setAccessible(true); field.set(o, tm);
-                        }
-                    }
-                    c = c.getSuperclass();
-                } while (c != null);
-                // init method invoke
-                c = clz;
-                loop: do {
-                    for (Method m : c.getDeclaredMethods()) {
-                        PostConstruct an = m.getAnnotation(PostConstruct.class);
-                        if (an == null) continue;
-                        invoke(m, o); break loop;
-                    }
-                    c = c.getSuperclass();
-                } while (c != null);
-                exposeBean(o, clz.getSimpleName()); // 暴露所有Repo出去
-            }
+
         }
     }
 

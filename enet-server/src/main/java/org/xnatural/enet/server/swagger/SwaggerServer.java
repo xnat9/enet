@@ -63,7 +63,7 @@ public class SwaggerServer extends ServerTpl {
 
     @EL(name = "${name}.addJaxrsDoc")
     public void addJaxrsDoc(Object source, String path, String tag, String desc) {
-        log.debug("addJaxrsDoc. source: {}, path: {}, tag: {}, desc: {}", source, path, tag, desc);
+        log.debug("add jaxr rest api doc. source: {}, path: {}, tag: {}, desc: {}", source, path, tag, desc);
         // 参照: SwaggerLoader
         HashSet<String> rs = new HashSet<>(1); rs.add(source.getClass().getName());
         OpenAPI openApi = null;

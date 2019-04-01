@@ -54,11 +54,12 @@ public class Launcher extends ServerTpl {
     // 环境配置完成后执行
     @EL(name = "env.configured", async = false)
     private void envConfigured(EC ec) {
-        Environment env = ((Environment) ec.source());
-        String t = env.getString("session.type", "memory");
-        // 根据配置来启动用哪一种session管理
-        if ("memory".equalsIgnoreCase(t)) ec.ep().fire("sys.addSource", new MemSessionManager());
-        else if ("redis".equalsIgnoreCase(t)) coreEp.fire("sys.addSource", new RedisSessionManager());
+        if (ctx.env().getBoolean("session.enabled", true)) {
+            String t = ctx.env().getString("session.type", "memory");
+            // 根据配置来启动用什么session管理
+            if ("memory".equalsIgnoreCase(t)) coreEp.fire("sys.addSource", new MemSessionManager());
+            else if ("redis".equalsIgnoreCase(t)) coreEp.fire("sys.addSource", new RedisSessionManager());
+        }
     }
 }
 

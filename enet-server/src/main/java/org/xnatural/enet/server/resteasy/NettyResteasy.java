@@ -17,6 +17,7 @@ import javax.annotation.PostConstruct;
 import javax.ws.rs.Path;
 import javax.ws.rs.core.Cookie;
 import javax.ws.rs.core.NewCookie;
+import javax.ws.rs.ext.Provider;
 import java.io.IOException;
 import java.util.LinkedList;
 import java.util.List;
@@ -100,6 +101,12 @@ public class NettyResteasy extends ServerTpl {
             protected void channelRead0(ChannelHandlerContext ctx, Object msg) {
                 coreExec.execute(() -> process(ctx, msg));
             }
+
+            @Override
+            public void exceptionCaught(ChannelHandlerContext ctx, Throwable e) throws Exception {
+                if (e instanceof IOException && e.getMessage().contains("Connection reset by peer")) ctx.close();
+                else super.exceptionCaught(ctx, e);
+            }
         });
     }
 
@@ -153,7 +160,7 @@ public class NettyResteasy extends ServerTpl {
 
 
     /**
-     * 添加 接口 资源
+     * 添加 resteasy 接口和 Provider 资源
      * @param source
      * @return
      */
@@ -162,8 +169,12 @@ public class NettyResteasy extends ServerTpl {
         log.debug("resteasy add resource {}, path: {}", source, path);
         if (source instanceof Class) return this;
         startDeployment();
-        if (path != null) deployment.getRegistry().addSingletonResource(source, path);
-        else deployment.getRegistry().addSingletonResource(source);
+        if (source.getClass().getAnnotation(Path.class) != null) {
+            if (path != null) deployment.getRegistry().addSingletonResource(source, path);
+            else deployment.getRegistry().addSingletonResource(source);
+        } else if (source.getClass().getAnnotation(Provider.class) != null) {
+            deployment.getProviderFactory().register(source);
+        }
         return this;
     }
 
@@ -233,7 +244,7 @@ public class NettyResteasy extends ServerTpl {
         log.debug("collect resteasy resource. scan: {}", scan);
         for (Class tmpClz : scan) {
             iterateClass(tmpClz.getPackage().getName(), getClass().getClassLoader(), clz -> {
-                if (clz.getAnnotation(Path.class) != null) {
+                if (clz.getAnnotation(Path.class) != null || clz.getAnnotation(Provider.class) != null) {
                     try {
                         addResource(createAndInitSource(clz), null);
                     } catch (Exception e) {
@@ -250,11 +261,9 @@ public class NettyResteasy extends ServerTpl {
         iterateField(clz, f -> {
             try {
                 if (EP.class.isAssignableFrom(f.getType())) {
-                    f.setAccessible(true);
-                    if (f.get(o) == null) f.set(o, coreEp);
+                    f.setAccessible(true); if (f.get(o) == null) f.set(o, coreEp);
                 } else if (Executor.class.isAssignableFrom(f.getType())) {
-                    f.setAccessible(true);
-                    if (f.get(o) == null) f.set(o, coreExec);
+                    f.setAccessible(true); if (f.get(o) == null) f.set(o, coreExec);
                 }
             } catch (IllegalAccessException e) {
                 log.error(e);

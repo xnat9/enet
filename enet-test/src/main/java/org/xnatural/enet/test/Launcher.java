@@ -6,7 +6,6 @@ import com.netflix.appinfo.*;
 import com.netflix.discovery.DefaultEurekaClientConfig;
 import com.netflix.discovery.DiscoveryClient;
 import org.xnatural.enet.core.AppContext;
-import org.xnatural.enet.core.Environment;
 import org.xnatural.enet.event.EC;
 import org.xnatural.enet.event.EL;
 import org.xnatural.enet.server.ServerTpl;
@@ -14,7 +13,6 @@ import org.xnatural.enet.server.cache.ehcache.EhcacheServer;
 import org.xnatural.enet.server.dao.hibernate.Hibernate;
 import org.xnatural.enet.server.http.netty.NettyHttp;
 import org.xnatural.enet.server.mview.MViewServer;
-import org.xnatural.enet.server.redis.RedisServer;
 import org.xnatural.enet.server.resteasy.NettyResteasy;
 import org.xnatural.enet.server.sched.SchedServer;
 import org.xnatural.enet.server.session.MemSessionManager;
@@ -40,7 +38,7 @@ public class Launcher extends ServerTpl {
 
     public static void main(String[] args) {
         AppContext app = new AppContext();
-        app.addSource(new NettyHttp());
+        app.addSource(new NettyHttp().setPort(8080));
         app.addSource(new NettyResteasy().scan(RestTpl.class));
         app.addSource(new MViewServer());
         app.addSource(new SwaggerServer());
@@ -197,47 +195,44 @@ public class Launcher extends ServerTpl {
      */
     private void monitorExec(ThreadPoolExecutor e) {
         int size = e.getQueue().size();
-        if (size > e.getCorePoolSize() * 100) {
-            coreEp.fire("sys.load", 10);
+        if (size > e.getCorePoolSize() * 50) {
+            coreEp.fire("sys.load", size / 7);
             log.warn("system is very heavy load running!. {}", "[" + e.toString().split("\\[")[1]);
-        } else if (size > e.getCorePoolSize() * 80) {
+        } else if (size > e.getCorePoolSize() * 40) {
             coreEp.fire("sys.load", 8);
             log.warn("system is heavy load running. {}", "[" + e.toString().split("\\[")[1]);
             coreEp.fire("sched.after", 45, TimeUnit.SECONDS, (Runnable) () -> {
                 if (e.getQueue().size() > size) {
-                    coreEp.fire("sys.load", 9);
+                    coreEp.fire("sys.load", 50);
                     log.warn("system is heavy(up) load running. {}", "[" + e.toString().split("\\[")[1]);
                 } else if (e.getQueue().size() < size) {
                     coreEp.fire("sys.load", 7);
                     log.warn("system is heavy(down) load running. {}", "[" + e.toString().split("\\[")[1]);
                 }
             });
-        } else if (size > e.getCorePoolSize() * 50) {
+        } else if (size > e.getCorePoolSize() * 20) {
             coreEp.fire("sys.load", 5);
             log.warn("system will heavy load running. {}", "[" + e.toString().split("\\[")[1]);
             coreEp.fire("sched.after", 30, TimeUnit.SECONDS, (Runnable) () -> {
                 if (e.getQueue().size() > size) {
-                    coreEp.fire("sys.load", 6);
+                    coreEp.fire("sys.load", 20);
                     log.warn("system will heavy(up) load running. {}", "[" + e.toString().split("\\[")[1]);
                 } else if (e.getQueue().size() < size) {
                     coreEp.fire("sys.load", 4);
                     log.warn("system will heavy(down) load running. {}", "[" + e.toString().split("\\[")[1]);
                 }
             });
-        } else if (size > e.getCorePoolSize() * 20) {
-            coreEp.fire("sys.load", 3);
+        } else if (size > e.getCorePoolSize() * 10) {
             log.warn("system is litter heavy load running. {}", "[" + e.toString().split("\\[")[1]);
             coreEp.fire("sched.after", 25, TimeUnit.SECONDS, (Runnable) () -> {
                 if (e.getQueue().size() > size) {
-                    coreEp.fire("sys.load", 4);
+                    coreEp.fire("sys.load", 7);
                     log.warn("system is litter heavy(up) load running. {}", "[" + e.toString().split("\\[")[1]);
                 } else if (e.getQueue().size() < size) {
-                    coreEp.fire("sys.load", 2);
                     log.warn("system is litter heavy(down) load running. {}", "[" + e.toString().split("\\[")[1]);
                 }
             });
         } else if (size > e.getCorePoolSize() * 5) {
-            coreEp.fire("sys.load", 1);
             log.info("system executor: {}", "[" + e.toString().split("\\[")[1]);
         } else if (log.isDebugEnabled() || log.isTraceEnabled()) {
             log.debug("system executor: {}", "[" + e.toString().split("\\[")[1]);

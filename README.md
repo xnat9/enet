@@ -190,6 +190,7 @@ public class Launcher extends ServerTpl {
         3. 添加dao(数据访问)对象扫描: app.addSource(new Hibernate().scanRepo(TestRepo.class)) 会扫描TestRepo这个类所在的包下边的所有dao对象
         4. 建议所有dao对象 都继承自BaseRepo
         5. 可单独取出 SessionFactory 进行数据库操作
+        6. repo 对象例子: [TestRepo](https://gitee.com/xnat/enet/blob/master/enet-test/src/main/java/org/xnatural/enet/test/TestRepo.java)
 
      
    ### EhcacheServer: ehcache 缓存

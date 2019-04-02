@@ -3,7 +3,6 @@ package org.xnatural.enet.test;
 import com.mongodb.MongoClient;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
-import org.apache.commons.io.IOUtils;
 import org.xnatural.enet.common.Log;
 import org.xnatural.enet.event.EL;
 import org.xnatural.enet.event.EP;
@@ -14,8 +13,6 @@ import org.xnatural.enet.server.resteasy.SessionId;
 import javax.ws.rs.*;
 import javax.ws.rs.core.Response;
 import java.io.File;
-import java.io.FileInputStream;
-import java.io.IOException;
 import java.text.SimpleDateFormat;
 import java.util.Date;
 import java.util.concurrent.CompletableFuture;
@@ -46,11 +43,13 @@ public class RestTpl {
 
     @GET @Path("dao")
     @Produces("application/json")
-    public Object dao() {
+    public Object dao() throws Exception {
         TestEntity e = new TestEntity();
         e.setName("aaaa" + new SimpleDateFormat("yyyy-MM-dd HH:mm:ss").format(new Date()));
         e.setAge(111);
         // return testRepo.tbName();
+//        tm.trans(() -> testRepo.delete(testRepo.findById(66L)));
+//        return "xxx";
         return tm.trans(() -> {
             // testRepo.findPage(0, 5, (root, query, cb) -> {query.orderBy(cb.desc(root.get("id"))); return null;});
             testRepo.saveOrUpdate(e);

@@ -1,6 +1,8 @@
 package org.xnatural.enet.common;
 
 import com.alibaba.fastjson.JSON;
+import net.sf.cglib.proxy.Enhancer;
+import net.sf.cglib.proxy.MethodInterceptor;
 import org.apache.commons.io.IOUtils;
 import org.apache.commons.lang3.StringUtils;
 
@@ -30,17 +32,6 @@ import java.util.jar.JarEntry;
 public class Utils {
 
     static Log log = Log.of(Utils.class);
-
-
-    /**
-     * 不想写 异常
-     * @param fn
-     */
-    public static void tryRun(Runnable fn) {
-        try { fn.run(); }
-        catch (Exception e) { log.error(e); }
-    }
-
 
 
     /**
@@ -218,7 +209,7 @@ public class Utils {
                     }
                 }
                 // 取结果
-                ret = IOUtils.toString(conn.getInputStream(), "UTF-8");
+                if (responseCode == 200) ret = IOUtils.toString(conn.getInputStream(), "UTF-8");
             } catch (Exception e) {
                 log.error(e, "http 错误, url: " + urlStr);
             } finally {
@@ -318,7 +309,7 @@ public class Utils {
                         if (e.isDirectory() || !name.startsWith(pkgDir) || !name.endsWith(".class")) {
                             continue;
                         }
-                        //加载类
+                        // 加载类
                         Class clz = cl.loadClass(name.substring(0, name.length() - 6).replace("/", "."));
                         if (clz != null) for (Consumer<Class> fn : fns) { fn.accept(clz); }
                     }
@@ -378,6 +369,26 @@ public class Utils {
         try {
             m.setAccessible(true); return m.invoke(target, args);
         } catch (Exception e) {}
+        return null;
+    }
+
+
+    /**
+     * Enhancer 增强 一个实例对象
+     * @param obj
+     * @param mi
+     * @return
+     */
+    public static Object enhance(Object obj, MethodInterceptor mi) {
+        try {
+            if (mi == null) return obj;
+            Enhancer enhancer = new Enhancer();
+            enhancer.setSuperclass(obj.getClass());
+            enhancer.setCallback(mi);
+            return enhancer.create();
+        } catch (Exception e) {
+            log.error(e);
+        }
         return null;
     }
 

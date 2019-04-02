@@ -66,7 +66,7 @@ public class NettyHttp extends ServerTpl {
      * 创建http服务
      */
     protected void createServer() {
-        boolean isLinux = isLinux() && getBoolean("epollEnabled", false);
+        boolean isLinux = isLinux() && getBoolean("epollEnabled", true);
         boosGroup = isLinux ? new EpollEventLoopGroup(getInteger("threads-boos", 1), coreExec) : new NioEventLoopGroup(getInteger("threads-boos", 1), coreExec);
         workerGroup = getBoolean("shareLoop", true) ? boosGroup : (isLinux ? new EpollEventLoopGroup(getInteger("threads-worker", 1)) : new NioEventLoopGroup(getInteger("threads-worker", 1), coreExec));
         ServerBootstrap sb = new ServerBootstrap()
@@ -106,14 +106,13 @@ public class NettyHttp extends ServerTpl {
     }
 
 
-
-    protected int sysLoad = 0;
+    protected int down = 0;
     /**
      * 监听系统负载
-     * @param load
+     * @param down
      */
     @EL(name = "sys.load", async = false)
-    protected void sysLoad(Integer load) { sysLoad = load * 10; }
+    protected void sysLoad(Integer down) { this.down = down; }
 
 
     /**
@@ -124,8 +123,8 @@ public class NettyHttp extends ServerTpl {
      */
     protected boolean fusing(ChannelHandlerContext ctx, Object msg) {
         if (!(msg instanceof DefaultHttpRequest)) return false;
-        if (sysLoad >= 10) { // 当系统负载过高时拒绝处理
-            sysLoad--;
+        if (down > 0) { // 当系统负载过高时拒绝处理
+            down--;
             DefaultHttpResponse resp = new DefaultHttpResponse(((DefaultHttpRequest) msg).protocolVersion(), SERVICE_UNAVAILABLE);
             ctx.writeAndFlush(resp); ctx.close();
             return true;

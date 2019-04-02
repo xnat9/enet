@@ -2,7 +2,6 @@ package org.xnatural.enet.test;
 
 import org.xnatural.enet.common.Log;
 
-import java.io.IOException;
 import java.net.SocketTimeoutException;
 import java.util.Map;
 import java.util.concurrent.ExecutorService;
@@ -11,7 +10,6 @@ import java.util.concurrent.atomic.AtomicInteger;
 
 import static org.xnatural.enet.common.Utils.Http;
 import static org.xnatural.enet.common.Utils.http;
-import static org.xnatural.enet.common.Utils.tryRun;
 
 public class Test {
 
@@ -36,14 +34,12 @@ public class Test {
         };
         for (int i = 0; i < threadCunt; i++) {
             exec.execute(() -> {
-                for (int j = 0; j < 100; j++) {
+                for (int j = 0; j < 200; j++) {
                     try {
                         Http h = http().timeout(10000).header("Connection", "close").cookies(cookies).get("http" + "://39.104.28.131:8080/tpl/dao");
-                        h.execute();
-                        // System.out.println(h.execute());
-                        if (h.getResponseCode() == 503) {
-                            System.out.println("server is busy");
-                        }
+                        String r = h.execute();
+                        if (h.getResponseCode() == 503) System.out.println("server is busy");
+                        else System.out.println(r);
                     } catch (Exception ex) {
                         if (ex instanceof SocketTimeoutException) System.out.println(ex.getMessage());
                         else {

@@ -5,12 +5,15 @@ import com.mongodb.*;
 import com.netflix.appinfo.*;
 import com.netflix.discovery.DefaultEurekaClientConfig;
 import com.netflix.discovery.DiscoveryClient;
+import org.xnatural.enet.common.Utils;
 import org.xnatural.enet.core.AppContext;
 import org.xnatural.enet.event.EC;
 import org.xnatural.enet.event.EL;
 import org.xnatural.enet.server.ServerTpl;
 import org.xnatural.enet.server.cache.ehcache.EhcacheServer;
 import org.xnatural.enet.server.dao.hibernate.Hibernate;
+import org.xnatural.enet.server.dao.hibernate.Trans;
+import org.xnatural.enet.server.dao.hibernate.TransWrapper;
 import org.xnatural.enet.server.http.netty.NettyHttp;
 import org.xnatural.enet.server.mview.MViewServer;
 import org.xnatural.enet.server.resteasy.NettyResteasy;
@@ -18,6 +21,11 @@ import org.xnatural.enet.server.sched.SchedServer;
 import org.xnatural.enet.server.session.MemSessionManager;
 import org.xnatural.enet.server.session.RedisSessionManager;
 import org.xnatural.enet.server.swagger.SwaggerServer;
+import org.xnatural.enet.test.dao.entity.TestEntity;
+import org.xnatural.enet.test.dao.repo.TestRepo;
+import org.xnatural.enet.test.rest.RestTpl;
+import org.xnatural.enet.test.service.FileUploader;
+import org.xnatural.enet.test.service.TestService;
 
 import java.lang.reflect.Field;
 import java.util.Arrays;
@@ -73,6 +81,20 @@ public class Launcher extends ServerTpl {
             if ("memory".equalsIgnoreCase(t)) coreEp.fire("sys.addSource", new MemSessionManager());
             else if ("redis".equalsIgnoreCase(t)) coreEp.fire("sys.addSource", new RedisSessionManager());
         }
+
+        // TestService 事务拦截
+        ctx.addSource(Utils.proxy(TestService.class, (obj, method, args1, proxy) -> {
+            if (method.getAnnotation(Trans.class) == null) return proxy.invokeSuper(obj, args1);
+            else return bean(TransWrapper.class).trans(() -> {
+                try {
+                    return proxy.invokeSuper(obj, args1);
+                } catch (Throwable t) {
+                    log.error(t);
+                }
+                return null;
+            });
+        }));
+        ctx.addSource(new FileUploader());
     }
 
 

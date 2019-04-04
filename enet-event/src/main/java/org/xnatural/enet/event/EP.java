@@ -262,7 +262,7 @@ public class EP {
                             log.warn("Same source same method name only one listener. source: {}, methodName: {}", source, m.getName());
                             continue;
                         }
-
+                        log.debug("add listener [name: {}, source: {}, method: {}, async: {}, order: {}]", listener.name, source, m.getName(), listener.async, listener.order);
                         ls.add(listener); ls.sort(Comparator.comparing(o -> o.order));
                     }
                 }

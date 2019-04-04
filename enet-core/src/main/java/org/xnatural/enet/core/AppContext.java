@@ -175,7 +175,7 @@ public class AppContext {
      */
     protected void initExecutor() {
         exec = new ThreadPoolExecutor(
-                4, 8, 30, TimeUnit.MINUTES, new LinkedBlockingQueue<>(),
+                4, 8, 60, TimeUnit.MINUTES, new LinkedBlockingQueue<>(),
                 new ThreadFactory() {
                     final AtomicInteger i = new AtomicInteger(1);
                     @Override

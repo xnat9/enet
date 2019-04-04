@@ -2,7 +2,9 @@ package org.xnatural.enet.server.resteasy;
 
 import io.netty.channel.ChannelHandlerContext;
 import io.netty.channel.ChannelPipeline;
+import io.netty.channel.nio.NioEventLoopGroup;
 import org.jboss.resteasy.core.InjectorFactoryImpl;
+import org.jboss.resteasy.core.ResourceInvoker;
 import org.jboss.resteasy.core.SynchronousDispatcher;
 import org.jboss.resteasy.core.ValueInjector;
 import org.jboss.resteasy.plugins.server.netty.*;
@@ -96,10 +98,11 @@ public class NettyResteasy extends ServerTpl {
         // 参考 NettyJaxrsServer
         cp.addLast(new RestEasyHttpRequestDecoder(dispatcher.getDispatcher(), rootPath, HTTP));
         cp.addLast(new RestEasyHttpResponseEncoder());
-        cp.addLast(new RequestHandler(dispatcher) {
+        cp.addLast(new NioEventLoopGroup(2, coreExec), new RequestHandler(dispatcher) {
             @Override
             protected void channelRead0(ChannelHandlerContext ctx, Object msg) {
-                coreExec.execute(() -> process(ctx, msg));
+                // coreExec.execute(() -> process(ctx, msg));
+                process(ctx, msg);
             }
 
             @Override
@@ -165,13 +168,14 @@ public class NettyResteasy extends ServerTpl {
      * @return
      */
     @EL(name = {"resteasy.addResource"})
-    public NettyResteasy addResource(Object source, String path) {
+    public NettyResteasy addResource(Object source, String path, Boolean addDoc) {
         log.debug("resteasy add resource {}, path: {}", source, path);
         if (source instanceof Class) return this;
         startDeployment();
         if (source.getClass().getAnnotation(Path.class) != null) {
             if (path != null) deployment.getRegistry().addSingletonResource(source, path);
             else deployment.getRegistry().addSingletonResource(source);
+            if (Boolean.TRUE.equals(addDoc)) coreEp.fire("swagger.addJaxrsDoc", source, path, "tpl", "tpl rest doc");
         } else if (source.getClass().getAnnotation(Provider.class) != null) {
             deployment.getProviderFactory().register(source);
         }
@@ -190,7 +194,16 @@ public class NettyResteasy extends ServerTpl {
 
 
     protected void startDeployment() {
-        if (deployment == null) deployment = new ResteasyDeployment();
+        if (deployment == null) {
+            deployment = new ResteasyDeployment();
+//            deployment.setDispatcher(new SynchronousDispatcher(new ResteasyProviderFactory()) {
+//                @Override
+//                public void invoke(HttpRequest request, HttpResponse response, ResourceInvoker invoker) {
+//                    // coreExec.execute(() -> super.invoke(request, response, invoker));
+//                    super.invoke(request, response, invoker);
+//                }
+//            });
+        }
         if (deployment.getRegistry() != null) return;
         synchronized(this) {
             if (deployment.getRegistry() != null) return;
@@ -246,7 +259,7 @@ public class NettyResteasy extends ServerTpl {
             iterateClass(tmpClz.getPackage().getName(), getClass().getClassLoader(), clz -> {
                 if (clz.getAnnotation(Path.class) != null || clz.getAnnotation(Provider.class) != null) {
                     try {
-                        addResource(createAndInitSource(clz), null);
+                        addResource(createAndInitSource(clz), null, true);
                     } catch (Exception e) {
                         log.error(e);
                     }
@@ -256,6 +269,12 @@ public class NettyResteasy extends ServerTpl {
     }
 
 
+    /**
+     * 创建和初始化 resteasy 接口source和Provider
+     * @param clz
+     * @return
+     * @throws Exception
+     */
     protected Object createAndInitSource(Class clz) throws Exception {
         Object o = clz.newInstance();
         iterateField(clz, f -> {

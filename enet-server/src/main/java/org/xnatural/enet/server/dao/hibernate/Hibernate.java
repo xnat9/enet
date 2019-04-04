@@ -252,7 +252,7 @@ public class Hibernate extends ServerTpl {
                 invoke(findMethod(clz, m -> m.getAnnotation(PostConstruct.class) != null), originObj);
 
                 // 增强 repo 对象
-                Object inst = Utils.enhance(originObj, (obj, method, args, proxy) -> {
+                Object inst = Utils.proxy(clz, (obj, method, args, proxy) -> {
                     if (method.getAnnotation(Trans.class) == null) return proxy.invoke(originObj, args);
                     else return tm.trans(() -> {
                         try { return proxy.invoke(originObj, args); } catch (Throwable t) { log.error(t); }

@@ -374,22 +374,17 @@ public class Utils {
 
 
     /**
-     * Enhancer 增强 一个实例对象
-     * @param obj
+     * Enhancer 代理
+     * @param clz
      * @param mi
      * @return
      */
-    public static Object enhance(Object obj, MethodInterceptor mi) {
-        try {
-            if (mi == null) return obj;
-            Enhancer enhancer = new Enhancer();
-            enhancer.setSuperclass(obj.getClass());
-            enhancer.setCallback(mi);
-            return enhancer.create();
-        } catch (Exception e) {
-            log.error(e);
-        }
-        return null;
+    public static Object proxy(Class clz, MethodInterceptor mi) {
+        if (mi == null) return null;
+        Enhancer en = new Enhancer();
+        en.setSuperclass(clz);
+        en.setCallback(mi);
+        return en.create();
     }
 
 

@@ -1,4 +1,4 @@
-package org.xnatural.enet.test;
+package org.xnatural.enet.test.rest;
 
 import org.apache.commons.lang3.builder.ToStringBuilder;
 import org.apache.commons.lang3.builder.ToStringStyle;

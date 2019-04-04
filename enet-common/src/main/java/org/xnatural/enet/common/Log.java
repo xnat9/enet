@@ -209,16 +209,13 @@ public class Log {
                     earlyLog.offer(d);
                     if (earlyLog.size() > 200) {
                         earlyLog.poll(); System.err.println("early log too much");
-                    }
+                }
                     return;
                 }
             }
         }
 
         if (logger == null) {
-//            if (LoggerFactory.getLogger(name) instanceof SubstituteLogger) {
-//                System.out.println("xxxx");
-//            }
             logger = (LocationAwareLogger) LoggerFactory.getLogger(name); name = null;
         }
 
@@ -232,12 +229,12 @@ public class Log {
     }
 
 
-    private static void doLog(LocationAwareLogger logger, String className, int level, String text, Throwable thrown) {
+    private static void doLog(LocationAwareLogger logger, String className, int level, String msg, Throwable thrown) {
         try {
             if (POST_1_6) {
-                LOG_METHOD.invoke(logger, null, className, level, text, EMPTY, thrown);
+                LOG_METHOD.invoke(logger, null, className, level, msg, EMPTY, thrown);
             } else {
-                LOG_METHOD.invoke(logger, null, className, level, text, thrown);
+                LOG_METHOD.invoke(logger, null, className, level, msg, thrown);
             }
         } catch (InvocationTargetException e) {
             try {

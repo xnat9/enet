@@ -77,11 +77,11 @@ public class ServerTpl {
 
 
     /**
-     * bean 容器. {@link #findBean}
+     * bean 容器. {@link #findLocalBean}
      */
     protected Context beanCtx;
     @EL(name = {"bean.get", "${name}.bean.get"}, async = false)
-    protected Object findBean(EC ec, Class beanType, String beanName) {
+    protected Object findLocalBean(EC ec, Class beanType, String beanName) {
         if (beanCtx == null) return ec.result;
         if (ec.result != null) return ec.result; // 已经找到结果了, 就直接返回
 
@@ -100,7 +100,18 @@ public class ServerTpl {
 
 
     /**
-     * 暴露 bean 给其它模块用. {@link #findBean}
+     * 全局查找Bean
+     * @param type
+     * @param <T>
+     * @return
+     */
+    protected <T> T bean(Class<T> type) {
+        return (T) coreEp.fire("bean.get", type);
+    }
+
+
+    /**
+     * 暴露 bean 给其它模块用. {@link #findLocalBean}
      * @param names bean 名字.
      * @param bean
      */
@@ -255,6 +266,10 @@ public class ServerTpl {
 
 
     public String getName() {
+        if (isEmpty(name)) {
+            name = getClass().getSimpleName().replace("$$EnhancerByCGLIB$$", "@");
+            name = name.substring(0, 1).toLowerCase() + name.substring(1);
+        }
         return name;
     }
 

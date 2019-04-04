@@ -1,4 +1,4 @@
-package org.xnatural.enet.test;
+package org.xnatural.enet.test.dao.entity;
 
 import org.xnatural.enet.server.dao.hibernate.LongIdEntity;
 

@@ -1,7 +1,7 @@
 package org.xnatural.enet.server.swagger;
 
 import io.swagger.v3.jaxrs2.integration.JaxrsApplicationAndAnnotationScanner;
-import io.swagger.v3.jaxrs2.integration.XmlWebOpenApiContext;
+import io.swagger.v3.jaxrs2.integration.JaxrsOpenApiContext;
 import io.swagger.v3.oas.integration.OpenApiConfigurationException;
 import io.swagger.v3.oas.integration.OpenApiContextLocator;
 import io.swagger.v3.oas.integration.SwaggerConfiguration;
@@ -68,7 +68,7 @@ public class SwaggerServer extends ServerTpl {
         HashSet<String> rs = new HashSet<>(1); rs.add(source.getClass().getName());
         OpenAPI openApi = null;
         try {
-            openApi = new XmlWebOpenApiContext().id(getName()).cacheTTL(0L).resourceClasses(rs).openApiConfiguration(
+            openApi = new JaxrsOpenApiContext<>().id(getName()).cacheTTL(0L).resourceClasses(rs).openApiConfiguration(
                     new SwaggerConfiguration()
                             .scannerClass(JaxrsApplicationAndAnnotationScanner.class.getName())
                             .resourceClasses(rs).cacheTTL(0L)

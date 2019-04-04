@@ -1,4 +1,4 @@
-package org.xnatural.enet.test;
+package org.xnatural.enet.test.rest;
 
 import org.xnatural.enet.common.Log;
 import org.xnatural.enet.event.EP;

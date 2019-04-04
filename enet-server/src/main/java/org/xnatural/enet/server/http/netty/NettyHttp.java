@@ -55,7 +55,7 @@ public class NettyHttp extends ServerTpl {
      */
     @EL(name = "sys.stopping", async = false)
     public void stop() {
-        log.info("Shutdown '{}' Server. hostname: {}, port: {}", getName(), isEmpty(getHostname()) ? "localhost" : getHostname(), getPort());
+        log.info("Shutdown '{}' Server. hostname: {}, port: {}", getName(), isEmpty(getHostname()) ? "0.0.0.0" : getHostname(), getPort());
         if (boosGroup != null) boosGroup.shutdownGracefully();
         if (workerGroup != null && workerGroup != boosGroup) workerGroup.shutdownGracefully();
         if (coreExec instanceof ExecutorService) ((ExecutorService) coreExec).shutdown();
@@ -66,12 +66,12 @@ public class NettyHttp extends ServerTpl {
      * 创建http服务
      */
     protected void createServer() {
-        boolean isLinux = isLinux() && getBoolean("epollEnabled", true);
-        boosGroup = isLinux ? new EpollEventLoopGroup(getInteger("threads-boos", 1), coreExec) : new NioEventLoopGroup(getInteger("threads-boos", 1), coreExec);
-        workerGroup = getBoolean("shareLoop", true) ? boosGroup : (isLinux ? new EpollEventLoopGroup(getInteger("threads-worker", 1)) : new NioEventLoopGroup(getInteger("threads-worker", 1), coreExec));
+        boolean useEpoll = isLinux() && getBoolean("epollEnabled", true);
+        boosGroup = useEpoll ? new EpollEventLoopGroup(getInteger("threads-boos", 1), coreExec) : new NioEventLoopGroup(getInteger("threads-boos", 1), coreExec);
+        workerGroup = getBoolean("shareLoop", true) ? boosGroup : (useEpoll ? new EpollEventLoopGroup(getInteger("threads-worker", 1)) : new NioEventLoopGroup(getInteger("threads-worker", 1), coreExec));
         ServerBootstrap sb = new ServerBootstrap()
                 .group(boosGroup, workerGroup)
-                .channel(isLinux ? EpollServerSocketChannel.class : NioServerSocketChannel.class)
+                .channel(useEpoll ? EpollServerSocketChannel.class : NioServerSocketChannel.class)
                 .childHandler(new ChannelInitializer<SocketChannel>() {
                     @Override
                     protected void initChannel(SocketChannel ch) throws Exception {
@@ -94,12 +94,12 @@ public class NettyHttp extends ServerTpl {
                         }, ch.pipeline());
                     }
                 })
-                .option(ChannelOption.SO_BACKLOG, getInteger("backlog", 128))
+                .option(ChannelOption.SO_BACKLOG, getInteger("backlog", 100))
                 .childOption(ChannelOption.SO_KEEPALIVE, true);
         try {
             if (isEmpty(getHostname())) sb.bind(getPort()).sync(); // 默认绑定本地所有地址
             else sb.bind(getHostname(), getPort()).sync();
-            log.info("Started {} Server. hostname: {}, port: {}", getName(), isEmpty(getHostname()) ? "localhost" : getHostname(), getPort());
+            log.info("Started {} Server. hostname: {}, port: {}, type: {}", getName(), isEmpty(getHostname()) ? "0.0.0.0" : getHostname(), getPort(), (useEpoll ? "epoll" : "nio"));
         } catch (Exception ex) {
             log.error(ex);
         }
@@ -142,11 +142,13 @@ public class NettyHttp extends ServerTpl {
     }
 
 
+    @EL(name = "http.getHostname", async = false)
     public String getHostname() {
         return getStr("hostname", "");
     }
 
 
+    @EL(name = "http.getPort", async = false)
     public int getPort() {
         return getInteger("port", 8080);
     }

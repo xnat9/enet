@@ -74,8 +74,6 @@ public class ServerTpl {
 //    }
 
 
-
-
     /**
      * bean 容器. {@link #findLocalBean}
      */
@@ -119,7 +117,6 @@ public class ServerTpl {
         if (bean == null) {
             log.warn("server '{}' expose bean with null object.", getName()); return this;
         }
-        // TODO 验证(相同的bean名字和类型)?
         if (beanCtx == null) beanCtx = new Context();
         if (names != null) {
             for (String n : names) {
@@ -221,7 +218,7 @@ public class ServerTpl {
         log.info("create private executor for '{}'.", getName());
         ThreadPoolExecutor e = new ThreadPoolExecutor(
             getInteger("exec.corePoolSize", 4), getInteger("exec.maximumPoolSize", 4),
-            getInteger("exec.keepAliveTime", 20), TimeUnit.MINUTES,
+            getInteger("exec.keepAliveTime", 30), TimeUnit.MINUTES,
             new LinkedBlockingQueue<>(100000),
             new ThreadFactory() {
                 final AtomicInteger i = new AtomicInteger(1);

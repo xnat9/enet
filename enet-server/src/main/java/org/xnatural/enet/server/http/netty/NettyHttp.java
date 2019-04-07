@@ -77,7 +77,7 @@ public class NettyHttp extends ServerTpl {
                     protected void initChannel(SocketChannel ch) throws Exception {
                         ch.pipeline().addLast(new IdleStateHandler(getLong("readerIdleTime", 2 * 60L), getLong("writerIdleTime", 0L), getLong("allIdleTime", 0L), TimeUnit.SECONDS));
                         ch.pipeline().addLast(new HttpServerCodec());
-                        ch.pipeline().addLast(new SimpleChannelInboundHandler<Object>() {
+                        ch.pipeline().addLast(new SimpleChannelInboundHandler<Object>(false) {
                             @Override
                             protected void channelRead0(ChannelHandlerContext ctx, Object msg) throws Exception {
                                 if (!fusing(ctx, msg)) ctx.fireChannelRead(msg);

@@ -4,6 +4,7 @@ import com.alibaba.fastjson.JSON;
 import com.mongodb.MongoClient;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
+import io.swagger.v3.oas.annotations.tags.Tag;
 import org.apache.commons.lang3.BooleanUtils;
 import org.apache.commons.lang3.StringUtils;
 import org.jboss.resteasy.plugins.providers.multipart.InputPart;
@@ -40,6 +41,7 @@ import static org.xnatural.enet.test.rest.ApiResp.ok;
  * @author xiangxb, 2019-01-13
  */
 @Path("tpl")
+@Tag(name = "tpl", description = "tpl rest")
 //@Hidden // 不加入到 swagger doc
 public class RestTpl extends ServerTpl {
 
@@ -88,7 +90,6 @@ public class RestTpl extends ServerTpl {
         @Parameter(hidden = true) @SessionAttr("attr1") Object attr1,
         @Parameter(description = "参数a") @QueryParam("a") String a
     ) {
-        // if (true) throw new IllegalArgumentException("xxxxxxxxxxxxx");
         ep.fire("session.set", sId, "attr1", "value1" + System.currentTimeMillis());
         return ok("sId", sId).attr("attr1", attr1).attr("param_a", a);
     }
@@ -139,12 +140,15 @@ public class RestTpl extends ServerTpl {
     @Path("upload")
     @Consumes("multipart/form-data")
     @Produces("application/json")
+    // @RequestBody
     public ApiResp upload(MultipartFormDataInput formData) {
     // public ApiResp upload(@MultipartForm AddFileDto addFile) {
+    // public ApiResp upload(@FormParam("name") String name, @FormParam("age") Integer ss) {
         AddFileDto addFile = extractFormDto(formData, AddFileDto.class);
         uploader.save(addFile.getHeadportrait());
         service.save(addFile);
         return ok(uploader.toFullUrl(addFile.getHeadportrait().getResultName()));
+        // return ok();
     }
 
 
@@ -152,6 +156,7 @@ public class RestTpl extends ServerTpl {
     @Consumes("application/x-www-form-urlencoded")
     @Produces("application/json")
     public ApiResp form(@FormParam("attr") String attr, @FormParam("ss") Integer ss) {
+        log.info("form request test.");
         return ok().attr("attr", attr).attr("ss", ss);
     }
 
@@ -168,7 +173,7 @@ public class RestTpl extends ServerTpl {
 
     @GET @Path("file/{fName}")
     public Response file(@PathParam("fName") String fName) {
-        File f = bean(FileUploader.class).findFile(fName);
+        File f = uploader.findFile(fName);
         return Response.ok(f)
                 .header("Content-Disposition", "attachment; filename=" + f.getName())
                 .header("Cache-Control", "max-age=60")

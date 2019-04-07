@@ -13,6 +13,7 @@ import java.net.URI;
 import java.net.URL;
 import java.util.Arrays;
 import java.util.List;
+import java.util.Map;
 import java.util.concurrent.Callable;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
@@ -44,10 +45,10 @@ public class FileUploader extends ServerTpl {
 
     @EL(name = "sys.starting")
     protected void init() {
+        attrs.putAll((Map<? extends String, ?>) coreEp.fire("env.ns", getName()));
         try {
             localDir = getStr("local-dir", new URL("file:upload").getFile());
-            File dir = new File(localDir);
-            dir.mkdirs();
+            File dir = new File(localDir); dir.mkdirs();
             log.info("file upload local dir: {}", dir.getAbsolutePath());
 
             String hostname = coreEp.fire("http.getHostname").toString();
@@ -101,24 +102,21 @@ public class FileUploader extends ServerTpl {
         // 并发上传
         if (files.length >= 2) {
             List<Callable<FileData>> uploadPayload = Arrays.stream(files).skip(1).filter(f -> f != null)
-                    .map(f -> new Callable<FileData>() {
-                        @Override
-                        public FileData call() throws Exception {
-                            try (FileOutputStream fo = new FileOutputStream(new File(localDir + File.separator + f.getResultName()));
-                                 InputStream in = f.getInputStream()) {
-                                IOUtils.copy(in, fo);
-                            } catch (Exception ex) {
-                                log.error(ex);
-                            }
-                            return f;
+                    .map(f -> (Callable<FileData>) () -> {
+                        try (FileOutputStream fo = new FileOutputStream(new File(localDir + File.separator + f.getResultName()));
+                             InputStream in = f.getInputStream()) {
+                            IOUtils.copy(in, fo);
+                        } catch (Exception ex) {
+                            log.error(ex);
                         }
+                        return f;
                     }).collect(Collectors.toList());
 
             ExecutorService executor = null;
             try {
                 List<Future<FileData>> fs = emptyList();
                 if (!uploadPayload.isEmpty()) {
-                    executor = Executors.newFixedThreadPool(Math.min(files.length - 1, 5));
+                    executor = Executors.newFixedThreadPool(Math.min(files.length - 1, getInteger("maxUploadThreads", 4)));
                     fs = executor.invokeAll(uploadPayload);
                 }
 

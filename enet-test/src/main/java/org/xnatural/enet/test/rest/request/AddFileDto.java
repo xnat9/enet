@@ -1,5 +1,7 @@
 package org.xnatural.enet.test.rest.request;
 
+import org.jboss.resteasy.annotations.providers.multipart.PartFilename;
+import org.jboss.resteasy.annotations.providers.multipart.PartType;
 import org.jboss.resteasy.plugins.providers.multipart.InputPart;
 import org.xnatural.enet.test.rest.BasePojo;
 import org.xnatural.enet.test.rest.FileData;
@@ -10,10 +12,14 @@ import java.io.InputStream;
 
 public class AddFileDto extends BasePojo {
     @FormParam("name")
+    @PartType("text/plan")
     private String name;
     @FormParam("age")
+    @PartType("text/plan")
     private Integer age;
     @FormParam("file")
+    @PartType("application/oc")
+    // @PartFilename
     private InputPart inputPart;
     private FileData headportrait;
 

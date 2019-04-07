@@ -22,12 +22,12 @@ import java.util.List;
 @Path("/")
 public class Controller {
 
-    final Log log = Log.of(getClass());
-    private EP ep;
-    private SwaggerServer server;
+    final   Log           log = Log.of(getClass());
+    private EP            ep;
+    private SwaggerApiDoc server;
 
 
-    public Controller(SwaggerServer server) {
+    public Controller(SwaggerApiDoc server) {
         this.server = server;
         this.ep = server.getCoreEp();
     }

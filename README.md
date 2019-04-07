@@ -37,7 +37,7 @@ public class Launcher extends ServerTpl {
         AppContext app = new AppContext();
         app.addSource(new NettyHttp());
         app.addSource(new NettyResteasy().scan(RestTpl.class));
-        app.addSource(new SwaggerServer());
+        app.addSource(new SwaggerApiDoc());
         app.addSource(new Hibernate().scanEntity(TestEntity.class).scanRepo(TestRepo.class));
         app.addSource(new Launcher(app));
         // app.addSource(new MongoClient("localhost", 27017));
@@ -47,18 +47,17 @@ public class Launcher extends ServerTpl {
 
     AppContext ctx;
     public Launcher(AppContext ctx) {
-        setName("launcher"); 
-        this.ctx = ctx; 
+        setName("launcher"); this.ctx = ctx;
     }
 
     // 环境配置完成后执行
     @EL(name = "env.configured", async = false)
-    private void envConfigured(EC ec) {
+    private void envConfigured() {
         if (ctx.env().getBoolean("session.enabled", true)) {
             String t = ctx.env().getString("session.type", "memory");
             // 根据配置来启动用什么session管理
-            if ("memory".equalsIgnoreCase(t)) coreEp.fire("sys.addSource", new MemSessionManager());
-            else if ("redis".equalsIgnoreCase(t)) coreEp.fire("sys.addSource", new RedisSessionManager());
+            if ("memory".equalsIgnoreCase(t)) ctx.addSource(new MemSessionManager());
+            else if ("redis".equalsIgnoreCase(t)) ctx.addSource(new RedisSessionManager());
         }
     }
 }
@@ -172,13 +171,13 @@ public class Launcher extends ServerTpl {
                app.addSource(new NettyResteasy().scan(RestTpl.class));
                app.start();
    
-   ### SwaggerServer: swagger api 文档服务
-        1. swagger.openApi: 事件是为收集rest swagger文档.如果需要把某个rest swagger文档显示就得监听此事件(例: 方法SwaggerServer.openApi)
+   ### SwaggerApiDoc: swagger api 文档服务
+        1. swagger.openApi: 事件是为收集rest swagger文档.如果需要把某个rest swagger文档显示就得监听此事件(例: 方法Swagger.openApi)
         2. 添加文档. ep.fire("swagger.addJaxrsDoc", this, "路径前缀", "tag(用于分组)", "描述");
         例:    AppContext app = new AppContext();
-               app.addSource(new NettyHttpServer().setPort(8080));
+               app.addSource(new NettyHttp().setPort(8080));
                app.addSource(new NettyResteasyServer().scan(RestTpl.class));
-               app.addSource(new SwaggerServer());
+               app.addSource(new SwaggerApiDoc());
                app.start();
                然后访问: http://localhost:8080/api-doc/
 

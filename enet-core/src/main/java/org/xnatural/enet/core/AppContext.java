@@ -237,7 +237,7 @@ public class AppContext {
 
 
     @EL(name = "sys.info")
-    protected Object info(EC ec) {
+    protected Object info() {
         Map<String, Object> info = new HashMap<>();
         info.put("modules", new TreeSet<>(sourceMap.keySet()));
         return info;

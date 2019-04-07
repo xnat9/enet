@@ -7,7 +7,6 @@ import com.netflix.discovery.DefaultEurekaClientConfig;
 import com.netflix.discovery.DiscoveryClient;
 import org.xnatural.enet.common.Utils;
 import org.xnatural.enet.core.AppContext;
-import org.xnatural.enet.event.EC;
 import org.xnatural.enet.event.EL;
 import org.xnatural.enet.server.ServerTpl;
 import org.xnatural.enet.server.cache.ehcache.EhcacheServer;
@@ -20,7 +19,7 @@ import org.xnatural.enet.server.resteasy.NettyResteasy;
 import org.xnatural.enet.server.sched.SchedServer;
 import org.xnatural.enet.server.session.MemSessionManager;
 import org.xnatural.enet.server.session.RedisSessionManager;
-import org.xnatural.enet.server.swagger.SwaggerServer;
+import org.xnatural.enet.server.swagger.SwaggerApiDoc;
 import org.xnatural.enet.test.dao.entity.TestEntity;
 import org.xnatural.enet.test.dao.repo.TestRepo;
 import org.xnatural.enet.test.rest.RestTpl;
@@ -49,7 +48,7 @@ public class Launcher extends ServerTpl {
         app.addSource(new NettyHttp().setPort(8080));
         app.addSource(new NettyResteasy().scan(RestTpl.class));
         app.addSource(new MViewServer());
-        app.addSource(new SwaggerServer());
+        app.addSource(new SwaggerApiDoc());
         app.addSource(new Hibernate().scanEntity(TestEntity.class).scanRepo(TestRepo.class));
         app.addSource(new SchedServer());
         app.addSource(new EhcacheServer());
@@ -71,15 +70,14 @@ public class Launcher extends ServerTpl {
 
     /**
      * 环境配置完成后执行
-     * @param ec
      */
     @EL(name = "env.configured", async = false)
-    private void envConfigured(EC ec) {
+    private void envConfigured() {
         if (ctx.env().getBoolean("session.enabled", true)) {
             String t = ctx.env().getString("session.type", "memory");
             // 根据配置来启动用什么session管理
-            if ("memory".equalsIgnoreCase(t)) coreEp.fire("sys.addSource", new MemSessionManager());
-            else if ("redis".equalsIgnoreCase(t)) coreEp.fire("sys.addSource", new RedisSessionManager());
+            if ("memory".equalsIgnoreCase(t)) ctx.addSource(new MemSessionManager());
+            else if ("redis".equalsIgnoreCase(t)) ctx.addSource(new RedisSessionManager());
         }
 
         // TestService 事务拦截

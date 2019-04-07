@@ -18,14 +18,14 @@ import java.util.*;
 import static java.util.Collections.singletonList;
 import static org.xnatural.enet.common.Utils.isEmpty;
 
-public class SwaggerServer extends ServerTpl {
+public class SwaggerApiDoc extends ServerTpl {
 
     protected String root;
     protected Controller ctl;
     protected List<OpenAPI> apis = new LinkedList<>();
 
 
-    public SwaggerServer() {
+    public SwaggerApiDoc() {
         setName("swagger");
     }
 
@@ -98,7 +98,7 @@ public class SwaggerServer extends ServerTpl {
     }
 
 
-    public SwaggerServer setRoot(String root) {
+    public SwaggerApiDoc setRoot(String root) {
         if (running.get()) throw new RuntimeException("服务正在运行不能更改");
         this.root = root;
         return this;

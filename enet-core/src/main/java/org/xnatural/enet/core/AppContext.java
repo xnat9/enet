@@ -7,6 +7,7 @@ import org.xnatural.enet.event.EC;
 import org.xnatural.enet.event.EL;
 import org.xnatural.enet.event.EP;
 
+import javax.annotation.Resource;
 import java.lang.management.ManagementFactory;
 import java.lang.reflect.Field;
 import java.lang.reflect.Method;
@@ -66,11 +67,12 @@ public class AppContext {
         env = new Environment(); env.setEp(ep); env.loadCfg();
         // 3. 通知所有服务启动
         ep.fire("sys.starting", EC.of(this), (ec) -> {
-            log.info("Started Application in {} seconds (JVM running for {})",
-                    (System.currentTimeMillis() - startup.getTime()) / 1000.0,
-                    ManagementFactory.getRuntimeMXBean().getUptime() / 1000.0
-            );
+            autoInject();
             if (shutdownHook != null) Runtime.getRuntime().addShutdownHook(shutdownHook);
+            log.info("Started Application in {} seconds (JVM running for {})",
+                (System.currentTimeMillis() - startup.getTime()) / 1000.0,
+                ManagementFactory.getRuntimeMXBean().getUptime() / 1000.0
+            );
             ep.fire("sys.started", EC.of(this));
         });
     }
@@ -116,6 +118,29 @@ public class AppContext {
 
 
     /**
+     * 初始化. 自动注入 {@link javax.annotation.Resource}
+     */
+    protected void autoInject() {
+        log.debug("auto inject @Resource field");
+        sourceMap.forEach((s, o) -> {
+            iterateField(o.getClass(), f -> {
+                Resource r = f.getAnnotation(Resource.class);
+                if (r == null) return;
+                f.setAccessible(true);
+                try {
+                    Object v = f.get(o);
+                    if (v != null) return; // 已经存在值则不需要再注入
+                    v = ep.fire("bean.get", f.getType(), r.name());
+                    if (v == null) return;
+                    f.set(o, v);
+                    log.trace("inject @Resource field '{}' for source object '{}'", f.getName(), o);
+                } catch (IllegalAccessException e) { log.error(e); }
+            });
+        });
+    }
+
+
+    /**
      * 查找对象
      * @param ec
      * @param beanType
@@ -123,16 +148,16 @@ public class AppContext {
      * @return
      */
     @EL(name = {"bean.get", "sys.bean.get"}, async = false, order = 1)
-    protected Object findBean(EC ec, Class beanType, String beanName) {
+    protected Object findLocalBean(EC ec, Class beanType, String beanName) {
         if (ec.result != null) return ec.result; // 已经找到结果了, 就直接返回
 
         Object bean = null;
-        if (beanName != null && beanType != null) {
+        if (isNotEmpty(beanName) && beanType != null) {
             bean = sourceMap.get(beanName);
             if (bean != null && !beanType.isAssignableFrom(bean.getClass())) bean = null;
-        } else if (beanName != null && beanType == null) {
+        } else if (isNotEmpty(beanName) && beanType == null) {
             bean = sourceMap.get(beanName);
-        } else if (beanName == null && beanType != null) {
+        } else if (isEmpty(beanName) && beanType != null) {
             if (beanType.isAssignableFrom(getClass())) bean = this;
             else {
                 for (Map.Entry<String, Object> entry : sourceMap.entrySet()) {
@@ -254,52 +279,35 @@ public class AppContext {
         List<Field> execFs = new LinkedList<>();
         iterateField(s.getClass(), f -> {
             if (Modifier.isFinal(f.getModifiers())) return;
+            if (f.getAnnotation(Resource.class) == null) return;
             if (EP.class.isAssignableFrom(f.getType())) epFs.add(f);
             else if (Executor.class.isAssignableFrom(f.getType())) execFs.add(f);
         });
 
         // 1. 为source设置公用 EP
         EP ep = wrapEpForSource(s); // 为了安全
-        if (epFs.size() == 1) {
-            Field f = epFs.get(0);
-            try {
-                f.setAccessible(true); f.set(s, ep);
-            } catch (Exception ex) {
-                log.error(ex);
+        try {
+            if (epFs.size() > 1) {
+                log.warn("inject multiple same EP for same object source '{}'", s);
             }
-        } else if (epFs.size() > 1) { // 有多个 EP, 则只设置 字段名字为 coreEp
             for (Field f : epFs) {
-                if ("coreEp".equals(f.getName())) {
-                    try {
-                        f.setAccessible(true); f.set(s, ep);
-                    } catch (Exception ex) {
-                        log.error(ex);
-                    }
-                    break;
-                }
+                f.setAccessible(true); f.set(s, ep);
             }
+        } catch (Exception ex) {
+            log.error(ex);
         }
 
         // 2. 为source 设置公用 Executor
         Executor exec = wrapExecForSource(s);
-        if (execFs.size() == 1) {
-            Field f = execFs.get(0);
-            try {
-                f.setAccessible(true); f.set(s, exec);
-            } catch (Exception ex) {
-                log.error(ex);
+        try {
+            if (epFs.size() > 1) {
+                log.warn("inject multiple same Executor for same object source '{}'", s);
             }
-        } else if (execFs.size() > 1) { // 有多个 Executor, 则只设置 字段名字为 coreExec
             for (Field f : execFs) {
-                if ("coreExec".equals(f.getName())) {
-                    try {
-                        f.setAccessible(true); f.set(s, exec);
-                    } catch (Exception ex) {
-                        log.error(ex);
-                    }
-                    break;
-                }
+                f.setAccessible(true); f.set(s, exec);
             }
+        } catch (Exception ex) {
+            log.error(ex);
         }
     }
 

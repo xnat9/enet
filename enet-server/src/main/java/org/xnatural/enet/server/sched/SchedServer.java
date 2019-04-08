@@ -33,21 +33,21 @@ public class SchedServer extends ServerTpl {
         if (!running.compareAndSet(false, true)) {
             log.warn("{} Server is running", getName()); return;
         }
-        if (coreExec == null) initExecutor();
-        if (coreEp == null) coreEp = new EP(coreExec);
-        coreEp.fire(getName() + ".starting");
+        if (exec == null) initExecutor();
+        if (ep == null) ep = new EP(exec);
+        ep.fire(getName() + ".starting");
         // 先从核心取配置, 然后再启动
-        attrs.putAll((Map) coreEp.fire("env.ns", getName()));
+        attrs.putAll((Map) ep.fire("env.ns", getName()));
         try {
             StdSchedulerFactory f = new StdSchedulerFactory();
             Properties p = new Properties(); p.putAll(attrs);
             p.setProperty(StdSchedulerFactory.PROP_THREAD_POOL_CLASS, AgentThreadPool.class.getName());
             f.initialize(p);
-            AgentThreadPool.exec = coreExec;
+            AgentThreadPool.exec = exec;
             scheduler = f.getScheduler();
             scheduler.start();
         } catch (SchedulerException e) { throw new RuntimeException(e); }
-        coreEp.fire(getName() + ".started");
+        ep.fire(getName() + ".started");
         log.info("Started {}(Quartz) Server", getName());
     }
 

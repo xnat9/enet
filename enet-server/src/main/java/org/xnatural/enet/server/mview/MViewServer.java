@@ -28,15 +28,15 @@ public class MViewServer extends ServerTpl {
         if (!running.compareAndSet(false, true)) {
             log.warn("{} Server is running", getName()); return;
         }
-        if (coreExec == null) initExecutor();
-        if (coreEp == null) coreEp = new EP(coreExec);
-        coreEp.fire(getName() + ".starting");
-        attrs.putAll((Map) coreEp.fire("env.ns", getName()));
+        if (exec == null) initExecutor();
+        if (ep == null) ep = new EP(exec);
+        ep.fire(getName() + ".starting");
+        attrs.putAll((Map) ep.fire("env.ns", getName()));
         path = getStr("path", "mview");
 
         ctl = new Controller(this);
         log.info("Started {} Server. pathPrefix: {}", getName(), ("/" + getPath() + "/").replace("//", "/"));
-        coreEp.fire("resteasy.addResource", ctl, getPath());
+        ep.fire("resteasy.addResource", ctl, getPath());
     }
 
 

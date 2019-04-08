@@ -4,73 +4,68 @@ import com.alibaba.fastjson.JSON;
 import com.mongodb.MongoClient;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
-import io.swagger.v3.oas.annotations.tags.Tag;
+import io.swagger.v3.oas.annotations.media.Content;
+import io.swagger.v3.oas.annotations.media.Schema;
+import io.swagger.v3.oas.annotations.parameters.RequestBody;
 import org.apache.commons.lang3.BooleanUtils;
-import org.apache.commons.lang3.StringUtils;
 import org.jboss.resteasy.plugins.providers.multipart.InputPart;
 import org.jboss.resteasy.plugins.providers.multipart.MultipartFormDataInput;
 import org.xnatural.enet.common.Log;
 import org.xnatural.enet.event.EL;
-import org.xnatural.enet.event.EP;
 import org.xnatural.enet.server.ServerTpl;
-import org.xnatural.enet.server.dao.hibernate.TransWrapper;
 import org.xnatural.enet.server.resteasy.SessionAttr;
 import org.xnatural.enet.server.resteasy.SessionId;
-import org.xnatural.enet.test.dao.repo.TestRepo;
 import org.xnatural.enet.test.rest.request.AddFileDto;
 import org.xnatural.enet.test.service.FileUploader;
 import org.xnatural.enet.test.service.TestService;
 
+import javax.annotation.Resource;
 import javax.ws.rs.*;
+import javax.ws.rs.container.AsyncResponse;
+import javax.ws.rs.container.Suspended;
 import javax.ws.rs.core.Response;
 import java.beans.Introspector;
 import java.beans.PropertyDescriptor;
 import java.io.File;
 import java.io.InputStream;
-import java.util.Collection;
-import java.util.Date;
-import java.util.List;
-import java.util.Objects;
+import java.net.URL;
+import java.util.*;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CompletionStage;
+import java.util.concurrent.TimeUnit;
 
 import static org.xnatural.enet.common.Utils.isEmpty;
+import static org.xnatural.enet.common.Utils.isNotEmpty;
 import static org.xnatural.enet.test.rest.ApiResp.ok;
 
 /**
  * @author xiangxb, 2019-01-13
  */
-@Path("tpl")
-@Tag(name = "tpl", description = "tpl rest")
+@Path("")
 //@Hidden // 不加入到 swagger doc
 public class RestTpl extends ServerTpl {
 
-    private EP ep;
     final Log log = Log.of(getClass());
 
-    private TestRepo     testRepo;
-    private TransWrapper tm;
-    private TestService  service;
-    private FileUploader uploader;
+    @Resource
+    TestService  service;
+    @Resource
+    FileUploader uploader;
 
 
     @EL(name = "sys.started")
     public void init() {
-        // ep.fire("swagger.addJaxrsDoc", this, null, "tpl", "tpl rest doc");
-        testRepo = (TestRepo) ep.fire("dao.bean.get", TestRepo.class);
-        tm = (TransWrapper) ep.fire("bean.get", TransWrapper.class);
-        service = bean(TestService.class);
-        uploader = bean(FileUploader.class);
+        attrs.putAll((Map<? extends String, ?>) ep.fire("env.ns", "mvc"));
     }
 
 
     @GET @Path("dao")
     @Produces("application/json")
-    public Object dao() throws Exception {
+    public ApiResp<PageModel> dao() throws Exception {
         // return testRepo.tbName();
 //        tm.trans(() -> testRepo.delete(testRepo.findById(66L)));
 //        return "xxx";
-        return service.findTestData();
+        return ok(service.findTestData());
         // return testRepo.findPage(0, 10, (root, query, cb) -> {query.orderBy(cb.desc(root.get("id"))); return null;});
     }
 
@@ -106,13 +101,6 @@ public class RestTpl extends ServerTpl {
 
         Object r = ep.fire("cache.get", "test", "key1");
         if (r == null) ep.fire("cache.set", "test", "key1", "mem");
-//        try {
-//            IOUtils.readLines(new FileInputStream("E:\\tmp\\idNo.txt")).forEach(l -> {
-//                ep.fire("redis.del", "overmind:PBOC:P01:"+l);
-//            });
-//        } catch (IOException e) {
-//            e.printStackTrace();
-//        }
         return ok(r);
     }
 
@@ -121,7 +109,7 @@ public class RestTpl extends ServerTpl {
     @Path("mongo")
     @Produces("application/json")
     public Object mongo() {
-        MongoClient c = (MongoClient) ep.fire("bean.get", MongoClient.class);
+        MongoClient c = bean(MongoClient.class);
         // return c == null ? "" : c.getDatabase("cenarius").getCollection("config_list").find().first().toJson();
         return c == null ? "" : c.getDatabase("gsis").getCollection("cidtb").find().first().toJson();
     }
@@ -136,15 +124,39 @@ public class RestTpl extends ServerTpl {
     }
 
 
+    @GET @Path("async2")
+    @Produces("text/plain")
+    public void async2(@Suspended final AsyncResponse resp) {
+        resp.setTimeout(1, TimeUnit.MINUTES);
+        resp.resume("@Suspended async result");
+    }
+
+
     @POST
     @Path("upload")
     @Consumes("multipart/form-data")
     @Produces("application/json")
-    // @RequestBody
-    public ApiResp upload(MultipartFormDataInput formData) {
+//    @Operation(
+//        summary = "文件上传测试",
+//        // parameters = {@Parameter(name = "name", )},
+//        requestBody = @RequestBody(content = {
+//            @Content(mediaType = "application/octet-stream",
+//                schema = @Schema(name = "headportrait", type="string", format="binary")
+//            ),
+//            @Content(
+//                mediaType = "text/plan",
+//                schema = @Schema(name = "name", type="string")
+//            ),
+//            @Content(mediaType = "text/plan",
+//                schema = @Schema(name = "age", type="integer")
+//            ),
+//        })
+//        )
+    public ApiResp upload(MultipartFormDataInput formData) throws Exception {
     // public ApiResp upload(@MultipartForm AddFileDto addFile) {
     // public ApiResp upload(@FormParam("name") String name, @FormParam("age") Integer ss) {
         AddFileDto addFile = extractFormDto(formData, AddFileDto.class);
+        if (addFile.getAge() == null) throw new IllegalArgumentException("年龄必填");
         uploader.save(addFile.getHeadportrait());
         service.save(addFile);
         return ok(uploader.toFullUrl(addFile.getHeadportrait().getResultName()));
@@ -161,95 +173,128 @@ public class RestTpl extends ServerTpl {
     }
 
 
-    @GET @Path("js/lib/{fName}")
-    public Response jsLib(@PathParam("fName") String fName) {
-        File f = new File(getClass().getClassLoader().getResource("static/js/lib/" + fName).getFile());
-        return Response.ok(f)
-            .header("Content-Disposition", "attachment; filename=" + f.getName())
-            .header("Cache-Control", "max-age=60")
+    @GET @Path("js/{fName}")
+    public Response js(@PathParam("fName") String fName) throws Exception {
+        URL url = getClass().getClassLoader().getResource("static/js/" + fName);
+        if (url == null) return Response.status(404).build();
+        return Response.ok(url.openStream())
+            .type("application/javascript; charset=utf-8")
+            .header("Cache-Control", "max-age=" + getInteger("jsCacheMaxAge", getInteger("maxAge", 60)))
             .build();
+    }
+
+
+    @GET @Path("css/{fName}")
+    public Response css(@PathParam("fName") String fName) throws Exception {
+        URL url = getClass().getClassLoader().getResource("static/css/" + fName);
+        if (url == null) return Response.status(404).build();
+        return Response.ok(url.openStream())
+            .type("text/css; charset=utf-8")
+            .header("Cache-Control", "max-age=" + getInteger("cssCacheMaxAge", getInteger("maxAge", 60)))
+            .build();
+    }
+
+
+    @GET @Path("{fName}")
+    public Response html(@PathParam("fName") String fName) throws Exception {
+        URL url = getClass().getClassLoader().getResource("static/" + fName);
+        if (url == null) return Response.status(404).build();
+        return Response.ok(url.openStream())
+            .type("text/html; charset=utf-8")
+            .header("Cache-Control", "max-age=" + getInteger("htmlCacheMaxAge", getInteger("maxAge", 60)))
+            .build();
+    }
+
+
+    @GET @Path("")
+    public Response index() throws Exception {
+        URL url = getClass().getClassLoader().getResource("static/index.html");
+        if (url == null) return Response.status(404).build();
+        return Response.ok(url.openStream()).type("text/html; charset=utf-8").build();
     }
 
 
     @GET @Path("file/{fName}")
     public Response file(@PathParam("fName") String fName) {
         File f = uploader.findFile(fName);
+        if (f == null) return Response.status(404).build();
         return Response.ok(f)
                 .header("Content-Disposition", "attachment; filename=" + f.getName())
-                .header("Cache-Control", "max-age=60")
+                .header("Cache-Control", "max-age=" + getInteger("uploadFileCacheMaxAge", getInteger("maxAge", 180)))
                 .build();
     }
 
 
-    public <T> T extractFormDto(MultipartFormDataInput formDataInput, Class<T> clz) {
-        T resultDto = null;
-        try {
-            resultDto = clz.newInstance();
-            for (PropertyDescriptor pd : Introspector.getBeanInfo(clz).getPropertyDescriptors()) {
-                List<InputPart> value = formDataInput.getFormDataMap().get(pd.getName());
-                if (isEmpty(value)) continue;
-                Class<?> pdType = pd.getPropertyType();
-                if (FileData.class.isAssignableFrom(pdType)) {
-                    InputPart inputPart = value.get(0);
-                    // if (!"image".equals(inputPart.getMediaType().getType())) continue;
+    /**
+     * 把表单中的数据填充到一个 java bean 中去
+     * @param formDataInput
+     * @param clz
+     * @param <T>
+     * @return
+     * @throws Exception
+     */
+    private  <T> T extractFormDto(MultipartFormDataInput formDataInput, Class<T> clz) throws Exception {
+        T resultDto = clz.newInstance();
+        for (PropertyDescriptor pd : Introspector.getBeanInfo(clz).getPropertyDescriptors()) {
+            List<InputPart> value = formDataInput.getFormDataMap().get(pd.getName());
+            if (isEmpty(value)) continue;
+            Class<?> pdType = pd.getPropertyType();
+            if (FileData.class.isAssignableFrom(pdType)) {
+                InputPart inputPart = value.get(0);
+                FileData fileData = new FileData();
+                InputStream inputStream = inputPart.getBody(InputStream.class, null);
+                if (inputStream.available() < 1) continue;
+                String fileNameHeader = inputPart.getHeaders().get("Content-Disposition").get(0).replace("\"", "");
+                String fileName = (fileNameHeader.contains("filename") ? fileNameHeader.split("filename=")[1] : (fileNameHeader.contains("name") ? fileNameHeader.split("name=")[1] : ""));
+                String[] fileNameArr = fileName.split("\\.");
 
-                    FileData fileDto = new FileData();
-                    InputStream inputStream = inputPart.getBody(InputStream.class, null);
-                    if (inputStream.available() < 1) continue;
-                    String fileNameHeader = inputPart.getHeaders().get("Content-Disposition").get(0).replace("\"", "");
-                    String fileName = (fileNameHeader.contains("filename") ? fileNameHeader.split("filename=")[1] : (fileNameHeader.contains("name") ? fileNameHeader.split("name=")[1] : ""));
-                    String[] fileNameArr = fileName.split("\\.");
+                fileData.setInputStream(inputStream);
+                fileData.setOriginName(fileName);
+                fileData.setExtension(fileNameArr.length > 1 ? fileNameArr[1] : "");
+                fileData.setGeneratedName(UUID.randomUUID().toString().replace("-", ""));
 
-                    // fileDto.setFileData(IOUtils.toByteArray(inputStream));
-                    fileDto.setInputStream(inputStream);
-                    fileDto.setOriginName(fileName);
-                    fileDto.setExtension(fileNameArr.length > 1 ? fileNameArr[1] : "");
-
-                    pd.getWriteMethod().invoke(resultDto, fileDto);
-                } else if (String.class.isAssignableFrom(pdType)) {
-                    pd.getWriteMethod().invoke(resultDto, value.get(0).getBodyAsString());
-                } else if (Boolean.class.isAssignableFrom(pdType) || boolean.class.isAssignableFrom(pdType)) {
-                    String strValue = value.get(0).getBodyAsString();
-                    if (StringUtils.isNotEmpty(strValue)) {
-                        pd.getWriteMethod().invoke(resultDto, BooleanUtils.toBoolean(strValue));
-                    }
-                } else if (Long.class.isAssignableFrom(pdType) || long.class.isAssignableFrom(pdType)) {
-                    String strValue = value.get(0).getBodyAsString();
-                    if (StringUtils.isNotEmpty(strValue)) {
-                        pd.getWriteMethod().invoke(resultDto, Long.valueOf(strValue));
-                    }
-                } else if (pdType.isEnum()) {
-                    String strValue = value.get(0).getBodyAsString();
-                    for (Object o : pdType.getEnumConstants()) {
-                        if (Objects.equals(o.toString(), strValue)) {
-                            pd.getWriteMethod().invoke(resultDto, o);
-                        }
-                    }
-                } else if (Integer.class.isAssignableFrom(pdType) || int.class.isAssignableFrom(pdType)) {
-                    String strValue = value.get(0).getBodyAsString();
-                    if (StringUtils.isNotEmpty(strValue)) {
-                        pd.getWriteMethod().invoke(resultDto, Integer.valueOf(strValue));
-                    }
-                } else if (Date.class.isAssignableFrom(pdType)) {
-                    String strValue = value.get(0).getBodyAsString();
-                    if (StringUtils.isNotEmpty(strValue)) {
-                        Date date = org.apache.commons.lang3.time.DateUtils.parseDate(strValue, new String[]{"yyyy-MM-dd", "yyyy-MM-dd HH:mm:ss", "yyyy-MM-dd HH:mm"});
-                        pd.getWriteMethod().invoke(resultDto, date);
-                    }
-                } else if (pdType.isArray()) {
-                    String strValue = value.get(0).getBodyAsString();
-                    if (StringUtils.isEmpty(strValue)) continue;
-                    pd.getWriteMethod().invoke(resultDto, JSON.parseObject("[" + strValue + "]", pdType));
-                } else if (Collection.class.isAssignableFrom(pdType)) {
-                    //
-                } else {
-                    String strValue = value.get(0).getBodyAsString();
-                    if (StringUtils.isEmpty(strValue)) continue;
-                    pd.getWriteMethod().invoke(resultDto, JSON.parseObject(strValue, pdType));
+                pd.getWriteMethod().invoke(resultDto, fileData);
+            } else if (String.class.isAssignableFrom(pdType)) {
+                pd.getWriteMethod().invoke(resultDto, value.get(0).getBodyAsString());
+            } else if (Boolean.class.isAssignableFrom(pdType) || boolean.class.isAssignableFrom(pdType)) {
+                String strValue = value.get(0).getBodyAsString();
+                if (isNotEmpty(strValue)) {
+                    pd.getWriteMethod().invoke(resultDto, BooleanUtils.toBoolean(strValue));
                 }
+            } else if (Long.class.isAssignableFrom(pdType) || long.class.isAssignableFrom(pdType)) {
+                String strValue = value.get(0).getBodyAsString();
+                if (isNotEmpty(strValue)) {
+                    pd.getWriteMethod().invoke(resultDto, Long.valueOf(strValue));
+                }
+            } else if (pdType.isEnum()) {
+                String strValue = value.get(0).getBodyAsString();
+                for (Object o : pdType.getEnumConstants()) {
+                    if (Objects.equals(o.toString(), strValue)) {
+                        pd.getWriteMethod().invoke(resultDto, o);
+                    }
+                }
+            } else if (Integer.class.isAssignableFrom(pdType) || int.class.isAssignableFrom(pdType)) {
+                String strValue = value.get(0).getBodyAsString();
+                if (isNotEmpty(strValue)) {
+                    pd.getWriteMethod().invoke(resultDto, Integer.valueOf(strValue));
+                }
+            } else if (Date.class.isAssignableFrom(pdType)) {
+                String strValue = value.get(0).getBodyAsString();
+                if (isNotEmpty(strValue)) {
+                    Date date = org.apache.commons.lang3.time.DateUtils.parseDate(strValue, new String[]{"yyyy-MM-dd", "yyyy-MM-dd HH:mm:ss", "yyyy-MM-dd HH:mm"});
+                    pd.getWriteMethod().invoke(resultDto, date);
+                }
+            } else if (pdType.isArray()) {
+                String strValue = value.get(0).getBodyAsString();
+                if (isEmpty(strValue)) continue;
+                pd.getWriteMethod().invoke(resultDto, JSON.parseObject("[" + strValue + "]", pdType));
+            } else if (Collection.class.isAssignableFrom(pdType)) {
+                //
+            } else {
+                String strValue = value.get(0).getBodyAsString();
+                if (isEmpty(strValue)) continue;
+                pd.getWriteMethod().invoke(resultDto, JSON.parseObject(strValue, pdType));
             }
-        } catch (Exception e) {
-            log.error(e);
         }
         return resultDto;
     }

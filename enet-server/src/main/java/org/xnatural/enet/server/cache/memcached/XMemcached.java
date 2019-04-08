@@ -35,10 +35,10 @@ public class XMemcached extends ServerTpl {
         if (!running.compareAndSet(false, true)) {
             log.warn("{} Server is running", getName()); return;
         }
-        if (coreExec == null) initExecutor();
-        if (coreEp == null) coreEp = new EP(coreExec);
-        coreEp.fire(getName() + ".starting");
-        attrs.putAll((Map) coreEp.fire("env.ns", "cache", getName()));
+        if (exec == null) initExecutor();
+        if (ep == null) ep = new EP(exec);
+        ep.fire(getName() + ".starting");
+        attrs.putAll((Map) ep.fire("env.ns", "cache", getName()));
 
         try {
             List<InetSocketAddress> as = AddrUtil.getAddresses(getStr("hosts", "localhost:11211"));
@@ -55,7 +55,7 @@ public class XMemcached extends ServerTpl {
             log.error(ex);
         }
 
-        coreEp.fire(getName() + ".started");
+        ep.fire(getName() + ".started");
         log.info("Started {} Server", getName());
     }
 
@@ -68,7 +68,7 @@ public class XMemcached extends ServerTpl {
         } catch (IOException e) {
             log.error(e);
         }
-        if (coreExec instanceof ExecutorService) ((ExecutorService) coreExec).shutdown();
+        if (exec instanceof ExecutorService) ((ExecutorService) exec).shutdown();
     }
 
 

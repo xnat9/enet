@@ -18,15 +18,15 @@ import java.util.*;
 import static java.util.Collections.singletonList;
 import static org.xnatural.enet.common.Utils.isEmpty;
 
-public class SwaggerApiDoc extends ServerTpl {
+public class OpenApiDoc extends ServerTpl {
 
     protected String root;
     protected Controller ctl;
     protected List<OpenAPI> apis = new LinkedList<>();
 
 
-    public SwaggerApiDoc() {
-        setName("swagger");
+    public OpenApiDoc() {
+        setName("openApi");
     }
 
 
@@ -35,16 +35,16 @@ public class SwaggerApiDoc extends ServerTpl {
         if (!running.compareAndSet(false, true)) {
             log.warn("服务正在运行"); return;
         }
-        if (coreExec == null) initExecutor();
-        if (coreEp == null) coreEp = new EP(coreExec);
-        coreEp.fire(getName() + ".starting");
-        attrs.putAll((Map) coreEp.fire("env.ns", getName()));
+        if (exec == null) initExecutor();
+        if (ep == null) ep = new EP(exec);
+        ep.fire(getName() + ".starting");
+        attrs.putAll((Map) ep.fire("env.ns", getName()));
         root = getStr("root", "api-doc");
 
         ctl = new Controller(this);
-        coreEp.fire("resteasy.addResource", ctl, getRoot()); // addJaxrsDoc(ctl, getRoot(), getName(), null);
+        ep.fire("resteasy.addResource", ctl, getRoot()); // addJaxrsDoc(ctl, getRoot(), getName(), null);
         log.info("Started {} Server. pathPrefix: {}", getName(), ("/" + getRoot() + "/").replace("//", "/"));
-        coreEp.fire(getName() + ".started");
+        ep.fire(getName() + ".started");
     }
 
 
@@ -56,7 +56,7 @@ public class SwaggerApiDoc extends ServerTpl {
             f.setAccessible(true);
             ((Map) f.get(OpenApiContextLocator.getInstance())).clear();
         } catch (Exception e) {
-            log.warn(e, "");
+            log.error(e);
         }
     }
 
@@ -98,7 +98,7 @@ public class SwaggerApiDoc extends ServerTpl {
     }
 
 
-    public SwaggerApiDoc setRoot(String root) {
+    public OpenApiDoc setRoot(String root) {
         if (running.get()) throw new RuntimeException("服务正在运行不能更改");
         this.root = root;
         return this;

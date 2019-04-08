@@ -1,10 +1,12 @@
 package org.xnatural.enet.test.dao.repo;
 
 import org.xnatural.enet.server.dao.hibernate.BaseRepo;
+import org.xnatural.enet.server.dao.hibernate.Repo;
 import org.xnatural.enet.test.dao.entity.UploadFile;
 
 import java.util.Date;
 
+@Repo
 public class UploadFileRepo extends BaseRepo<UploadFile, Long> {
 
     @Override

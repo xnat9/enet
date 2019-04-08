@@ -1,9 +1,5 @@
 package org.xnatural.enet.test.rest;
 
-import org.apache.commons.lang3.builder.ToStringBuilder;
-import org.apache.commons.lang3.builder.ToStringStyle;
-
-import java.io.Serializable;
 import java.util.LinkedHashMap;
 import java.util.Map;
 
@@ -12,8 +8,7 @@ import java.util.Map;
  *
  * @author hubert
  */
-public class ApiResp<T> implements Serializable {
-    private static final long serialVersionUID = 1L;
+public class ApiResp<T> extends BasePojo {
 
     private boolean success;
     private T       data;
@@ -39,13 +34,7 @@ public class ApiResp<T> implements Serializable {
 
 
     public static ApiResp fail(String errorMsg) {
-        return new ApiResp().setErrorMsg(errorMsg);
-    }
-
-
-    @Override
-    public String toString() {
-        return ToStringBuilder.reflectionToString(this, ToStringStyle.NO_CLASS_NAME_STYLE);
+        return new ApiResp().setSuccess(false).setErrorMsg(errorMsg);
     }
 
 

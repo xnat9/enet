@@ -45,15 +45,15 @@ public class FileUploader extends ServerTpl {
 
     @EL(name = "sys.starting")
     protected void init() {
-        attrs.putAll((Map<? extends String, ?>) coreEp.fire("env.ns", getName()));
+        attrs.putAll((Map<? extends String, ?>) ep.fire("env.ns", getName()));
         try {
             localDir = getStr("local-dir", new URL("file:upload").getFile());
             File dir = new File(localDir); dir.mkdirs();
             log.info("file upload local dir: {}", dir.getAbsolutePath());
 
-            String hostname = coreEp.fire("http.getHostname").toString();
-            urlPrefix = URI.create(getStr("url-prefix", ("http://" + (isEmpty(hostname) ? "localhost" : hostname) + ":" + coreEp.fire("http.getPort") + "/file/")) + "/");
-            log.info("static file url prefix: {}", urlPrefix);
+            String hostname = ep.fire("http.getHostname").toString();
+            urlPrefix = URI.create(getStr("url-prefix", ("http://" + (isEmpty(hostname) ? "localhost" : hostname) + ":" + ep.fire("http.getPort") + "/file/")) + "/");
+            log.info("upload file url prefix: {}", urlPrefix);
         } catch (MalformedURLException e) {
             log.error(e);
         }

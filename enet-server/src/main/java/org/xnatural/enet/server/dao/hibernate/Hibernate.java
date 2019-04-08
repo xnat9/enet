@@ -60,13 +60,13 @@ public class Hibernate extends ServerTpl {
         if (!running.compareAndSet(false, true)) {
             log.warn("{} Server is running", getName()); return;
         }
-        if (coreExec == null) initExecutor();
-        if (coreEp == null) coreEp = new EP(coreExec);
-        coreEp.fire(getName() + ".starting");
+        if (exec == null) initExecutor();
+        if (ep == null) ep = new EP(exec);
+        ep.fire(getName() + ".starting");
         attrs.put("hibernate.physical_naming_strategy", "org.xnatural.enet.server.dao.hibernate.SpringPhysicalNamingStrategy");
         attrs.put("hibernate.implicit_naming_strategy", "org.xnatural.enet.server.dao.hibernate.SpringImplicitNamingStrategy");
         attrs.put("hibernate.current_session_context_class", "thread");
-        attrs.putAll((Map) coreEp.fire("env.ns", getName()));
+        attrs.putAll((Map) ep.fire("env.ns", getName()));
 
         for (String s : getStr("entity-scan", "").split(",")) { // 扫描entity
             if (s == null || s.trim().isEmpty()) continue;
@@ -90,7 +90,7 @@ public class Hibernate extends ServerTpl {
         tm = new TransWrapper(sf); exposeBean(tm, "transManager");
         repoCollect();
         log.info("Started {}(Hibernate) Server", getName());
-        coreEp.fire(getName() + ".started");
+        ep.fire(getName() + ".started");
     }
 
 
@@ -98,7 +98,7 @@ public class Hibernate extends ServerTpl {
     public void stop() {
         log.info("Shutdown '{}(Hibernate)' Server", getName());
         sf.close(); closeDs();
-        if (coreExec instanceof ExecutorService) ((ExecutorService) coreExec).shutdown();
+        if (exec instanceof ExecutorService) ((ExecutorService) exec).shutdown();
     }
 
 
@@ -226,7 +226,7 @@ public class Hibernate extends ServerTpl {
         log.debug("collect hibernate repo. scan: {}", repoScan);
         for (Class tmpClz : repoScan) {
             iterateClass(tmpClz.getPackage().getName(), getClass().getClassLoader(), clz -> {
-                if (clz.getAnnotation(Repository.class) == null) return;
+                if (clz.getAnnotation(Repo.class) == null) return;
                 Object originObj;
                 try { originObj = clz.newInstance(); } catch (Exception e) { log.error(e); return; }
 
@@ -235,9 +235,9 @@ public class Hibernate extends ServerTpl {
                         if (Hibernate.class.isAssignableFrom(f.getType())) {
                             f.setAccessible(true); f.set(originObj, this);
                         } else if (EP.class.isAssignableFrom(f.getType())) {
-                            f.setAccessible(true); if (f.get(originObj) == null) f.set(originObj, getCoreEp());
+                            f.setAccessible(true); if (f.get(originObj) == null) f.set(originObj, getEp());
                         } else if (Executor.class.isAssignableFrom(f.getType())) {
-                            f.setAccessible(true); if (f.get(originObj) == null) f.set(originObj, coreExec);
+                            f.setAccessible(true); if (f.get(originObj) == null) f.set(originObj, exec);
                         } else if (EntityManagerFactory.class.isAssignableFrom(f.getType()) || SessionFactory.class.isAssignableFrom(f.getType())) {
                             f.setAccessible(true); f.set(originObj, sf);
                         } else if (TransWrapper.class.isAssignableFrom(f.getType())) {
@@ -259,7 +259,7 @@ public class Hibernate extends ServerTpl {
                         return null;
                     });
                 });
-                coreEp.addListenerSource(inst);
+                ep.addListenerSource(inst);
                 log.debug("add hibernate repo object: {}", inst);
                 exposeBean(inst, clz.getSimpleName()); // 暴露所有Repo出去
             });
@@ -276,7 +276,7 @@ public class Hibernate extends ServerTpl {
             log.warn("New Datasource and close old Datasource");
             closeDs();
         }
-        Map<String, String> r = (Map) coreEp.fire("env.ns", getName() + ".ds");
+        Map<String, String> r = (Map) ep.fire("env.ns", getName() + ".ds");
         boolean f = false;
         // druid 数据源
         try {

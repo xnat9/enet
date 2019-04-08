@@ -7,22 +7,30 @@ import org.xnatural.enet.test.dao.entity.TestEntity;
 import org.xnatural.enet.test.dao.entity.UploadFile;
 import org.xnatural.enet.test.dao.repo.TestRepo;
 import org.xnatural.enet.test.dao.repo.UploadFileRepo;
+import org.xnatural.enet.test.rest.PageModel;
 import org.xnatural.enet.test.rest.request.AddFileDto;
 
+import javax.annotation.Resource;
 import java.text.SimpleDateFormat;
 import java.util.Date;
 
 public class TestService extends ServerTpl {
+    @Resource
+    TestRepo       testRepo;
+    @Resource
+    UploadFileRepo uploadFileRepo;
 
 
     @Trans
-    public Page findTestData() {
+    public PageModel findTestData() {
         TestEntity e = new TestEntity();
         e.setName("aaaa" + new SimpleDateFormat("yyyy-MM-dd HH:mm:ss").format(new Date()));
         e.setAge(111);
-        TestRepo repo = bean(TestRepo.class);
-        repo.saveOrUpdate(e);
-        return repo.findPage(0, 5, (root, query, cb) -> {query.orderBy(cb.desc(root.get("id"))); return null;});
+        testRepo.saveOrUpdate(e);
+        return PageModel.of(
+            testRepo.findPage(0, 5, (root, query, cb) -> {query.orderBy(cb.desc(root.get("id"))); return null;}),
+            ee -> ee
+        );
     }
 
 
@@ -31,6 +39,6 @@ public class TestService extends ServerTpl {
         UploadFile e = new UploadFile();
         e.setOriginName(dto.getHeadportrait().getOriginName());
         e.setThirdFileId(dto.getHeadportrait().getResultName());
-        bean(UploadFileRepo.class).saveOrUpdate(e);
+        uploadFileRepo.saveOrUpdate(e);
     }
 }

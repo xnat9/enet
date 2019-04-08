@@ -41,12 +41,12 @@ public class NettyHttp extends ServerTpl {
         if (!running.compareAndSet(false, true)) {
             log.warn("{} Server is running", getName()); return;
         }
-        if (coreExec == null) initExecutor();
-        if (coreEp == null) coreEp = new EP(coreExec);
-        coreEp.fire(getName() + ".starting");
-        attrs.putAll((Map) coreEp.fire("env.ns", "http", getName()));
+        if (exec == null) initExecutor();
+        if (ep == null) ep = new EP(exec);
+        ep.fire(getName() + ".starting");
+        attrs.putAll((Map) ep.fire("env.ns", "http", getName()));
         createServer();
-        coreEp.fire(getName() + ".started");
+        ep.fire(getName() + ".started");
     }
 
 
@@ -58,7 +58,7 @@ public class NettyHttp extends ServerTpl {
         log.info("Shutdown '{}' Server. hostname: {}, port: {}", getName(), isEmpty(getHostname()) ? "0.0.0.0" : getHostname(), getPort());
         if (boosGroup != null) boosGroup.shutdownGracefully();
         if (workerGroup != null && workerGroup != boosGroup) workerGroup.shutdownGracefully();
-        if (coreExec instanceof ExecutorService) ((ExecutorService) coreExec).shutdown();
+        if (exec instanceof ExecutorService) ((ExecutorService) exec).shutdown();
     }
 
 
@@ -67,8 +67,8 @@ public class NettyHttp extends ServerTpl {
      */
     protected void createServer() {
         boolean useEpoll = isLinux() && getBoolean("epollEnabled", true);
-        boosGroup = useEpoll ? new EpollEventLoopGroup(getInteger("threads-boos", 1), coreExec) : new NioEventLoopGroup(getInteger("threads-boos", 1), coreExec);
-        workerGroup = getBoolean("shareLoop", true) ? boosGroup : (useEpoll ? new EpollEventLoopGroup(getInteger("threads-worker", 1)) : new NioEventLoopGroup(getInteger("threads-worker", 1), coreExec));
+        boosGroup = useEpoll ? new EpollEventLoopGroup(getInteger("threads-boos", 1), exec) : new NioEventLoopGroup(getInteger("threads-boos", 1), exec);
+        workerGroup = getBoolean("shareLoop", true) ? boosGroup : (useEpoll ? new EpollEventLoopGroup(getInteger("threads-worker", 1)) : new NioEventLoopGroup(getInteger("threads-worker", 1), exec));
         ServerBootstrap sb = new ServerBootstrap()
                 .group(boosGroup, workerGroup)
                 .channel(useEpoll ? EpollServerSocketChannel.class : NioServerSocketChannel.class)
@@ -86,7 +86,7 @@ public class NettyHttp extends ServerTpl {
                         ch.pipeline().addLast(new HttpServerKeepAliveHandler());
                         ch.pipeline().addLast(new HttpObjectAggregator(getInteger("maxContentLength", 65536)));
                         ch.pipeline().addLast(new ChunkedWriteHandler());
-                        coreEp.fire("http-netty.addHandler", ec -> {
+                        ep.fire("http-netty.addHandler", ec -> {
                             if (ec.isNoListener()) {
                                 log.error("'{}' server not available handler", getName());
                                 stop();

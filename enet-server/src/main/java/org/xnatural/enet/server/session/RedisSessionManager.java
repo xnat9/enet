@@ -16,19 +16,19 @@ public class RedisSessionManager extends ServerTpl {
     }
 
 
-    @EL(name = "${redisServerName}.started")
+    @EL(name = "${redisServerName}.started", async = false)
     public void start() {
         if (!running.compareAndSet(false, true)) {
             log.warn("{} Server is running", getName()); return;
         }
-        if (coreExec == null) initExecutor();
-        if (coreEp == null) coreEp = new EP(coreExec);
+        if (exec == null) initExecutor();
+        if (ep == null) ep = new EP(exec);
         // 过期时间(单位: 分钟)
         attr("expire", 30);
         attr("keyPrefix", "session-");
-        attrs.putAll((Map) coreEp.fire("env.ns", getName()));
+        attrs.putAll((Map) ep.fire("env.ns", getName()));
 
-        coreEp.fire(getName() + ".started");
+        ep.fire(getName() + ".started");
         log.info("Started {} Server", getName());
     }
 
@@ -39,19 +39,19 @@ public class RedisSessionManager extends ServerTpl {
      */
     @EL(name = {"${name}.access", "session.access"}, async = false)
     protected void access(String sId) {
-        coreEp.fire(getRedisServerName() + ".hset", getKeyPrefix() + sId, "access", System.currentTimeMillis(), getExpire() * 60);
+        ep.fire(getRedisServerName() + ".hset", getKeyPrefix() + sId, "access", System.currentTimeMillis(), getExpire() * 60);
     }
 
 
     @EL(name = {"${name}.set", "session.set"})
     protected void set(String sId, String key, String value) {
-        coreEp.fire(getRedisServerName() + ".hset", getKeyPrefix() + sId, key, value, getExpire() * 60);
+        ep.fire(getRedisServerName() + ".hset", getKeyPrefix() + sId, key, value, getExpire() * 60);
     }
 
 
     @EL(name = {"${name}.get", "session.get"}, async = false)
     protected Object get(String sId, String key) {
-        return coreEp.fire(getRedisServerName() + ".hget", getKeyPrefix() + sId, key);
+        return ep.fire(getRedisServerName() + ".hget", getKeyPrefix() + sId, key);
     }
 
 

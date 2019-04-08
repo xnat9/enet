@@ -14,6 +14,7 @@ import org.xnatural.enet.event.EP;
 import org.xnatural.enet.server.ServerTpl;
 
 import javax.annotation.PostConstruct;
+import javax.annotation.Resource;
 import javax.ws.rs.Path;
 import javax.ws.rs.core.Cookie;
 import javax.ws.rs.core.NewCookie;
@@ -41,17 +42,21 @@ public class NettyResteasy extends ServerTpl {
     /**
      * 表示 session 的 cookie 名字
      */
-    protected String sessionCookieName;
+    protected String             sessionCookieName;
     /**
      * session 是否可用
      */
-    protected boolean enableSession;
+    protected boolean            enableSession;
     /**
      * see: {@link #collect()}
      */
     protected List<Class>        scan       = new LinkedList<>();
     protected ResteasyDeployment deployment = new ResteasyDeployment();
     protected RequestDispatcher  dispatcher;
+    /**
+     * 关联的所有
+     */
+    protected List<Object>    sources = new LinkedList<>();
 
 
     public NettyResteasy() { setName("resteasy"); }
@@ -62,11 +67,11 @@ public class NettyResteasy extends ServerTpl {
         if (!running.compareAndSet(false, true)) {
             log.warn("{} Server is running", getName()); return;
         }
-        if (coreExec == null) initExecutor();
-        if (coreEp == null) coreEp = new EP(coreExec);
-        coreEp.fire(getName() + ".starting");
-        attrs.putAll((Map) coreEp.fire("env.ns", "mvc", getName()));
-        enableSession = Utils.toBoolean(coreEp.fire("env.getAttr", "session.enabled"), true);
+        if (exec == null) initExecutor();
+        if (ep == null) ep = new EP(exec);
+        ep.fire(getName() + ".starting");
+        attrs.putAll((Map) ep.fire("env.ns", "mvc", getName()));
+        enableSession = Utils.toBoolean(ep.fire("env.getAttr", "session.enabled"), true);
         rootPath = getStr("rootPath", "/");
         sessionCookieName = getStr("sessionCookieName", "sId");
         for (String c : getStr("scan", "").split(",")) {
@@ -76,11 +81,14 @@ public class NettyResteasy extends ServerTpl {
                 log.error(e);
             }
         }
-
         startDeployment(); initDispatcher(); collect();
-        coreEp.fire(getName() + ".started");
+        ep.fire(getName() + ".started");
         log.info("Started {} Server. rootPath: {}", getName(), getRootPath());
     }
+
+
+    @EL(name = "sys.started", async = false)
+    protected void init() { autoInject(); }
 
 
     @EL(name = "sys.stopping")
@@ -99,7 +107,7 @@ public class NettyResteasy extends ServerTpl {
         cp.addLast(new RequestHandler(dispatcher) {
             @Override
             protected void channelRead0(ChannelHandlerContext ctx, Object msg) {
-                coreExec.execute(() -> process(ctx, msg));
+                exec.execute(() -> process(ctx, msg));
             }
 
             @Override
@@ -129,12 +137,12 @@ public class NettyResteasy extends ServerTpl {
                         ((NettyHttpRequest) msg).getResponse().addNewCookie(
                             new NewCookie(
                                 getSessionCookieName(), sId, "/", (String) null, 1, (String) null,
-                                (int) TimeUnit.MINUTES.toSeconds((Integer) coreEp.fire("session.getExpire") + 5)
+                                (int) TimeUnit.MINUTES.toSeconds((Integer) ep.fire("session.getExpire") + 5)
                                 , null, false, false
                             )
                         );
                     } else sId = c.getValue();
-                    coreEp.fire("session.access", sId);
+                    ep.fire("session.access", sId);
                     ((NettyHttpRequest) msg).setAttribute(getSessionCookieName(), sId);
                 }
 
@@ -160,6 +168,29 @@ public class NettyResteasy extends ServerTpl {
 
 
     /**
+     * 自动注入 {@link javax.annotation.Resource}
+     */
+    protected void autoInject() {
+        log.debug("auto inject @Resource field");
+        sources.forEach(o -> {
+            iterateField(o.getClass(), f -> {
+                Resource r = f.getAnnotation(Resource.class);
+                if (r == null) return;
+                f.setAccessible(true);
+                try {
+                    Object v = f.get(o);
+                    if (v != null) return; // 已经存在值则不需要再注入
+                    v = ep.fire("bean.get", f.getType(), r.name());
+                    if (v == null) return;
+                    f.set(o, v);
+                    log.trace("inject @Resource field '{}' for source object '{}'", f.getName(), o);
+                } catch (IllegalAccessException e) { log.error(e); }
+            });
+        });
+    }
+
+
+    /**
      * 添加 resteasy 接口和 Provider 资源
      * @param source
      * @return
@@ -173,12 +204,12 @@ public class NettyResteasy extends ServerTpl {
         if (pathAnno != null) {
             if (path != null) deployment.getRegistry().addSingletonResource(source, path);
             else deployment.getRegistry().addSingletonResource(source);
-            if (Boolean.TRUE.equals(addDoc)) { coreEp.fire("swagger.addJaxrsDoc", source, path, pathAnno.value()); }
+            if (Boolean.TRUE.equals(addDoc)) { ep.fire("openApi.addJaxrsDoc", source, path, pathAnno.value()); }
         } else if (source.getClass().getAnnotation(Provider.class) != null) {
             deployment.getProviderFactory().register(source);
         }
 
-        coreEp.addListenerSource(source);
+        ep.addListenerSource(source); sources.add(source);
         return this;
     }
 
@@ -217,7 +248,7 @@ public class NettyResteasy extends ServerTpl {
                             public Object inject() { return null; }
                             @Override
                             public Object inject(HttpRequest request, HttpResponse response) {
-                                return coreEp.fire("session.get", request.getAttribute(getSessionCookieName()), attrAnno.value());
+                                return ep.fire("session.get", request.getAttribute(getSessionCookieName()), attrAnno.value());
                             }
                         };
                     }
@@ -271,9 +302,9 @@ public class NettyResteasy extends ServerTpl {
         iterateField(clz, f -> {
             try {
                 if (EP.class.isAssignableFrom(f.getType())) {
-                    f.setAccessible(true); if (f.get(o) == null) f.set(o, coreEp);
+                    f.setAccessible(true); if (f.get(o) == null) f.set(o, ep);
                 } else if (Executor.class.isAssignableFrom(f.getType())) {
-                    f.setAccessible(true); if (f.get(o) == null) f.set(o, coreExec);
+                    f.setAccessible(true); if (f.get(o) == null) f.set(o, exec);
                 }
             } catch (IllegalAccessException e) {
                 log.error(e);

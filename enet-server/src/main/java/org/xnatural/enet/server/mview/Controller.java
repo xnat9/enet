@@ -26,7 +26,7 @@ public class Controller {
 
     Controller(MViewServer server) {
         this.server = server;
-        this.ep = server.getCoreEp();
+        this.ep = server.getEp();
     }
 
 

@@ -7,6 +7,7 @@ import org.xnatural.enet.event.EC;
 import org.xnatural.enet.event.EL;
 import org.xnatural.enet.event.EP;
 
+import javax.annotation.Resource;
 import java.lang.reflect.Method;
 import java.lang.reflect.Modifier;
 import java.util.*;
@@ -39,12 +40,14 @@ public class ServerTpl {
     /**
      * 此服务执行器
      */
-    protected Executor            coreExec;
+    @Resource
+    protected Executor            exec;
     /**
      * 1. 当此服务被加入核心时, 此值会自动设置为核心的EP.
      * 2. 如果要服务独立运行时, 请手动设置
      */
-    protected EP                  coreEp;
+    @Resource
+    protected EP                  ep;
     /**
      * 是否正在运行标志
      */
@@ -84,12 +87,12 @@ public class ServerTpl {
         if (ec.result != null) return ec.result; // 已经找到结果了, 就直接返回
 
         Object bean = null;
-        if (beanName != null && beanType != null) {
+        if (isNotEmpty(beanName) && beanType != null) {
             bean = beanCtx.getAttr(beanName);
             if (bean != null && !beanType.isAssignableFrom(bean.getClass())) bean = null;
-        } else if (beanName != null && beanType == null) {
+        } else if (isNotEmpty(beanName) && beanType == null) {
             bean = beanCtx.getAttr(beanName);
-        } else if (beanName == null && beanType != null) {
+        } else if (isEmpty(beanName) && beanType != null) {
             if (beanType.isAssignableFrom(getClass())) bean = this;
             else bean = beanCtx.getValue(beanType);
         }
@@ -104,7 +107,7 @@ public class ServerTpl {
      * @return
      */
     protected <T> T bean(Class<T> type) {
-        return (T) coreEp.fire("bean.get", type);
+        return (T) ep.fire("bean.get", type);
     }
 
 
@@ -212,8 +215,8 @@ public class ServerTpl {
      * 初始化一个内部 {@link Executor}
      */
     protected void initExecutor() {
-        if (coreEp instanceof ExecutorService) {
-            log.warn("close previous executor"); ((ExecutorService) coreEp).shutdown();
+        if (ep instanceof ExecutorService) {
+            log.warn("close previous executor"); ((ExecutorService) ep).shutdown();
         }
         log.info("create private executor for '{}'.", getName());
         ThreadPoolExecutor e = new ThreadPoolExecutor(
@@ -229,7 +232,7 @@ public class ServerTpl {
             }
         );
         e.allowCoreThreadTimeOut(true);
-        coreExec = e;
+        exec = e;
     }
 
 
@@ -271,8 +274,8 @@ public class ServerTpl {
     }
 
 
-    public EP getCoreEp() {
-        return coreEp;
+    public EP getEp() {
+        return ep;
     }
 
 

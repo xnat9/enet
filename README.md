@@ -29,7 +29,9 @@
 ```
 
 ## 简单用例
-可参照模块: enet-test 中的 [Launcher](https://gitee.com/xnat/enet/blob/master/enet-test/src/main/java/org/xnatural/enet/test/Launcher.java) 类
+可参照模块: enet-test
+
+入口: [Launcher](https://gitee.com/xnat/enet/blob/master/enet-test/src/main/java/org/xnatural/enet/test/Launcher.java) 类
 ```
 public class Launcher extends ServerTpl {
 
@@ -37,7 +39,7 @@ public class Launcher extends ServerTpl {
         AppContext app = new AppContext();
         app.addSource(new NettyHttp());
         app.addSource(new NettyResteasy().scan(RestTpl.class));
-        app.addSource(new SwaggerApiDoc());
+        app.addSource(new OpenApiDoc());
         app.addSource(new Hibernate().scanEntity(TestEntity.class).scanRepo(TestRepo.class));
         app.addSource(new Launcher(app));
         // app.addSource(new MongoClient("localhost", 27017));
@@ -171,13 +173,13 @@ public class Launcher extends ServerTpl {
                app.addSource(new NettyResteasy().scan(RestTpl.class));
                app.start();
    
-   ### SwaggerApiDoc: swagger api 文档服务
+   ### OpenApiDoc: open api (swagger v3) 文档服务
         1. swagger.openApi: 事件是为收集rest swagger文档.如果需要把某个rest swagger文档显示就得监听此事件(例: 方法Swagger.openApi)
         2. 添加文档. ep.fire("swagger.addJaxrsDoc", this, "路径前缀", "tag(用于分组)", "描述");
         例:    AppContext app = new AppContext();
                app.addSource(new NettyHttp().setPort(8080));
                app.addSource(new NettyResteasyServer().scan(RestTpl.class));
-               app.addSource(new SwaggerApiDoc());
+               app.addSource(new OpenApiDoc());
                app.start();
                然后访问: http://localhost:8080/api-doc/
 

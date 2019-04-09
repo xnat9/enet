@@ -20,7 +20,7 @@ import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 import java.util.stream.Collectors;
 
-import static org.xnatural.enet.common.Utils.findMethod;
+import static org.xnatural.enet.common.Utils.*;
 
 /**
  * 系统环境
@@ -141,6 +141,11 @@ public class Environment {
         // 配置 logback
         if ("ch.qos.logback.classic.LoggerContext".equals(fa.getClass().getName())) {
             try {
+                // 设置logback 配置文件中的变量
+                System.setProperty("PID", getPid());
+                String logPath = getAttr("log.path");
+                if (isNotEmpty(logPath)) System.setProperty("LOG_PATH", logPath);
+
                 Object o = Class.forName("ch.qos.logback.classic.joran.JoranConfigurator").newInstance();
                 Method m = findMethod(o.getClass(), "setContext", Class.forName("ch.qos.logback.core.Context"));
                 m.invoke(o, fa);

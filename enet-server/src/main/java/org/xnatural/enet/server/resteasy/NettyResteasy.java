@@ -87,10 +87,6 @@ public class NettyResteasy extends ServerTpl {
     }
 
 
-    @EL(name = "sys.started", async = false)
-    protected void init() { autoInject(); }
-
-
     @EL(name = "sys.stopping")
     public void stop() {
         log.debug("Shutdown '{}' Server", getName());
@@ -170,6 +166,7 @@ public class NettyResteasy extends ServerTpl {
     /**
      * 自动注入 {@link javax.annotation.Resource}
      */
+    @EL(name = "sys.started", async = false)
     protected void autoInject() {
         log.debug("auto inject @Resource field");
         sources.forEach(o -> {

@@ -77,7 +77,6 @@ public class Log {
         POST_1_6 = post16;
         LOG_METHOD = logMethod;
         root = of(Logger.ROOT_LOGGER_NAME);
-        System.setProperty("PID", getPid());
         if ("true".equalsIgnoreCase(System.getProperty("enet.initlog", "false"))) init(null);
     }
 
@@ -336,6 +335,9 @@ public class Log {
 
     // ====================log method ==============
     private boolean isEnabled(final Level level) {
+        if (logger == null && !early) {
+            logger = (LocationAwareLogger) LoggerFactory.getLogger(name); name = null;
+        }
         if (level != null) switch (level) {
             case ERROR: return logger.isErrorEnabled();
             case WARN:  return logger.isWarnEnabled();
@@ -348,31 +350,31 @@ public class Log {
 
 
     public boolean isInfoEnabled() {
-        return logger == null ? true: logger.isInfoEnabled();
+        return isEnabled(Level.INFO);
     }
 
 
 
     public boolean isWarnEnabled() {
-        return logger == null ? true: logger.isWarnEnabled();
+        return isEnabled(Level.WARN);
     }
 
 
 
     public boolean isErrorEnabled() {
-        return logger == null ? true: logger.isErrorEnabled();
+        return isEnabled(Level.ERROR);
     }
 
 
 
     public boolean isDebugEnabled() {
-        return logger == null ? false: logger.isDebugEnabled();
+        return isEnabled(Level.DEBUG);
     }
 
 
 
     public boolean isTraceEnabled() {
-        return logger == null ? false: logger.isTraceEnabled();
+        return isEnabled(Level.TRACE);
     }
 
 

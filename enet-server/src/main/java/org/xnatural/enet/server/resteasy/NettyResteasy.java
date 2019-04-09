@@ -298,9 +298,9 @@ public class NettyResteasy extends ServerTpl {
         Object o = clz.newInstance();
         iterateField(clz, f -> {
             try {
-                if (EP.class.isAssignableFrom(f.getType())) {
+                if (EP.class.isAssignableFrom(f.getType()) && f.getAnnotation(Resource.class) != null) {
                     f.setAccessible(true); if (f.get(o) == null) f.set(o, ep);
-                } else if (Executor.class.isAssignableFrom(f.getType())) {
+                } else if (Executor.class.isAssignableFrom(f.getType()) && f.getAnnotation(Resource.class) != null) {
                     f.setAccessible(true); if (f.get(o) == null) f.set(o, exec);
                 }
             } catch (IllegalAccessException e) {

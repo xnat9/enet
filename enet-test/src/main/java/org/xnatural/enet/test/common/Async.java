@@ -1,12 +1,12 @@
-package org.xnatural.enet.server.dao.hibernate;
+package org.xnatural.enet.test.common;
 
 import java.lang.annotation.*;
 
 /**
- * 事务方法注解
+ * 异步方法注解
  */
 @Target({ElementType.METHOD})
 @Retention(RetentionPolicy.RUNTIME)
 @Documented
-public @interface Trans {
+public @interface Async {
 }

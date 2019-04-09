@@ -5,7 +5,6 @@ import com.mongodb.*;
 import com.netflix.appinfo.*;
 import com.netflix.discovery.DefaultEurekaClientConfig;
 import com.netflix.discovery.DiscoveryClient;
-import org.xnatural.enet.common.Utils;
 import org.xnatural.enet.core.AppContext;
 import org.xnatural.enet.event.EL;
 import org.xnatural.enet.server.ServerTpl;
@@ -20,6 +19,7 @@ import org.xnatural.enet.server.sched.SchedServer;
 import org.xnatural.enet.server.session.MemSessionManager;
 import org.xnatural.enet.server.session.RedisSessionManager;
 import org.xnatural.enet.server.swagger.OpenApiDoc;
+import org.xnatural.enet.test.common.Async;
 import org.xnatural.enet.test.dao.entity.TestEntity;
 import org.xnatural.enet.test.dao.repo.TestRepo;
 import org.xnatural.enet.test.rest.RestTpl;
@@ -27,11 +27,16 @@ import org.xnatural.enet.test.service.FileUploader;
 import org.xnatural.enet.test.service.TestService;
 
 import java.lang.reflect.Field;
+import java.lang.reflect.Method;
 import java.util.Arrays;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.ThreadPoolExecutor;
 import java.util.concurrent.TimeUnit;
+import java.util.function.BiFunction;
+import java.util.function.Function;
+import java.util.function.Supplier;
 import java.util.stream.Collectors;
 
 import static com.netflix.appinfo.DataCenterInfo.Name.Netflix;
@@ -80,19 +85,34 @@ public class Launcher extends ServerTpl {
             else if ("redis".equalsIgnoreCase(t)) ctx.addSource(new RedisSessionManager());
         }
 
-        // TestService 事务拦截
-        ctx.addSource(Utils.proxy(TestService.class, (obj, method, args1, proxy) -> {
-            if (method.getAnnotation(Trans.class) == null) return proxy.invokeSuper(obj, args1);
-            else return bean(TransWrapper.class).trans(() -> {
-                try {
-                    return proxy.invokeSuper(obj, args1);
-                } catch (Throwable t) {
-                    log.error(t);
-                }
+        Map<Class, BiFunction<Method, Supplier<Object>, Object>> aopFn = new HashMap<>();
+        aopFn.put(Trans.class, (method, fn) -> { // 事务方法拦截
+            if (method.getAnnotation(Trans.class) != null) {
+                return bean(TransWrapper.class).trans(() -> fn.get());
+            } else return fn.get();
+        });
+        aopFn.put(Async.class, (method, fn) -> { // 异步方法拦截
+            if (method.getAnnotation(Async.class) != null) {
+                exec.execute(() -> fn.get());
                 return null;
+            } else return fn.get();
+        });
+
+        // 多注解拦截
+        Function<Class, Object> wrap = clz -> {
+            return proxy(clz, (obj, method, args, proxy) -> {
+                Supplier fn = () -> {
+                    try { return proxy.invokeSuper(obj, args);
+                    } catch (Throwable t) { log.error(t); }
+                    return null;
+                };
+                return aopFn.get(Async.class).apply(method, () ->
+                    aopFn.get(Trans.class).apply(method, fn)
+                );
             });
-        }));
-        ctx.addSource(new FileUploader());
+        };
+        ctx.addSource(wrap.apply(TestService.class));
+        ctx.addSource(wrap.apply(FileUploader.class));
     }
 
 
@@ -201,7 +221,7 @@ public class Launcher extends ServerTpl {
             f.setAccessible(true);
             ThreadPoolExecutor v = (ThreadPoolExecutor) f.get(ctx);
             if (v instanceof ThreadPoolExecutor) {
-                ep.fire("sched.cron", "31 1/1 * * * ?", (Runnable) () -> monitorExec(v));
+                ep.fire("sched.cron", "0 0/1 * * * ?", (Runnable) () -> monitorExec(v));
             }
         } catch (Exception e) {
             log.error(e);

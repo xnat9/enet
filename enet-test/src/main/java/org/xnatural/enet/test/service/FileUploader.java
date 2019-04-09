@@ -3,6 +3,7 @@ package org.xnatural.enet.test.service;
 import org.apache.commons.io.IOUtils;
 import org.xnatural.enet.event.EL;
 import org.xnatural.enet.server.ServerTpl;
+import org.xnatural.enet.test.common.Async;
 import org.xnatural.enet.test.rest.FileData;
 
 import java.io.File;
@@ -90,6 +91,15 @@ public class FileUploader extends ServerTpl {
      */
     public File findFile(String fileName) {
         return new File(localDir + File.separator + fileName);
+    }
+
+
+    @Async
+    @EL(name = "deleteFile")
+    public void delete(String fileName) {
+        File f = new File(localDir + File.separator + fileName);
+        if (f.exists()) f.delete();
+        else log.warn("delete file '{}' not exists", fileName);
     }
 
 

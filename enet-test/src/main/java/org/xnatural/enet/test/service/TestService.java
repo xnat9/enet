@@ -1,8 +1,8 @@
 package org.xnatural.enet.test.service;
 
 import org.xnatural.enet.server.ServerTpl;
-import org.xnatural.enet.server.dao.hibernate.Page;
 import org.xnatural.enet.server.dao.hibernate.Trans;
+import org.xnatural.enet.test.common.Async;
 import org.xnatural.enet.test.dao.entity.TestEntity;
 import org.xnatural.enet.test.dao.entity.UploadFile;
 import org.xnatural.enet.test.dao.repo.TestRepo;
@@ -34,6 +34,7 @@ public class TestService extends ServerTpl {
     }
 
 
+    @Async
     @Trans
     public void save(AddFileDto dto) {
         UploadFile e = new UploadFile();

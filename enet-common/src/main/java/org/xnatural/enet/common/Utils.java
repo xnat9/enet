@@ -379,12 +379,12 @@ public class Utils {
      * @param mi
      * @return
      */
-    public static Object proxy(Class clz, MethodInterceptor mi) {
+    public static <T> T proxy(Class<T> clz, MethodInterceptor mi) {
         if (mi == null) return null;
         Enhancer en = new Enhancer();
         en.setSuperclass(clz);
         en.setCallback(mi);
-        return en.create();
+        return (T) en.create();
     }
 
 

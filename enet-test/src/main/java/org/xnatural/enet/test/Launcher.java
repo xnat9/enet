@@ -88,29 +88,28 @@ public class Launcher extends ServerTpl {
         Map<Class, BiFunction<Method, Supplier<Object>, Object>> aopFn = new HashMap<>();
         aopFn.put(Trans.class, (method, fn) -> { // 事务方法拦截
             if (method.getAnnotation(Trans.class) != null) {
-                return bean(TransWrapper.class).trans(() -> fn.get());
+                return bean(TransWrapper.class).trans(fn);
             } else return fn.get();
         });
         aopFn.put(Async.class, (method, fn) -> { // 异步方法拦截
             if (method.getAnnotation(Async.class) != null) {
-                exec.execute(() -> fn.get());
-                return null;
+                exec.execute(fn::get); return null;
             } else return fn.get();
         });
 
         // 多注解拦截
-        Function<Class, Object> wrap = clz -> {
+        Function<Class<?>, ?> wrap = clz -> {
             return proxy(clz, (obj, method, args, proxy) -> {
                 Supplier fn = () -> {
-                    try { return proxy.invokeSuper(obj, args);
-                    } catch (Throwable t) { log.error(t); }
-                    return null;
+                    try { return proxy.invokeSuper(obj, args); }
+                    catch (Throwable t) { throw new RuntimeException(t); }
                 };
                 return aopFn.get(Async.class).apply(method, () ->
                     aopFn.get(Trans.class).apply(method, fn)
                 );
             });
         };
+
         ctx.addSource(wrap.apply(TestService.class));
         ctx.addSource(wrap.apply(FileUploader.class));
     }

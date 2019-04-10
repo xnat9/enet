@@ -1,5 +1,6 @@
 package org.xnatural.enet.server.dao.hibernate;
 
+import org.hibernate.HibernateException;
 import org.hibernate.SessionFactory;
 import org.hibernate.jpa.HibernatePersistenceProvider;
 import org.xnatural.enet.common.Utils;
@@ -255,13 +256,12 @@ public class Hibernate extends ServerTpl {
                 Object inst = Utils.proxy(clz, (obj, method, args, proxy) -> {
                     if (method.getAnnotation(Trans.class) == null) return proxy.invoke(originObj, args);
                     else return tm.trans(() -> {
-                        try { return proxy.invoke(originObj, args); } catch (Throwable t) { log.error(t); }
-                        return null;
+                        try { return proxy.invoke(originObj, args); } catch (Throwable t) { throw new HibernateException(t); }
                     });
                 });
                 ep.addListenerSource(inst);
-                log.debug("add hibernate repo object: {}", inst);
                 exposeBean(inst, clz.getSimpleName()); // 暴露所有Repo出去
+                log.debug("add hibernate repo object: {}", inst);
             });
         }
     }

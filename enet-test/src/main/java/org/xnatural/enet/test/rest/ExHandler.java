@@ -18,10 +18,10 @@ public class ExHandler implements ExceptionMapper<Throwable> {
     public Response toResponse(Throwable ex) {
         ApiResp r = new ApiResp();
         String errorId = UUID.randomUUID().toString();
-        log.error(ex, "errorId: " + errorId);
+        log.error((ex.getCause() == null ? ex : ex.getCause()), "errorId: " + errorId);
         r.setErrorId(errorId);
         if (ex.getMessage() == null) r.setErrorMsg(ex.getClass().getSimpleName());
-        else r.setErrorMsg(ex.getMessage());
+        else r.setErrorMsg(ex.getCause() == null ? ex.getMessage() : ex.getCause().getMessage());
         return Response.ok(r).build();
     }
 }

@@ -42,15 +42,12 @@ public class Launcher extends ServerTpl {
         app.addSource(new OpenApiDoc());
         app.addSource(new Hibernate().scanEntity(TestEntity.class).scanRepo(TestRepo.class));
         app.addSource(new Launcher(app));
-        // app.addSource(new MongoClient("localhost", 27017));
         // TODO 添加其它服务()
         app.start(); // 并发启动各模块服务
     }
 
+    @Resource
     AppContext ctx;
-    public Launcher(AppContext ctx) {
-        setName("launcher"); this.ctx = ctx;
-    }
 
     // 环境配置完成后执行
     @EL(name = "env.configured", async = false)
@@ -72,9 +69,7 @@ public class Launcher extends ServerTpl {
 
 ### [事件驱动](https://gitee.com/xnat/enet/wikis/%E4%BA%8B%E4%BB%B6%E9%A9%B1%E5%8A%A8?sort_id=1409719)
 
-### [事件说明](https://gitee.com/xnat/enet/wikis/%E4%BA%8B%E4%BB%B6%E8%AF%B4%E6%98%8E?sort_id=1409714)
-
-### [enet-server提供的模块说明](https://gitee.com/xnat/enet/wikis/enet-server%E6%8F%90%E4%BE%9B%E7%9A%84%E6%A8%A1%E5%9D%97%E8%AF%B4%E6%98%8E?sort_id=1409722)
+### [模块说明](https://gitee.com/xnat/enet/wikis/enet-server%E6%8F%90%E4%BE%9B%E7%9A%84%E6%A8%A1%E5%9D%97%E8%AF%B4%E6%98%8E?sort_id=1409722)
 
 ### [eureka 注册例子](https://gitee.com/xnat/enet/wikis/eureka%E6%B3%A8%E5%86%8C?sort_id=1400954)
 

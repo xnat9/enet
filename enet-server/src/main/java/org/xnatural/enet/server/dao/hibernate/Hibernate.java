@@ -23,7 +23,6 @@ import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
 import java.util.Properties;
-import java.util.concurrent.Executor;
 import java.util.concurrent.ExecutorService;
 
 import static javax.persistence.SharedCacheMode.UNSPECIFIED;
@@ -87,8 +86,8 @@ public class Hibernate extends ServerTpl {
         }
 
         sf = (SessionFactory) new HibernatePersistenceProvider().createContainerEntityManagerFactory(createPersistenceUnit(), attrs);
-        exposeBean(sf, "entityManagerFactory", "sessionFactory");
-        tm = new TransWrapper(sf); exposeBean(tm, "transManager");
+        exposeBean(sf);
+        tm = new TransWrapper(); exposeBean(tm); ep.fire("inject", tm);
         repoCollect();
         log.info("Started {}(Hibernate) Server", getName());
         ep.fire(getName() + ".started");
@@ -231,26 +230,11 @@ public class Hibernate extends ServerTpl {
                 Object originObj;
                 try { originObj = clz.newInstance(); } catch (Exception e) { log.error(e); return; }
 
-                iterateField(clz, f -> {
-                    try {
-                        if (Hibernate.class.isAssignableFrom(f.getType())) {
-                            f.setAccessible(true); f.set(originObj, this);
-                        } else if (EP.class.isAssignableFrom(f.getType())) {
-                            f.setAccessible(true); if (f.get(originObj) == null) f.set(originObj, getEp());
-                        } else if (Executor.class.isAssignableFrom(f.getType())) {
-                            f.setAccessible(true); if (f.get(originObj) == null) f.set(originObj, exec);
-                        } else if (EntityManagerFactory.class.isAssignableFrom(f.getType()) || SessionFactory.class.isAssignableFrom(f.getType())) {
-                            f.setAccessible(true); f.set(originObj, sf);
-                        } else if (TransWrapper.class.isAssignableFrom(f.getType())) {
-                            f.setAccessible(true); f.set(originObj, tm);
-                        }
-                    } catch (Exception ex) {
-                        log.error(ex);
-                    }
-                });
+                ep.fire("inject", originObj); //注入@Resource注解的字段
 
                 // invoke init method
-                invoke(findMethod(clz, m -> m.getAnnotation(PostConstruct.class) != null), originObj);
+                Method mm = findMethod(clz, m -> m.getAnnotation(PostConstruct.class) != null);
+                if (mm != null) invoke(mm, originObj);
 
                 // 增强 repo 对象
                 Object inst = Utils.proxy(clz, (obj, method, args, proxy) -> {

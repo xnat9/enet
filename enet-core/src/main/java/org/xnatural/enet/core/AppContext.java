@@ -9,10 +9,12 @@ import org.xnatural.enet.event.EP;
 
 import javax.annotation.Resource;
 import java.lang.management.ManagementFactory;
-import java.lang.reflect.Field;
 import java.lang.reflect.Method;
 import java.lang.reflect.Modifier;
-import java.util.*;
+import java.util.Date;
+import java.util.HashMap;
+import java.util.Map;
+import java.util.TreeSet;
 import java.util.concurrent.*;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.function.Consumer;
@@ -62,7 +64,7 @@ public class AppContext {
         if (exec == null) initExecutor();
         // 1. 初始化事件发布器
         ep = initEp(); ep.addListenerSource(this);
-        sourceMap.forEach((k, v) -> { setForSource(v); ep.addListenerSource(v); });
+        sourceMap.forEach((k, v) -> { inject(v); ep.addListenerSource(v); });
         // 2. 设置系统环境
         env = new Environment(); env.setEp(ep); env.loadCfg();
         // 3. 通知所有服务启动
@@ -101,10 +103,12 @@ public class AppContext {
     public void addSource(Object source) {
         if (source == null) return;
         if (source instanceof Class) return;
-        Method m = findMethod(source.getClass(), "getName");
+        Method m = findMethod(source.getClass(), mm -> Modifier.isPublic(mm.getModifiers()) && "getName".equals(mm.getName()) && mm.getParameterCount() == 0 && String.class.equals(mm.getReturnType()));
         String name;
-        if (m == null) { name = getClass().getName() + "@" + Integer.toHexString(source.hashCode()); }
-        else name = (String) invoke(m, source);
+        if (m == null) {
+            name = getClass().getSimpleName().replace("$$EnhancerByCGLIB$$", "@");
+            name = name.substring(0, 1).toLowerCase() + name.substring(1);
+        } else name = (String) invoke(m, source);
         if (Utils.isEmpty(name)) { log.warn("Get name property is empty from '{}'", source); return; }
         if ("sys".equalsIgnoreCase(name) || "env".equalsIgnoreCase(name) || "log".equalsIgnoreCase(name)) {
             log.warn("name property cannot equal 'sys', 'env' or 'log' . source: {}", source); return;
@@ -113,29 +117,44 @@ public class AppContext {
             log.warn("name property '{}' already exist in source: {}", name, sourceMap.get(name)); return;
         }
         sourceMap.put(name, source);
-        if (ep != null) { setForSource(source); ep.addListenerSource(source); }
+        if (ep != null) { inject(source); ep.addListenerSource(source); }
     }
 
 
     /**
-     * 初始化. 自动注入 {@link javax.annotation.Resource}
+     * 初始化. 自动为所有对象源注入
      */
     protected void autoInject() {
         log.debug("auto inject @Resource field");
-        sourceMap.forEach((s, o) -> {
-            iterateField(o.getClass(), f -> {
-                Resource r = f.getAnnotation(Resource.class);
-                if (r == null) return;
-                f.setAccessible(true);
-                try {
-                    Object v = f.get(o);
-                    if (v != null) return; // 已经存在值则不需要再注入
-                    v = ep.fire("bean.get", f.getType(), r.name());
-                    if (v == null) return;
-                    f.set(o, v);
-                    log.trace("inject @Resource field '{}' for source object '{}'", f.getName(), o);
-                } catch (IllegalAccessException e) { log.error(e); }
-            });
+        sourceMap.forEach((s, o) -> inject(o));
+    }
+
+
+    /**
+     * 为bean对象中的{@link javax.annotation.Resource}注解字段注入对应的bean对象
+     * @param o
+     */
+    @EL(name = "inject", async = false)
+    protected void inject(Object o) {
+        iterateField(o.getClass(), f -> {
+            Resource r = f.getAnnotation(Resource.class);
+            if (r == null) return;
+            f.setAccessible(true);
+            try {
+                Object v = f.get(o);
+                if (v != null) return; // 已经存在值则不需要再注入
+
+                // 取值
+                if (EP.class.isAssignableFrom(f.getType())) v = wrapEpForSource(o);
+                else if (Executor.class.isAssignableFrom(f.getType())) v = wrapExecForSource(o);
+                else if (Environment.class.isAssignableFrom(f.getType())) v = env;
+                else if (AppContext.class.isAssignableFrom(f.getType())) v = this;
+                else v = ep.fire("bean.get", EC.of(this).sync().args(f.getType(), r.name())); // 全局获取bean对象
+
+                if (v == null) return;
+                f.set(o, v);
+                log.trace("inject @Resource field '{}' for object '{}'", f.getName(), o);
+            } catch (Exception e) { log.error(e); }
         });
     }
 
@@ -158,12 +177,9 @@ public class AppContext {
         } else if (isNotEmpty(beanName) && beanType == null) {
             bean = sourceMap.get(beanName);
         } else if (isEmpty(beanName) && beanType != null) {
-            if (beanType.isAssignableFrom(getClass())) bean = this;
-            else {
-                for (Map.Entry<String, Object> entry : sourceMap.entrySet()) {
-                    if (beanType.isAssignableFrom(entry.getValue().getClass())) {
-                        bean = entry.getValue(); break;
-                    }
+            for (Map.Entry<String, Object> entry : sourceMap.entrySet()) {
+                if (beanType.isAssignableFrom(entry.getValue().getClass())) {
+                    bean = entry.getValue(); break;
                 }
             }
         }
@@ -266,49 +282,6 @@ public class AppContext {
         Map<String, Object> info = new HashMap<>();
         info.put("modules", new TreeSet<>(sourceMap.keySet()));
         return info;
-    }
-
-
-    /**
-     * 为source 设置 coreEp.
-     * 为source 设置 coreExec.
-     * @param s
-     */
-    protected void setForSource(Object s) {
-        List<Field> epFs = new LinkedList<>();
-        List<Field> execFs = new LinkedList<>();
-        iterateField(s.getClass(), f -> {
-            if (Modifier.isFinal(f.getModifiers())) return;
-            if (f.getAnnotation(Resource.class) == null) return;
-            if (EP.class.isAssignableFrom(f.getType())) epFs.add(f);
-            else if (Executor.class.isAssignableFrom(f.getType())) execFs.add(f);
-        });
-
-        // 1. 为source设置公用 EP
-        EP ep = wrapEpForSource(s); // 为了安全
-        try {
-            if (epFs.size() > 1) {
-                log.warn("inject multiple same EP for same object source '{}'", s);
-            }
-            for (Field f : epFs) {
-                f.setAccessible(true); f.set(s, ep);
-            }
-        } catch (Exception ex) {
-            log.error(ex);
-        }
-
-        // 2. 为source 设置公用 Executor
-        Executor exec = wrapExecForSource(s);
-        try {
-            if (epFs.size() > 1) {
-                log.warn("inject multiple same Executor for same object source '{}'", s);
-            }
-            for (Field f : execFs) {
-                f.setAccessible(true); f.set(s, exec);
-            }
-        } catch (Exception ex) {
-            log.error(ex);
-        }
     }
 
 

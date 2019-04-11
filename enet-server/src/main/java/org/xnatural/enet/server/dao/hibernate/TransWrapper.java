@@ -4,22 +4,19 @@ import org.hibernate.Session;
 import org.hibernate.SessionFactory;
 import org.hibernate.Transaction;
 import org.xnatural.enet.common.Log;
+import org.xnatural.enet.server.ServerTpl;
 
+import javax.annotation.Resource;
 import java.util.function.Consumer;
 import java.util.function.Supplier;
 
 /**
  * 事务包装器
  */
-public class TransWrapper {
+public class TransWrapper extends ServerTpl {
     protected Log            log = Log.of(getClass());
+    @Resource
     protected SessionFactory sf;
-
-
-    public TransWrapper(SessionFactory sf) {
-        this.sf = sf;
-    }
-
 
     public void trans(Runnable fn) {
         trans(fn, null);

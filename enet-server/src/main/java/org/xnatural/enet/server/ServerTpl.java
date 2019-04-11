@@ -60,24 +60,6 @@ public class ServerTpl {
 
 
     /**
-     * Server start
-     */
-//    @EL(name = "sys.starting")
-//    public void start() {
-//        if (!running.compareAndSet(false, true)) {
-//            log.warn("{} Server is running", getName()); return;
-//        }
-//        if (coreExec == null) initExecutor();
-//        if (coreEp == null) coreEp = new EP(coreExec);
-//        coreEp.fire(getName() + ".starting");
-//        // 先从核心取配置, 然后再启动
-//        attrs.putAll((Map) coreEp.fire("env.ns", getName()));
-//        coreEp.fire(getName() + ".started");
-//        log.info("Started {} Server", getName());
-//    }
-
-
-    /**
      * bean 容器. {@link #findLocalBean}
      */
     protected Context beanCtx;

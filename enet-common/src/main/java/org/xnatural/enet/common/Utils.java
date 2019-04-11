@@ -234,11 +234,8 @@ public class Utils {
      * @return
      */
     public static String getHostname() {
-        try {
-            return InetAddress.getLocalHost().getHostName();
-        } catch (UnknownHostException e) {
-            return "";
-        }
+        try { return InetAddress.getLocalHost().getHostName(); }
+        catch (UnknownHostException e) { return ""; }
     }
 
 
@@ -366,9 +363,8 @@ public class Utils {
      * @return
      */
     public static Object invoke(Method m, Object target, Object...args) {
-        try {
-            m.setAccessible(true); return m.invoke(target, args);
-        } catch (Exception e) {}
+        try { m.setAccessible(true); return m.invoke(target, args); }
+        catch (Exception e) { log.error(e); }
         return null;
     }
 

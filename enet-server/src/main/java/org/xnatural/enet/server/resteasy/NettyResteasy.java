@@ -14,17 +14,16 @@ import org.xnatural.enet.event.EP;
 import org.xnatural.enet.server.ServerTpl;
 
 import javax.annotation.PostConstruct;
-import javax.annotation.Resource;
 import javax.ws.rs.Path;
 import javax.ws.rs.core.Cookie;
 import javax.ws.rs.core.NewCookie;
 import javax.ws.rs.ext.Provider;
 import java.io.IOException;
+import java.lang.reflect.Method;
 import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
-import java.util.concurrent.Executor;
 import java.util.concurrent.TimeUnit;
 
 import static org.jboss.resteasy.plugins.server.netty.RestEasyHttpRequestDecoder.Protocol.HTTP;
@@ -169,21 +168,7 @@ public class NettyResteasy extends ServerTpl {
     @EL(name = "sys.started", async = false)
     protected void autoInject() {
         log.debug("auto inject @Resource field");
-        sources.forEach(o -> {
-            iterateField(o.getClass(), f -> {
-                Resource r = f.getAnnotation(Resource.class);
-                if (r == null) return;
-                f.setAccessible(true);
-                try {
-                    Object v = f.get(o);
-                    if (v != null) return; // 已经存在值则不需要再注入
-                    v = ep.fire("bean.get", f.getType(), r.name());
-                    if (v == null) return;
-                    f.set(o, v);
-                    log.trace("inject @Resource field '{}' for source object '{}'", f.getName(), o);
-                } catch (IllegalAccessException e) { log.error(e); }
-            });
-        });
+        sources.forEach(o -> ep.fire("inject", o));
     }
 
 
@@ -296,20 +281,12 @@ public class NettyResteasy extends ServerTpl {
      */
     protected Object createAndInitSource(Class clz) throws Exception {
         Object o = clz.newInstance();
-        iterateField(clz, f -> {
-            try {
-                if (EP.class.isAssignableFrom(f.getType()) && f.getAnnotation(Resource.class) != null) {
-                    f.setAccessible(true); if (f.get(o) == null) f.set(o, ep);
-                } else if (Executor.class.isAssignableFrom(f.getType()) && f.getAnnotation(Resource.class) != null) {
-                    f.setAccessible(true); if (f.get(o) == null) f.set(o, exec);
-                }
-            } catch (IllegalAccessException e) {
-                log.error(e);
-            }
-        });
+
+        ep.fire("inject", o); //注入@Resource注解的字段
 
         // 调用 PostConstruct 方法
-        invoke(findMethod(clz, m -> m.getAnnotation(PostConstruct.class) != null), o);
+        Method m = findMethod(clz, mm -> mm.getAnnotation(PostConstruct.class) != null);
+        if (m != null) invoke(m, o);
 
         return o;
     }

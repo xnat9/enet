@@ -2,9 +2,11 @@ package org.xnatural.enet.event;
 
 
 import org.xnatural.enet.common.Log;
+import org.xnatural.enet.common.Utils;
 
 import java.lang.reflect.Array;
 import java.lang.reflect.Method;
+import java.lang.reflect.Modifier;
 import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.Executor;
@@ -239,39 +241,30 @@ public class EP {
      */
     protected void resolve(final Object source) {
         if (source == null) return;
-        Class<? extends Object> c = source.getClass();
-        do {
-            try {
-                for (Method m : c.getDeclaredMethods()) {
-                    EL el = m.getDeclaredAnnotation(EL.class);
-                    if (el == null) continue;
-                    for (String n : el.name()) {
-                        Listener listener = new Listener();
-                        listener.async = el.async(); listener.source = source; listener.order = el.order();
-                        listener.m = m; m.setAccessible(true); listener.name = parseName(n, source);
-                        if (listener.name == null) continue;
+        Utils.iterateMethod(source.getClass(), m -> { // 查找包含@EL注解的方法
+            EL el = m.getDeclaredAnnotation(EL.class);
+            if (el == null) return;
+            for (String n : el.name()) {
+                Listener listener = new Listener();
+                listener.async = el.async(); listener.source = source; listener.order = el.order();
+                listener.m = m; m.setAccessible(true); listener.name = parseName(n, source);
+                if (listener.name == null) continue;
 
-                        List<Listener> ls = lsMap.computeIfAbsent(listener.name, s -> new LinkedList<>());
-                        // 同一个对象源中, 不能有相同的事件监听名. 忽略
-                        if (ls.stream().anyMatch(l -> l.source == source && Objects.equals(l.name, listener.name))) {
-                            log.warn("Exist listener. name: {}, source: {}", n, listener.source);
-                            continue;
-                        }
-                        // 同一个对象源中, 不同的监听, 方法名不能相同.
-                        if (ls.stream().anyMatch(l -> l.source == source && Objects.equals(l.m.getName(), listener.m.getName()))) {
-                            log.warn("Same source same method name only one listener. source: {}, methodName: {}", source, m.getName());
-                            continue;
-                        }
-                        log.debug("add listener [name: {}, source: {}, method: {}, async: {}, order: {}]", listener.name, source, m.getName(), listener.async, listener.order);
-                        ls.add(listener); ls.sort(Comparator.comparing(o -> o.order));
-                    }
+                List<Listener> ls = lsMap.computeIfAbsent(listener.name, s -> new LinkedList<>());
+                // 同一个对象源中, 不能有相同的事件监听名. 忽略
+                if (ls.stream().anyMatch(l -> l.source == source && Objects.equals(l.name, listener.name))) {
+                    log.warn("Exist listener. name: {}, source: {}", n, listener.source);
+                    continue;
                 }
-            } catch (Exception ex) {
-                log.error(ex);
-            } finally {
-                c = c.getSuperclass();
+                // 同一个对象源中, 不同的监听, 方法名不能相同.
+                if (ls.stream().anyMatch(l -> l.source == source && Objects.equals(l.m.getName(), listener.m.getName()))) {
+                    log.warn("Same source same method name only one listener. source: {}, methodName: {}", source, m.getName());
+                    continue;
+                }
+                log.debug("add listener [name: {}, source: {}, method: {}, async: {}, order: {}]", listener.name, source, m.getName(), listener.async, listener.order);
+                ls.add(listener); ls.sort(Comparator.comparing(o -> o.order));
             }
-        } while (c != null);
+        });
     }
 
 
@@ -283,29 +276,26 @@ public class EP {
      * @return
      */
     protected String parseName(String name, Object source) {
-        Matcher ma = p.matcher(name);
-        if (!ma.find()) return name;
-        String attr = ma.group("attr");
-        String getName = "get" + (attr.substring(0, 1).toUpperCase() + attr.substring(1));
-        Class<? extends Object> c = source.getClass();
-        do {
-            try {
-                Method m = c.getDeclaredMethod(getName);
-                if (m == null) break;
-                Object v = m.invoke(source);
-                if (v == null || v.toString().isEmpty()) {
-                    log.warn("Parse event name '{}' error. Get property '{}' is empty from '{}'.", name, attr, source);
-                    return null;
-                }
-                return ma.replaceAll(v.toString());
-            } catch (NoSuchMethodException ex) {
-            } catch (Exception ex) {
-                log.warn(ex, "Parse event name '{}' error. source: {}", name, source);
-                break;
-            } finally {
-                c = c.getSuperclass();
+        Matcher matcher = p.matcher(name);
+        if (!matcher.find()) return name;
+        String attr = matcher.group("attr");
+        // 查找属性对应的get方法
+        Method m = Utils.findMethod(source.getClass(), mm -> {
+            if (Modifier.isPublic(mm.getModifiers()) &&
+                mm.getParameterCount() == 0 && // 参数个数为0
+                String.class.equals(mm.getReturnType()) && // 返回String类型
+                ("get" + (attr.substring(0, 1).toUpperCase() + attr.substring(1))).equals(mm.getName()) // get方法名相同
+            ) return true;
+            return false;
+        });
+        if (m != null) {
+            Object v = Utils.invoke(m, source);
+            if (v == null || v.toString().isEmpty()) {
+                log.warn("Parse event name '{}' error. Get property '{}' is empty from '{}'.", name, attr, source);
+                return null;
             }
-        } while (c != null);
+            return matcher.replaceAll(v.toString());
+        }
         log.warn("Parse event name '{}'. Not found property '{}' from {} ", name, attr, source);
         return null;
     }
@@ -335,7 +325,7 @@ public class EP {
          */
         protected boolean async;
 
-
+        // 调用此监听器
         protected void invoke(EC ec) {
             try {
                 if (fn != null) fn.run();
@@ -345,7 +335,7 @@ public class EP {
                     else if (m.getParameterCount() == 1) { // 1个参数的情况
                         Class<?> t = m.getParameterTypes()[0];
                         if (EC.class.isAssignableFrom(t)) r = m.invoke(source, ec);
-                        else if (t.isArray()) { // 如果是数组得转下类型
+                        else if (t.isArray()) { // 如果是数组需要转下类型
                             Object arr = Array.newInstance(t.getComponentType(), ec.args.length);
                             for (int i = 0; i < ec.args.length; i++) {
                                 Array.set(arr, i, t.getComponentType().cast(ec.args[i]));

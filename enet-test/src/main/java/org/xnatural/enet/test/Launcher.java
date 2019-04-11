@@ -26,6 +26,7 @@ import org.xnatural.enet.test.rest.RestTpl;
 import org.xnatural.enet.test.service.FileUploader;
 import org.xnatural.enet.test.service.TestService;
 
+import javax.annotation.Resource;
 import java.lang.reflect.Field;
 import java.lang.reflect.Method;
 import java.util.Arrays;
@@ -60,17 +61,13 @@ public class Launcher extends ServerTpl {
         // app.addSource(new RedisServer());
         // app.addSource(new XMemcached());
         // app.addSource(new MongoClient("localhost", 27017));
-        app.addSource(new Launcher(app));
+        app.addSource(new Launcher());
         app.start();
     }
 
 
+    @Resource
     AppContext ctx;
-
-    public Launcher(AppContext ctx) {
-        setName("launcher");
-        this.ctx = ctx;
-    }
 
 
     /**
@@ -220,7 +217,7 @@ public class Launcher extends ServerTpl {
             f.setAccessible(true);
             ThreadPoolExecutor v = (ThreadPoolExecutor) f.get(ctx);
             if (v instanceof ThreadPoolExecutor) {
-                ep.fire("sched.cron", "0 0/1 * * * ?", (Runnable) () -> monitorExec(v));
+                ep.fire("sched.cron", "0 0/2 * * * ?", (Runnable) () -> monitorExec(v));
             }
         } catch (Exception e) {
             log.error(e);

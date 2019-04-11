@@ -7,6 +7,7 @@ import org.hibernate.persister.entity.AbstractEntityPersister;
 import org.xnatural.enet.common.Log;
 
 import javax.annotation.PostConstruct;
+import javax.annotation.Resource;
 import javax.persistence.NoResultException;
 import javax.persistence.Query;
 import javax.persistence.criteria.CriteriaBuilder;
@@ -22,8 +23,11 @@ import java.util.Objects;
 
 public class BaseRepo<T extends IEntity, ID extends Serializable> {
     protected Log            log = Log.of(getClass());
+    @Resource
     protected SessionFactory sf;
+    @Resource
     protected Hibernate      hs;
+    @Resource
     protected TransWrapper   tm;
     protected Class<T>       entityType;
     protected Class<ID>      idType;

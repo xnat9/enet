@@ -39,9 +39,7 @@ public class FileUploader extends ServerTpl {
     private URI    urlPrefix;
 
 
-    public FileUploader() {
-        setName("file-uploader");
-    }
+    public FileUploader() { super("file-uploader"); }
 
 
     @EL(name = "sys.starting")

@@ -9,15 +9,18 @@ import redis.clients.jedis.JedisPoolConfig;
 import redis.clients.jedis.Protocol;
 
 import java.util.Map;
+import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.function.Function;
 
 /**
  * redis
  */
 public class RedisServer extends ServerTpl {
-    protected JedisPool pool;
+    protected final AtomicBoolean running = new AtomicBoolean(false);
+    protected       JedisPool     pool;
 
-    public RedisServer() { setName("redis"); }
+    public RedisServer() { super("redis"); }
+    public RedisServer(String name) { super(name); }
 
 
     @EL(name = "sys.starting")
@@ -25,8 +28,7 @@ public class RedisServer extends ServerTpl {
         if (!running.compareAndSet(false, true)) {
             log.warn("{} Server is running", getName()); return;
         }
-        if (exec == null) initExecutor();
-        if (ep == null) ep = new EP(exec);
+        if (ep == null) ep = new EP();
         ep.fire(getName() + ".starting");
         attrs.putAll((Map) ep.fire("env.ns", "cache", getName()));
 

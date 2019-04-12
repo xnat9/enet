@@ -9,7 +9,7 @@
  * 高效: 事件网络到各个模块异步执行任务充分利用线程资源
     ### 系统运行上下文 AppContext
         1. 环境系统(Environment). 为系统本身和各模块提供环境配置
-        2. 事件中心(EP). 包含事件的注册(addListenerSource),发布(doPublish),执行(invoke)
+        2. 事件中心(EP).
         3. 执行器(线程池). 系统的所有执行最终会扔到这个线程池
         4. 模块管理
 
@@ -37,11 +37,15 @@ public class Launcher extends ServerTpl {
 
     public static void main(String[] args) {
         AppContext app = new AppContext();
+        // http
         app.addSource(new NettyHttp());
+        // mvc
         app.addSource(new NettyResteasy().scan(RestTpl.class));
+        // rest 接口文档
         app.addSource(new OpenApiDoc());
+        // dao层hibernate
         app.addSource(new Hibernate().scanEntity(TestEntity.class).scanRepo(TestRepo.class));
-        app.addSource(new Launcher(app));
+        app.addSource(new Launcher());
         // TODO 添加其它服务()
         app.start(); // 并发启动各模块服务
     }
@@ -52,9 +56,9 @@ public class Launcher extends ServerTpl {
     // 环境配置完成后执行
     @EL(name = "env.configured", async = false)
     private void envConfigured() {
-        if (ctx.env().getBoolean("session.enabled", true)) {
+        if (Utils.toBoolean(ep.fire("session.isEnabled"), false)) {
             String t = ctx.env().getString("session.type", "memory");
-            // 根据配置来启动用什么session管理
+            // 根据配置来添加session管理功能
             if ("memory".equalsIgnoreCase(t)) ctx.addSource(new MemSessionManager());
             else if ("redis".equalsIgnoreCase(t)) ctx.addSource(new RedisSessionManager());
         }

@@ -11,6 +11,7 @@ import org.xnatural.enet.server.ServerTpl;
 
 import java.time.Duration;
 import java.util.Map;
+import java.util.concurrent.atomic.AtomicBoolean;
 
 import static org.ehcache.config.builders.CacheConfigurationBuilder.newCacheConfigurationBuilder;
 import static org.ehcache.config.builders.ResourcePoolsBuilder.newResourcePoolsBuilder;
@@ -21,13 +22,14 @@ import static org.ehcache.config.units.MemoryUnit.MB;
  * 提供 ehcache 服务
  */
 public class EhcacheServer extends ServerTpl {
-
-    protected CacheManager cm;
+    protected final AtomicBoolean running = new AtomicBoolean(false);
+    protected       CacheManager  cm;
 
 
     public EhcacheServer() {
-        setName("ehcache");
+        super("ehcache");
     }
+    public EhcacheServer(String name) { super(name); }
 
 
     @EL(name = "sys.starting")
@@ -35,8 +37,7 @@ public class EhcacheServer extends ServerTpl {
         if (!running.compareAndSet(false, true)) {
             log.warn("{} Server is running", getName()); return;
         }
-        if (exec == null) initExecutor();
-        if (ep == null) ep = new EP(exec);
+        if (ep == null) ep = new EP();
         ep.fire(getName() + ".starting");
         attrs.putAll((Map) ep.fire("env.ns", "cache", getName()));
 

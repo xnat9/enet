@@ -14,6 +14,7 @@ import org.xnatural.enet.event.EP;
 import org.xnatural.enet.server.ServerTpl;
 
 import javax.annotation.PostConstruct;
+import javax.annotation.Resource;
 import javax.ws.rs.Path;
 import javax.ws.rs.core.Cookie;
 import javax.ws.rs.core.NewCookie;
@@ -24,7 +25,9 @@ import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
+import java.util.concurrent.Executor;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicBoolean;
 
 import static org.jboss.resteasy.plugins.server.netty.RestEasyHttpRequestDecoder.Protocol.HTTP;
 import static org.jboss.resteasy.util.FindAnnotation.findAnnotation;
@@ -34,31 +37,35 @@ import static org.xnatural.enet.common.Utils.*;
  * netty4 和 resteasy 结合
  */
 public class NettyResteasy extends ServerTpl {
+    protected final AtomicBoolean      running    = new AtomicBoolean(false);
+    @Resource
+    protected       Executor           exec;
     /**
      * 根 path 前缀
      */
-    protected String             rootPath;
+    protected       String             rootPath;
     /**
      * 表示 session 的 cookie 名字
      */
-    protected String             sessionCookieName;
+    protected       String             sessionCookieName;
     /**
      * session 是否可用
      */
-    protected boolean            enableSession;
+    protected       boolean            enableSession;
     /**
      * see: {@link #collect()}
      */
-    protected List<Class>        scan       = new LinkedList<>();
-    protected ResteasyDeployment deployment = new ResteasyDeployment();
-    protected RequestDispatcher  dispatcher;
+    protected       List<Class>        scan       = new LinkedList<>();
+    protected       ResteasyDeployment deployment = new ResteasyDeployment();
+    protected       RequestDispatcher  dispatcher;
     /**
      * 关联的所有
      */
-    protected List<Object>    sources = new LinkedList<>();
+    protected       List<Object>       sources    = new LinkedList<>();
 
 
-    public NettyResteasy() { setName("resteasy"); }
+    public NettyResteasy() { super("resteasy"); }
+    public NettyResteasy(String name) { super(name); }
 
 
     @EL(name = "sys.starting")
@@ -66,11 +73,10 @@ public class NettyResteasy extends ServerTpl {
         if (!running.compareAndSet(false, true)) {
             log.warn("{} Server is running", getName()); return;
         }
-        if (exec == null) initExecutor();
         if (ep == null) ep = new EP(exec);
         ep.fire(getName() + ".starting");
         attrs.putAll((Map) ep.fire("env.ns", "mvc", getName()));
-        enableSession = Utils.toBoolean(ep.fire("env.getAttr", "session.enabled"), true);
+        enableSession = Utils.toBoolean(ep.fire("env.getAttr", "session.enabled"), false);
         rootPath = getStr("rootPath", "/");
         sessionCookieName = getStr("sessionCookieName", "sId");
         for (String c : getStr("scan", "").split(",")) {
@@ -317,6 +323,7 @@ public class NettyResteasy extends ServerTpl {
     }
 
 
+    @EL(name = "session.isEnabled", async = false)
     public boolean isEnableSession() {
         return enableSession;
     }

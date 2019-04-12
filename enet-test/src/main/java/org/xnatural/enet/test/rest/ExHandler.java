@@ -2,6 +2,7 @@ package org.xnatural.enet.test.rest;
 
 import org.xnatural.enet.common.Log;
 
+import javax.ws.rs.core.MediaType;
 import javax.ws.rs.core.Response;
 import javax.ws.rs.ext.ExceptionMapper;
 import javax.ws.rs.ext.Provider;
@@ -22,6 +23,6 @@ public class ExHandler implements ExceptionMapper<Throwable> {
         r.setErrorId(errorId);
         if (ex.getMessage() == null) r.setErrorMsg(ex.getClass().getSimpleName());
         else r.setErrorMsg(ex.getCause() == null ? ex.getMessage() : ex.getCause().getMessage());
-        return Response.ok(r).build();
+        return Response.ok(r, MediaType.APPLICATION_JSON_TYPE).build();
     }
 }

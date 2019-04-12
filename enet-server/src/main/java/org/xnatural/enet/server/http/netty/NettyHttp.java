@@ -14,10 +14,13 @@ import org.xnatural.enet.event.EL;
 import org.xnatural.enet.event.EP;
 import org.xnatural.enet.server.ServerTpl;
 
+import javax.annotation.Resource;
 import java.util.Locale;
 import java.util.Map;
+import java.util.concurrent.Executor;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicBoolean;
 
 import static io.netty.handler.codec.http.HttpResponseStatus.SERVICE_UNAVAILABLE;
 import static org.xnatural.enet.common.Utils.isEmpty;
@@ -26,14 +29,15 @@ import static org.xnatural.enet.common.Utils.isEmpty;
  * 用 netty 实现的 http server
  */
 public class NettyHttp extends ServerTpl {
-    protected EventLoopGroup boosGroup;
-    protected EventLoopGroup workerGroup;
+    protected final AtomicBoolean  running = new AtomicBoolean(false);
+    @Resource
+    protected       Executor       exec;
+    protected       EventLoopGroup boosGroup;
+    protected       EventLoopGroup workerGroup;
 
 
-    public NettyHttp() {
-        setName("http-netty");
-        setPort(8080);
-    }
+    public NettyHttp() { this("http-netty"); }
+    public NettyHttp(String name) { super(name); setPort(8080);}
 
 
     @EL(name = "sys.starting")
@@ -41,7 +45,6 @@ public class NettyHttp extends ServerTpl {
         if (!running.compareAndSet(false, true)) {
             log.warn("{} Server is running", getName()); return;
         }
-        if (exec == null) initExecutor();
         if (ep == null) ep = new EP(exec);
         ep.fire(getName() + ".starting");
         attrs.putAll((Map) ep.fire("env.ns", "http", getName()));

@@ -14,20 +14,20 @@ import org.xnatural.enet.server.ServerTpl;
 
 import java.lang.reflect.Field;
 import java.util.*;
+import java.util.concurrent.atomic.AtomicBoolean;
 
 import static java.util.Collections.singletonList;
 import static org.xnatural.enet.common.Utils.isEmpty;
 
 public class OpenApiDoc extends ServerTpl {
+    protected final AtomicBoolean running = new AtomicBoolean(false);
+    protected   String        root;
+    protected   Controller    ctl;
+    protected   List<OpenAPI> apis    = new LinkedList<>();
 
-    protected String root;
-    protected Controller ctl;
-    protected List<OpenAPI> apis = new LinkedList<>();
 
-
-    public OpenApiDoc() {
-        setName("openApi");
-    }
+    public OpenApiDoc() { super("openApi"); }
+    public OpenApiDoc(String name) { super(name); }
 
 
     @EL(name = "sys.starting")
@@ -35,8 +35,7 @@ public class OpenApiDoc extends ServerTpl {
         if (!running.compareAndSet(false, true)) {
             log.warn("服务正在运行"); return;
         }
-        if (exec == null) initExecutor();
-        if (ep == null) ep = new EP(exec);
+        if (ep == null) ep = new EP();
         ep.fire(getName() + ".starting");
         attrs.putAll((Map) ep.fire("env.ns", getName()));
         root = getStr("root", "api-doc");

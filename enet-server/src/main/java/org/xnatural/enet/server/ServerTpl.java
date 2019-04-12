@@ -11,9 +11,6 @@ import javax.annotation.Resource;
 import java.lang.reflect.Method;
 import java.lang.reflect.Modifier;
 import java.util.*;
-import java.util.concurrent.*;
-import java.util.concurrent.atomic.AtomicBoolean;
-import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.function.Supplier;
 import java.util.stream.Collectors;
@@ -25,36 +22,34 @@ import static org.xnatural.enet.common.Utils.*;
  * 自定义模块时, 可参考此类代码按需copy
  */
 public class ServerTpl {
-    protected Log                 log;
+    protected     Log                 log;
     /**
      * 服务名字标识.(保证唯一)
      * 可用于命名空间:
-     *      1. 可用于属性配置前缀
-     *      2. 可用于事件名字前缀
+     * 1. 可用于属性配置前缀
+     * 2. 可用于事件名字前缀
      */
-    private   String              name;
+    private final String              name;
     /**
      * 可配置属性集.
      */
-    protected Map<String, Object> attrs   = new HashMap<>(7);
-    /**
-     * 此服务执行器
-     */
-    @Resource
-    protected Executor            exec;
+    protected     Map<String, Object> attrs = new HashMap<>(7);
     /**
      * 1. 当此服务被加入核心时, 此值会自动设置为核心的EP.
      * 2. 如果要服务独立运行时, 请手动设置
      */
     @Resource
-    protected EP                  ep;
-    /**
-     * 是否正在运行标志
-     */
-    protected AtomicBoolean       running = new AtomicBoolean(false);
+    protected     EP                  ep;
 
 
     public ServerTpl() {
+        String n = getClass().getSimpleName().replace("$$EnhancerByCGLIB$$", "@");
+        this.name = n.substring(0, 1).toLowerCase() + n.substring(1);
+        log = Log.of(getClass());
+    }
+    public ServerTpl(String name) {
+        if (isEmpty(name)) throw new IllegalArgumentException("name can not be empty");
+        this.name = name;
         log = Log.of(getClass());
     }
 
@@ -193,39 +188,6 @@ public class ServerTpl {
     }
 
 
-    /**
-     * 初始化一个内部 {@link Executor}
-     */
-    protected void initExecutor() {
-        if (ep instanceof ExecutorService) {
-            log.warn("close previous executor"); ((ExecutorService) ep).shutdown();
-        }
-        log.info("create private executor for '{}'.", getName());
-        ThreadPoolExecutor e = new ThreadPoolExecutor(
-            getInteger("exec.corePoolSize", 4), getInteger("exec.maximumPoolSize", 4),
-            getInteger("exec.keepAliveTime", 30), TimeUnit.MINUTES,
-            new LinkedBlockingQueue<>(100000),
-            new ThreadFactory() {
-                final AtomicInteger i = new AtomicInteger(1);
-                @Override
-                public Thread newThread(Runnable r) {
-                    return new Thread(r, getName() + "-" + i.getAndIncrement());
-                }
-            }
-        );
-        e.allowCoreThreadTimeOut(true);
-        exec = e;
-    }
-
-
-    public ServerTpl setName(String name) {
-        if (running.get()) throw new RuntimeException("服务正在运行.不允许更新服务名");
-        if (name == null || name.isEmpty()) throw new IllegalArgumentException("服务标识名不能为空");
-        this.name = name;
-        return this;
-    }
-
-
     public String getLogLevel() {
         if (log == null) return null;
         else if (log.isTraceEnabled()) return "trace";
@@ -242,16 +204,7 @@ public class ServerTpl {
     }
 
 
-    public boolean isRunning() {
-        return running.get();
-    }
-
-
     public String getName() {
-        if (isEmpty(name)) {
-            name = getClass().getSimpleName().replace("$$EnhancerByCGLIB$$", "@");
-            name = name.substring(0, 1).toLowerCase() + name.substring(1);
-        }
         return name;
     }
 

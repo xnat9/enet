@@ -5,7 +5,9 @@ import com.mongodb.*;
 import com.netflix.appinfo.*;
 import com.netflix.discovery.DefaultEurekaClientConfig;
 import com.netflix.discovery.DiscoveryClient;
+import org.xnatural.enet.common.Utils;
 import org.xnatural.enet.core.AppContext;
+import org.xnatural.enet.event.EC;
 import org.xnatural.enet.event.EL;
 import org.xnatural.enet.server.ServerTpl;
 import org.xnatural.enet.server.cache.ehcache.EhcacheServer;
@@ -33,6 +35,7 @@ import java.util.Arrays;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.concurrent.Executor;
 import java.util.concurrent.ThreadPoolExecutor;
 import java.util.concurrent.TimeUnit;
 import java.util.function.BiFunction;
@@ -68,6 +71,8 @@ public class Launcher extends ServerTpl {
 
     @Resource
     AppContext ctx;
+    @Resource
+    Executor   exec;
 
 
     /**
@@ -75,7 +80,7 @@ public class Launcher extends ServerTpl {
      */
     @EL(name = "env.configured", async = false)
     private void envConfigured() {
-        if (ctx.env().getBoolean("session.enabled", true)) {
+        if (Utils.toBoolean(ep.fire("session.isEnabled"), false)) {
             String t = ctx.env().getString("session.type", "memory");
             // 根据配置来启动用什么session管理
             if ("memory".equalsIgnoreCase(t)) ctx.addSource(new MemSessionManager());
@@ -217,7 +222,7 @@ public class Launcher extends ServerTpl {
             f.setAccessible(true);
             ThreadPoolExecutor v = (ThreadPoolExecutor) f.get(ctx);
             if (v instanceof ThreadPoolExecutor) {
-                ep.fire("sched.cron", "0 0/2 * * * ?", (Runnable) () -> monitorExec(v));
+                ep.fire("sched.cron", "0 0/1 * * * ?", (Runnable) () -> monitorExec(v));
             }
         } catch (Exception e) {
             log.error(e);
@@ -232,7 +237,7 @@ public class Launcher extends ServerTpl {
     private void monitorExec(ThreadPoolExecutor e) {
         int size = e.getQueue().size();
         if (size > e.getCorePoolSize() * 50) {
-            ep.fire("sys.load", size / 7);
+            ep.fire("sys.load", EC.of(this).sync().args(size / 7));
             log.warn("system is very heavy load running!. {}", "[" + e.toString().split("\\[")[1]);
         } else if (size > e.getCorePoolSize() * 40) {
             ep.fire("sys.load", 8);

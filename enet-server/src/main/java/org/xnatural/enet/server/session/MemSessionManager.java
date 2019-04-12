@@ -7,21 +7,23 @@ import org.xnatural.enet.server.ServerTpl;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicBoolean;
 
 /**
  * @author xiangxb, 2019-02-05
  */
 public class MemSessionManager extends ServerTpl {
+    protected final AtomicBoolean            running = new AtomicBoolean(false);
     /**
      * 过期时间(单位: 分钟)
      */
-    protected Integer expire;
-
-    protected Map<String, SessionData> sMap;
+    protected       Integer                  expire;
+    protected       Map<String, SessionData> sMap;
 
     public MemSessionManager() {
-        setName("session-mem");
+        super("session-mem");
     }
+    public MemSessionManager(String name) { super(name); }
 
 
     @EL(name = "sys.starting")
@@ -29,8 +31,7 @@ public class MemSessionManager extends ServerTpl {
         if (!running.compareAndSet(false, true)) {
             log.warn("{} Server is running", getName()); return;
         }
-        if (exec == null) initExecutor();
-        if (ep == null) ep = new EP(exec);
+        if (ep == null) ep = new EP();
         ep.fire(getName() + ".starting");
         attrs.putAll((Map) ep.fire("env.ns", "session", getName()));
         expire = getInteger("expire", 30);

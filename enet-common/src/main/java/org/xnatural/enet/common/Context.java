@@ -9,8 +9,7 @@ import java.util.Map;
  * @author hubert
  */
 public class Context {
-    private final Map<Object, Object> attrs  = new LinkedHashMap<>();
-    private final Map<Class, Object>  values = new LinkedHashMap<>(7);
+    private final Map<Object, Object> attrs  = new LinkedHashMap<>(7);
 
 
     public Context attr(Object pKey, Object pValue) {
@@ -21,7 +20,7 @@ public class Context {
 
     public Context put(Object pValue) {
         if (pValue == null) return this;
-        values.put(pValue.getClass(), pValue);
+        attrs.put(pValue.getClass(), pValue);
         return this;
     }
 
@@ -44,17 +43,17 @@ public class Context {
 
 
     public <T> T getAttr(Object pKey, Class<T> type, T defaultValue) {
-        T r = type.cast(attrs.get(pKey));
-        return (r == null ? defaultValue : r);
+        Object r = attrs.get(pKey);
+        return (r == null ? defaultValue : type.cast(r));
     }
 
 
     public <T> T getValue(Class<T> type) {
         if (type == null) return null;
-        Object r = values.get(type);
+        Object r = attrs.get(type);
         if (r != null) type.cast(r);
-        for (Map.Entry<Class, Object> e : values.entrySet()) {
-            if (type.isAssignableFrom(e.getKey())) return type.cast(e.getValue());
+        for (Map.Entry<Object, Object> e : attrs.entrySet()) {
+            if (e.getKey() instanceof Class && type.isAssignableFrom((Class<?>) e.getKey())) return type.cast(e.getValue());
         }
         return null;
     }
@@ -102,6 +101,6 @@ public class Context {
 
     @Override
     public String toString() {
-        return "Context [" + attrs + "], [" + values + "]";
+        return "Context [" + attrs + "]";
     }
 }

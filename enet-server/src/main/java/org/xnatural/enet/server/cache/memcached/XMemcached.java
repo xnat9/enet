@@ -13,20 +13,20 @@ import java.io.IOException;
 import java.net.InetSocketAddress;
 import java.util.List;
 import java.util.Map;
-import java.util.concurrent.ExecutorService;
+import java.util.concurrent.atomic.AtomicBoolean;
 
 /**
  * Memcached
  */
 public class XMemcached extends ServerTpl {
-
-    protected MemcachedClient client;
+    protected final AtomicBoolean   running = new AtomicBoolean(false);
+    protected       MemcachedClient client;
 
     public XMemcached() {
-        setName("memcached");
+        super("memcached");
     }
     public XMemcached(String name) {
-        setName(name);
+        super(name);
     }
 
 
@@ -35,8 +35,7 @@ public class XMemcached extends ServerTpl {
         if (!running.compareAndSet(false, true)) {
             log.warn("{} Server is running", getName()); return;
         }
-        if (exec == null) initExecutor();
-        if (ep == null) ep = new EP(exec);
+        if (ep == null) ep = new EP();
         ep.fire(getName() + ".starting");
         attrs.putAll((Map) ep.fire("env.ns", "cache", getName()));
 
@@ -68,7 +67,6 @@ public class XMemcached extends ServerTpl {
         } catch (IOException e) {
             log.error(e);
         }
-        if (exec instanceof ExecutorService) ((ExecutorService) exec).shutdown();
     }
 
 

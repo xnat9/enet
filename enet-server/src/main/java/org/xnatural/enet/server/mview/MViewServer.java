@@ -5,22 +5,24 @@ import org.xnatural.enet.event.EP;
 import org.xnatural.enet.server.ServerTpl;
 
 import java.util.Map;
+import java.util.concurrent.atomic.AtomicBoolean;
 
 /**
  * mview web界面管理模块
  * 对系统中的所有模块管理
  */
 public class MViewServer extends ServerTpl {
-
+    protected final AtomicBoolean running = new AtomicBoolean(false);
     /**
      * mview http path前缀. 默认为: mview
      */
-    protected String path;
-    protected Controller ctl;
+    protected   String        path;
+    protected   Controller    ctl;
 
     public MViewServer() {
-        setName("mview");
+        super("mview");
     }
+    public MViewServer(String name) { super(name); }
 
 
     @EL(name = "sys.starting")
@@ -28,8 +30,7 @@ public class MViewServer extends ServerTpl {
         if (!running.compareAndSet(false, true)) {
             log.warn("{} Server is running", getName()); return;
         }
-        if (exec == null) initExecutor();
-        if (ep == null) ep = new EP(exec);
+        if (ep == null) ep = new EP();
         ep.fire(getName() + ".starting");
         attrs.putAll((Map) ep.fire("env.ns", getName()));
         path = getStr("path", "mview");

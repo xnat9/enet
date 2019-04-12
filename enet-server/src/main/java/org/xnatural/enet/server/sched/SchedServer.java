@@ -8,24 +8,29 @@ import org.xnatural.enet.event.EL;
 import org.xnatural.enet.event.EP;
 import org.xnatural.enet.server.ServerTpl;
 
+import javax.annotation.Resource;
 import java.text.SimpleDateFormat;
 import java.util.Date;
 import java.util.Map;
 import java.util.Properties;
 import java.util.concurrent.Executor;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicBoolean;
 
 /**
  * 时间任务调度器
  * @author xiangxb, 2019-02-16
  */
 public class SchedServer extends ServerTpl {
-
-    protected Scheduler scheduler;
+    protected final AtomicBoolean running = new AtomicBoolean(false);
+    @Resource
+    protected       Executor      exec;
+    protected       Scheduler     scheduler;
 
     public SchedServer() {
-        setName("sched");
+        super("sched");
     }
+    public SchedServer(String name) { super(name); }
 
 
     @EL(name = "sys.starting")
@@ -33,7 +38,6 @@ public class SchedServer extends ServerTpl {
         if (!running.compareAndSet(false, true)) {
             log.warn("{} Server is running", getName()); return;
         }
-        if (exec == null) initExecutor();
         if (ep == null) ep = new EP(exec);
         ep.fire(getName() + ".starting");
         // 先从核心取配置, 然后再启动

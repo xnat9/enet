@@ -23,7 +23,7 @@ import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
 import java.util.Properties;
-import java.util.concurrent.ExecutorService;
+import java.util.concurrent.atomic.AtomicBoolean;
 
 import static javax.persistence.SharedCacheMode.UNSPECIFIED;
 import static org.xnatural.enet.common.Utils.*;
@@ -33,26 +33,26 @@ import static org.xnatural.enet.common.Utils.*;
  * 暴露出 {@link EntityManagerFactory} 实例(所有的数据库操作入口)
  */
 public class Hibernate extends ServerTpl {
-    protected DataSource     ds;
-    protected SessionFactory sf;
-    protected TransWrapper   tm;
+    protected final AtomicBoolean  running    = new AtomicBoolean(false);
+    protected       DataSource     ds;
+    protected       SessionFactory sf;
+    protected       TransWrapper   tm;
     /**
      * 实体扫描
      */
-    protected List<Class>    entityScan = new LinkedList<>();
+    protected       List<Class>    entityScan = new LinkedList<>();
     /**
      * repo 扫描
      */
-    protected List<Class>    repoScan   = new LinkedList<>();
+    protected       List<Class>    repoScan   = new LinkedList<>();
     /**
      * 被管理的实体类名
      */
-    protected List<String>   entities   = new LinkedList<>();
+    protected       List<String>   entities   = new LinkedList<>();
 
 
-    public Hibernate() {
-        setName("dao");
-    }
+    public Hibernate() { super("dao"); }
+    public Hibernate(String name) { super(name); }
 
 
     @EL(name = "sys.starting")
@@ -60,8 +60,7 @@ public class Hibernate extends ServerTpl {
         if (!running.compareAndSet(false, true)) {
             log.warn("{} Server is running", getName()); return;
         }
-        if (exec == null) initExecutor();
-        if (ep == null) ep = new EP(exec);
+        if (ep == null) ep = new EP();
         ep.fire(getName() + ".starting");
         attrs.put("hibernate.physical_naming_strategy", "org.xnatural.enet.server.dao.hibernate.SpringPhysicalNamingStrategy");
         attrs.put("hibernate.implicit_naming_strategy", "org.xnatural.enet.server.dao.hibernate.SpringImplicitNamingStrategy");
@@ -98,7 +97,6 @@ public class Hibernate extends ServerTpl {
     public void stop() {
         log.info("Shutdown '{}(Hibernate)' Server", getName());
         sf.close(); closeDs();
-        if (exec instanceof ExecutorService) ((ExecutorService) exec).shutdown();
     }
 
 

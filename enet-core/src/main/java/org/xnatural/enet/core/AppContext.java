@@ -1,11 +1,11 @@
 package org.xnatural.enet.core;
 
 
-import org.xnatural.enet.common.Log;
-import org.xnatural.enet.common.Utils;
-import org.xnatural.enet.event.EC;
-import org.xnatural.enet.event.EL;
-import org.xnatural.enet.event.EP;
+import cn.xnatural.enet.common.Log;
+import cn.xnatural.enet.common.Utils;
+import cn.xnatural.enet.event.EC;
+import cn.xnatural.enet.event.EL;
+import cn.xnatural.enet.event.EP;
 
 import javax.annotation.Resource;
 import java.lang.management.ManagementFactory;
@@ -19,7 +19,7 @@ import java.util.concurrent.*;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.function.Consumer;
 
-import static org.xnatural.enet.common.Utils.*;
+import static cn.xnatural.enet.common.Utils.*;
 
 /**
  * 系统运行上下文
@@ -101,12 +101,11 @@ public class AppContext {
      */
     @EL(name = "sys.addSource", async = false)
     public void addSource(Object source) {
-        if (source == null) return;
-        if (source instanceof Class) return;
+        if (source == null || source instanceof Class) return;
         Method m = findMethod(source.getClass(), mm -> Modifier.isPublic(mm.getModifiers()) && "getName".equals(mm.getName()) && mm.getParameterCount() == 0 && String.class.equals(mm.getReturnType()));
         String name;
         if (m == null) {
-            name = getClass().getSimpleName().replace("$$EnhancerByCGLIB$$", "@");
+            name = source.getClass().getSimpleName().replace("$$EnhancerByCGLIB$$", "@");
             name = name.substring(0, 1).toLowerCase() + name.substring(1);
         } else name = (String) invoke(m, source);
         if (Utils.isEmpty(name)) { log.warn("Get name property is empty from '{}'", source); return; }

@@ -4,7 +4,7 @@
          xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
     <parent>
         <artifactId>enet</artifactId>
-        <groupId>org.xnatural.enet</groupId>
+        <groupId>cn.xnatural.enet</groupId>
         <version>0.0.8</version>
     </parent>
     <modelVersion>4.0.0</modelVersion>
@@ -13,12 +13,12 @@
 
     <dependencies>
         <dependency>
-            <groupId>org.xnatural.enet</groupId>
+            <groupId>cn.xnatural.enet</groupId>
             <artifactId>enet-core</artifactId>
             <version>0.0.8</version>
         </dependency>
         <dependency>
-            <groupId>org.xnatural.enet</groupId>
+            <groupId>cn.xnatural.enet</groupId>
             <artifactId>enet-server</artifactId>
             <version>0.0.8</version>
         </dependency>
@@ -116,7 +116,7 @@
                         <manifest>
                             <addClasspath>true</addClasspath>
                             <classpathPrefix>lib/</classpathPrefix>
-                            <mainClass>org.xnatural.enet.test.Launcher</mainClass>
+                            <mainClass>cn.xnatural.enet.test.Launcher</mainClass>
                         </manifest>
                     </archive>
                 </configuration>

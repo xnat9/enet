@@ -37,13 +37,9 @@ public class Launcher extends ServerTpl {
 
     public static void main(String[] args) {
         AppContext app = new AppContext();
-        // http
-        app.addSource(new NettyHttp());
-        // mvc
-        app.addSource(new NettyResteasy().scan(RestTpl.class));
-        // rest 接口文档
-        app.addSource(new OpenApiDoc());
-        // dao层hibernate
+        app.addSource(new NettyHttp()); // http
+        app.addSource(new NettyResteasy().scan(RestTpl.class)); // mvc
+        app.addSource(new OpenApiDoc()); // swagger rest 接口文档
         app.addSource(new Hibernate().scanEntity(TestEntity.class).scanRepo(TestRepo.class));
         app.addSource(new Launcher());
         // TODO 添加其它服务()

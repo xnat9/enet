@@ -2,6 +2,7 @@ package cn.xnatural.enet.test.rest;
 
 import cn.xnatural.enet.common.Log;
 
+import javax.ws.rs.ClientErrorException;
 import javax.ws.rs.core.MediaType;
 import javax.ws.rs.core.Response;
 import javax.ws.rs.ext.ExceptionMapper;
@@ -17,7 +18,12 @@ public class ExHandler implements ExceptionMapper<Throwable> {
 
     @Override
     public Response toResponse(Throwable ex) {
-        ApiResp r = new ApiResp();
+        if (ex instanceof ClientErrorException) {
+            log.warn(ex.getMessage());
+            return ((ClientErrorException) ex).getResponse();
+        }
+
+        ApiResp r = new ApiResp().setSuccess(false);
         String errorId = UUID.randomUUID().toString();
         log.error((ex.getCause() == null ? ex : ex.getCause()), "errorId: " + errorId);
         r.setErrorId(errorId);

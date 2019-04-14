@@ -110,10 +110,10 @@ public class AppContext {
         } else name = (String) invoke(m, source);
         if (Utils.isEmpty(name)) { log.warn("Get name property is empty from '{}'", source); return; }
         if ("sys".equalsIgnoreCase(name) || "env".equalsIgnoreCase(name) || "log".equalsIgnoreCase(name)) {
-            log.warn("name property cannot equal 'sys', 'env' or 'log' . source: {}", source); return;
+            log.warn("Name property cannot equal 'sys', 'env' or 'log' . source: {}", source); return;
         }
         if (sourceMap.containsKey(name)) {
-            log.warn("name property '{}' already exist in source: {}", name, sourceMap.get(name)); return;
+            log.warn("Name property '{}' already exist in source: {}", name, sourceMap.get(name)); return;
         }
         sourceMap.put(name, source);
         if (ep != null) { inject(source); ep.addListenerSource(source); }
@@ -124,7 +124,7 @@ public class AppContext {
      * 初始化. 自动为所有对象源注入
      */
     protected void autoInject() {
-        log.debug("auto inject @Resource field");
+        log.debug("Auto inject @Resource field");
         sourceMap.forEach((s, o) -> inject(o));
     }
 
@@ -152,7 +152,7 @@ public class AppContext {
 
                 if (v == null) return;
                 f.set(o, v);
-                log.trace("inject @Resource field '{}' for object '{}'", f.getName(), o);
+                log.trace("Inject @Resource field '{}' for object '{}'", f.getName(), o);
             } catch (Exception e) { log.error(e); }
         });
     }
@@ -229,9 +229,9 @@ public class AppContext {
                 try {
                     super.execute(fn);
                 } catch (RejectedExecutionException ex) {
-                    log.warn("thread pool rejected new task very heavy load. {}", this);
+                    log.warn("Thread pool rejected new task very heavy load. {}", this);
                 } catch (Throwable t) {
-                    log.error("task happen error", t);
+                    log.error("Task happen unknown error", t);
                 }
             }
         };
@@ -271,7 +271,7 @@ public class AppContext {
                 Long l = toLong(v, null);
                 if (l == null) throw new IllegalArgumentException("sys.exec.keepAliveTime属性值只能是整数");
                 exec.setKeepAliveTime(l, TimeUnit.SECONDS);
-            } else log.warn("not allow change property '{}'", k);
+            } else log.warn("Not allow change property '{}'", k);
         }
     }
 

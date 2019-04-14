@@ -1,14 +1,7 @@
 package cn.xnatural.enet.test;
 
 
-import cn.xnatural.enet.test.service.FileUploader;
-import cn.xnatural.enet.test.service.TestService;
-import com.mongodb.*;
-import com.netflix.appinfo.*;
-import com.netflix.discovery.DefaultEurekaClientConfig;
-import com.netflix.discovery.DiscoveryClient;
 import cn.xnatural.enet.common.Utils;
-import org.xnatural.enet.core.AppContext;
 import cn.xnatural.enet.event.EC;
 import cn.xnatural.enet.event.EL;
 import cn.xnatural.enet.server.ServerTpl;
@@ -24,17 +17,22 @@ import cn.xnatural.enet.server.session.MemSessionManager;
 import cn.xnatural.enet.server.session.RedisSessionManager;
 import cn.xnatural.enet.server.swagger.OpenApiDoc;
 import cn.xnatural.enet.test.common.Async;
+import cn.xnatural.enet.test.common.Monitor;
 import cn.xnatural.enet.test.dao.entity.TestEntity;
 import cn.xnatural.enet.test.dao.repo.TestRepo;
 import cn.xnatural.enet.test.rest.RestTpl;
+import cn.xnatural.enet.test.service.FileUploader;
+import cn.xnatural.enet.test.service.TestService;
+import com.mongodb.*;
+import com.netflix.appinfo.*;
+import com.netflix.discovery.DefaultEurekaClientConfig;
+import com.netflix.discovery.DiscoveryClient;
+import org.xnatural.enet.core.AppContext;
 
 import javax.annotation.Resource;
 import java.lang.reflect.Field;
 import java.lang.reflect.Method;
-import java.util.Arrays;
-import java.util.HashMap;
-import java.util.List;
-import java.util.Map;
+import java.util.*;
 import java.util.concurrent.Executor;
 import java.util.concurrent.ThreadPoolExecutor;
 import java.util.concurrent.TimeUnit;
@@ -43,8 +41,8 @@ import java.util.function.Function;
 import java.util.function.Supplier;
 import java.util.stream.Collectors;
 
-import static com.netflix.appinfo.DataCenterInfo.Name.Netflix;
 import static cn.xnatural.enet.common.Utils.*;
+import static com.netflix.appinfo.DataCenterInfo.Name.Netflix;
 
 /**
  * @author xiangxb, 2018-12-22
@@ -86,7 +84,13 @@ public class Launcher extends ServerTpl {
             if ("memory".equalsIgnoreCase(t)) ctx.addSource(new MemSessionManager());
             else if ("redis".equalsIgnoreCase(t)) ctx.addSource(new RedisSessionManager());
         }
+        Function<Class<?>, ?> wrap = createAopFn();
+        ctx.addSource(wrap.apply(TestService.class));
+        ctx.addSource(wrap.apply(FileUploader.class));
+    }
 
+
+    protected Function<Class<?>, ?> createAopFn() {
         Map<Class, BiFunction<Method, Supplier<Object>, Object>> aopFn = new HashMap<>();
         aopFn.put(Trans.class, (method, fn) -> { // 事务方法拦截
             if (method.getAnnotation(Trans.class) != null) {
@@ -98,9 +102,47 @@ public class Launcher extends ServerTpl {
                 exec.execute(fn::get); return null;
             } else return fn.get();
         });
+//        aopFn.put(Monitor.class, (method, fn) -> { // 异步方法拦截
+//            Monitor anno = method.getAnnotation(Monitor.class);
+//
+//            long start = System.currentTimeMillis();
+//            Throwable ex = null;
+//            Object ret = null;
+//            try {
+//                ret = fn.get();
+//            } catch (Throwable t) {ex = t;}
+//            long end = System.currentTimeMillis();
+//
+//            boolean warn = (end - start >= anno.warnTimeUnit().toMillis(anno.warnTimeOut()));
+//            if (anno.trace() || warn) {
+//                StringBuilder sb = new StringBuilder(anno.logPrefix());
+//                // sb.append(signature.toShortString());
+//                sb.append(method.getDeclaringClass().getName()).append(".").append(method.getName());
+//                Object[] args = pjp.getArgs();
+//                if (anno.printArgs() && args.length > 0) {
+//                    sb.append("(");
+//                    for (int i = 0; i < args.length; i++) {
+//                        if (i == 0) sb.append(Objects.toString(args[i], ""));
+//                        else sb.append(";").append(Objects.toString(args[i], ""));
+//                    }
+//                    sb.append(")");
+//                }
+//                sb.append(", time: ").append(end - start).append("ms");
+//                if (warn) log.warn(sb.append(anno.logSuffix()).toString());
+//                else log.info(sb.append(anno.logSuffix()).toString());
+//            }
+//            if (ex != null) throw ex;
+//            return ret;
+//        });
 
         // 多注解拦截
-        Function<Class<?>, ?> wrap = clz -> {
+        return clz -> {
+            Method m = Utils.findMethod(clz, mm -> mm.getAnnotation(Trans.class) != null || mm.getAnnotation(Async.class) != null);
+            if (m == null) {
+                try { return clz.newInstance(); }
+                catch (Exception e) { log.error(e); }
+                return null;
+            }
             return proxy(clz, (obj, method, args, proxy) -> {
                 Supplier fn = () -> {
                     try { return proxy.invokeSuper(obj, args); }
@@ -111,9 +153,6 @@ public class Launcher extends ServerTpl {
                 );
             });
         };
-
-        ctx.addSource(wrap.apply(TestService.class));
-        ctx.addSource(wrap.apply(FileUploader.class));
     }
 
 

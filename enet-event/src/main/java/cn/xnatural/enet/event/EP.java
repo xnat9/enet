@@ -122,18 +122,18 @@ public class EP {
     protected Object doPublish(String eName, EC ec, Consumer<EC> completeFn) {
         List<Listener> ls = lsMap.get(eName); // 获取需要执行的监听器
         if (ls == null || ls.isEmpty()) {
-            log.trace("not found listener for event name: {}", eName);
+            log.trace("Not found listener for event name: {}", eName);
             if (completeFn != null) completeFn.accept(ec); return ec.result;
         }
         ec.willPass(ls).ep = this;
         if (trackEvents.contains(eName) || log.isTraceEnabled()) ec.track = true;
         if (ec.track) { // 是否要追踪此条事件链的执行
             ec.id = UUID.randomUUID().toString();
-            log.info("starting executing listener chain for event name '{}'. id: {}, event source: {}", eName, ec.id, ec.source());
+            log.info("Starting executing listener chain for event name '{}'. id: {}, event source: {}", eName, ec.id, ec.source());
         }
         if (exec == null) { // 只能同步执行
             for (Listener l : ls) l.invoke(ec);
-            if (ec.track) log.info("end executing listener chain for event name '{}'. id: {}, result: {}", eName, ec.id, ec.result);
+            if (ec.track) log.info("End executing listener chain for event name '{}'. id: {}, result: {}", eName, ec.id, ec.result);
             if (completeFn != null) completeFn.accept(ec);
         } else {
             // 异步, 同步执行的监听器, 分开执行
@@ -155,7 +155,7 @@ public class EP {
                     AtomicBoolean f = new AtomicBoolean(false); // 防止被执行多遍
                     Runnable fn = () -> {
                         if (i.get() == 0 && f.compareAndSet(false, true)) {
-                            if (ec.track) log.info("end executing listener chain for event name '{}'. id: {}, result: {}", eName, ec.id, ec.result);
+                            if (ec.track) log.info("End executing listener chain for event name '{}'. id: {}, result: {}", eName, ec.id, ec.result);
                         }
                     };
                     syncLs.forEach(l -> {l.invoke(ec); i.decrementAndGet(); fn.run();});
@@ -169,7 +169,7 @@ public class EP {
                 AtomicBoolean f = new AtomicBoolean(false); // 防止被执行多遍
                 Runnable fn = () -> { // 两个列表都执行完后才执行completeFn函数
                     if (i.get() == 0 && f.compareAndSet(false, true)) {
-                        if (ec.track) log.info("end executing listener chain for event name '{}'. id: {}, result: {}", eName, ec.id, ec.result);
+                        if (ec.track) log.info("End executing listener chain for event name '{}'. id: {}, result: {}", eName, ec.id, ec.result);
                         completeFn.accept(ec);
                     }
                 };
@@ -261,7 +261,7 @@ public class EP {
                     log.warn("Same source same method name only one listener. source: {}, methodName: {}", source, m.getName());
                     continue;
                 }
-                log.debug("add listener [name: {}, source: {}, method: {}, async: {}, order: {}]", listener.name, source, m.getName(), listener.async, listener.order);
+                log.debug("Add listener [name: {}, source: {}, method: {}, async: {}, order: {}]", listener.name, source, m.getName(), listener.async, listener.order);
                 ls.add(listener); ls.sort(Comparator.comparing(o -> o.order));
             }
         });

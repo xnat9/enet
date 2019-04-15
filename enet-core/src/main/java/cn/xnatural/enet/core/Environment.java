@@ -1,4 +1,4 @@
-package org.xnatural.enet.core;
+package cn.xnatural.enet.core;
 
 import org.slf4j.ILoggerFactory;
 import org.slf4j.LoggerFactory;

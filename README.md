@@ -17,12 +17,12 @@
 ## 安装教程
 ```
 <dependency>
-    <groupId>org.xnatural.enet</groupId>
+    <groupId>cn.xnatural.enet</groupId>
     <artifactId>enet-core</artifactId>
     <version>0.0.8</version>
 </dependency>
 <dependency>
-    <groupId>org.xnatural.enet</groupId>
+    <groupId>cn.xnatural.enet</groupId>
     <artifactId>enet-server</artifactId>
     <version>0.0.8</version>
 </dependency>

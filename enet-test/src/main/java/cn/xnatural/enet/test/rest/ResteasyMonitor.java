@@ -1,19 +1,38 @@
 package cn.xnatural.enet.test.rest;
 
 import cn.xnatural.enet.common.Log;
+import cn.xnatural.enet.core.Environment;
 import cn.xnatural.enet.event.EP;
 
+import javax.annotation.PostConstruct;
+import javax.annotation.Resource;
 import javax.ws.rs.container.ContainerRequestContext;
 import javax.ws.rs.container.ContainerRequestFilter;
 import javax.ws.rs.container.ContainerResponseContext;
 import javax.ws.rs.container.ContainerResponseFilter;
 import javax.ws.rs.ext.Provider;
 import java.io.IOException;
+import java.util.Arrays;
+import java.util.Set;
+import java.util.stream.Collectors;
 
 @Provider
 public class ResteasyMonitor implements ContainerRequestFilter, ContainerResponseFilter {
-    protected EP ep;
-    protected Log log = Log.of(getClass());
+    @Resource
+    Environment env;
+    @Resource
+    EP ep;
+    Log         log = Log.of(getClass());
+    Set<String> ignore;
+
+
+    @PostConstruct
+    protected void init() {
+        ignore = Arrays.stream(env.getString("ignoreTimeoutRest", "").split(","))
+            .filter(s -> s != null && !s.trim().isEmpty())
+            .collect(Collectors.toSet());
+    }
+
 
     @Override
     public void filter(ContainerRequestContext reqCtx) throws IOException {
@@ -24,7 +43,7 @@ public class ResteasyMonitor implements ContainerRequestFilter, ContainerRespons
     @Override
     public void filter(ContainerRequestContext reqCtx, ContainerResponseContext respCtx) throws IOException {
         Object startTime = reqCtx.getProperty("startTime");
-        if (startTime != null) {
+        if (startTime != null && !ignore.contains(reqCtx.getUriInfo().getPath())) {
             long spend = System.currentTimeMillis() - (long) startTime;
             if (spend > 3000) {
                 log.warn("接口 '{}' 超时. spend: {}", reqCtx.getUriInfo().getPath(), spend);

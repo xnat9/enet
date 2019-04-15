@@ -2,6 +2,7 @@ package cn.xnatural.enet.test;
 
 
 import cn.xnatural.enet.common.Utils;
+import cn.xnatural.enet.core.AppContext;
 import cn.xnatural.enet.event.EC;
 import cn.xnatural.enet.event.EL;
 import cn.xnatural.enet.server.ServerTpl;
@@ -23,26 +24,21 @@ import cn.xnatural.enet.test.dao.repo.TestRepo;
 import cn.xnatural.enet.test.rest.RestTpl;
 import cn.xnatural.enet.test.service.FileUploader;
 import cn.xnatural.enet.test.service.TestService;
-import com.mongodb.*;
-import com.netflix.appinfo.*;
-import com.netflix.discovery.DefaultEurekaClientConfig;
-import com.netflix.discovery.DiscoveryClient;
-import org.xnatural.enet.core.AppContext;
 
 import javax.annotation.Resource;
 import java.lang.reflect.Field;
 import java.lang.reflect.Method;
-import java.util.*;
+import java.util.Arrays;
+import java.util.HashMap;
+import java.util.Map;
+import java.util.Objects;
 import java.util.concurrent.Executor;
 import java.util.concurrent.ThreadPoolExecutor;
 import java.util.concurrent.TimeUnit;
-import java.util.function.BiFunction;
 import java.util.function.Function;
 import java.util.function.Supplier;
-import java.util.stream.Collectors;
 
-import static cn.xnatural.enet.common.Utils.*;
-import static com.netflix.appinfo.DataCenterInfo.Name.Netflix;
+import static cn.xnatural.enet.common.Utils.proxy;
 
 /**
  * @author xiangxb, 2018-12-22
@@ -90,54 +86,73 @@ public class Launcher extends ServerTpl {
     }
 
 
+    /**
+     * 创建aop函数
+     * @return
+     */
     protected Function<Class<?>, ?> createAopFn() {
-        Map<Class, BiFunction<Method, Supplier<Object>, Object>> aopFn = new HashMap<>();
-        aopFn.put(Trans.class, (method, fn) -> { // 事务方法拦截
-            if (method.getAnnotation(Trans.class) != null) {
-                return bean(TransWrapper.class).trans(fn);
-            } else return fn.get();
+        abstract class AopFn {
+            abstract Object run(Method m, Object[] args, Supplier<Object> fn);
+        }
+        Map<Class, AopFn> aopFn = new HashMap<>();
+        aopFn.put(Trans.class, new AopFn() { // 事务方法拦截
+            @Override
+            Object run(Method m, Object[] args, Supplier<Object> fn) {
+                if (m.getAnnotation(Trans.class) != null) {
+                    return bean(TransWrapper.class).trans(fn);
+                } else return fn.get();
+            }
         });
-        aopFn.put(Async.class, (method, fn) -> { // 异步方法拦截
-            if (method.getAnnotation(Async.class) != null) {
-                exec.execute(fn::get); return null;
-            } else return fn.get();
+        aopFn.put(Async.class, new AopFn() { // 异步方法拦截
+            @Override
+            Object run(Method m, Object[] args, Supplier<Object> fn) {
+                if (m.getAnnotation(Async.class) != null) {
+                    exec.execute(fn::get); return null;
+                } else return fn.get();
+            }
         });
-//        aopFn.put(Monitor.class, (method, fn) -> { // 异步方法拦截
-//            Monitor anno = method.getAnnotation(Monitor.class);
-//
-//            long start = System.currentTimeMillis();
-//            Throwable ex = null;
-//            Object ret = null;
-//            try {
-//                ret = fn.get();
-//            } catch (Throwable t) {ex = t;}
-//            long end = System.currentTimeMillis();
-//
-//            boolean warn = (end - start >= anno.warnTimeUnit().toMillis(anno.warnTimeOut()));
-//            if (anno.trace() || warn) {
-//                StringBuilder sb = new StringBuilder(anno.logPrefix());
-//                // sb.append(signature.toShortString());
-//                sb.append(method.getDeclaringClass().getName()).append(".").append(method.getName());
-//                Object[] args = pjp.getArgs();
-//                if (anno.printArgs() && args.length > 0) {
-//                    sb.append("(");
-//                    for (int i = 0; i < args.length; i++) {
-//                        if (i == 0) sb.append(Objects.toString(args[i], ""));
-//                        else sb.append(";").append(Objects.toString(args[i], ""));
-//                    }
-//                    sb.append(")");
-//                }
-//                sb.append(", time: ").append(end - start).append("ms");
-//                if (warn) log.warn(sb.append(anno.logSuffix()).toString());
-//                else log.info(sb.append(anno.logSuffix()).toString());
-//            }
-//            if (ex != null) throw ex;
-//            return ret;
-//        });
+        aopFn.put(Monitor.class, new AopFn() { // 方法监视执行
+            @Override
+            Object run(Method m, Object[] args, Supplier<Object> fn) {
+                Monitor anno = m.getAnnotation(Monitor.class);
+                if (anno == null) return fn.get();
+
+                long start = System.currentTimeMillis();
+                Object ret = null;
+                try { ret = fn.get();}
+                catch (Throwable t) { throw t; }
+                finally {
+                    long end = System.currentTimeMillis();
+                    boolean warn = (end - start >= anno.warnTimeUnit().toMillis(anno.warnTimeOut()));
+                    if (anno.trace() || warn) {
+                        StringBuilder sb = new StringBuilder(anno.logPrefix());
+                        sb.append(m.getDeclaringClass().getName()).append(".").append(m.getName());
+                        if (anno.printArgs() && args.length > 0) {
+                            sb.append("(");
+                            for (int i = 0; i < args.length; i++) {
+                                String s;
+                                if (args[i].getClass().isArray()) s = Arrays.toString((Object[]) args[i]);
+                                else s = Objects.toString(args[i], "");
+
+                                if (i == 0) sb.append(s);
+                                else sb.append(";").append(s);
+                            }
+                            sb.append(")");
+                        }
+                        sb.append(", time: ").append(end - start).append("ms");
+                        if (warn) log.warn(sb.append(anno.logSuffix()).toString());
+                        else log.info(sb.append(anno.logSuffix()).toString());
+                    }
+                }
+                return ret;
+            }
+        });
 
         // 多注解拦截
         return clz -> {
-            Method m = Utils.findMethod(clz, mm -> mm.getAnnotation(Trans.class) != null || mm.getAnnotation(Async.class) != null);
+            Method m = Utils.findMethod(clz, mm ->
+                mm.getAnnotation(Trans.class) != null || mm.getAnnotation(Async.class) != null
+            );
             if (m == null) {
                 try { return clz.newInstance(); }
                 catch (Exception e) { log.error(e); }
@@ -148,92 +163,13 @@ public class Launcher extends ServerTpl {
                     try { return proxy.invokeSuper(obj, args); }
                     catch (Throwable t) { throw new RuntimeException(t); }
                 };
-                return aopFn.get(Async.class).apply(method, () ->
-                    aopFn.get(Trans.class).apply(method, fn)
+                return aopFn.get(Async.class).run(method, args, () ->
+                    aopFn.get(Monitor.class).run(method, args, () ->
+                        aopFn.get(Trans.class).run(method, args, fn)
+                    )
                 );
             });
         };
-    }
-
-
-    MongoClient mongoClient;
-    // @EL(name = "sys.starting")
-    protected void mongoClient() {
-        Map<String, String> attrs = ctx.env().groupAttr("mongo");
-        MongoClientOptions options = MongoClientOptions.builder()
-            .connectTimeout(toInteger(attrs.get("connectTimeout"), 3000))
-            .socketTimeout(toInteger(attrs.get("socketTimeout"), 3000))
-            .maxWaitTime(toInteger(attrs.get("maxWaitTime"), 5000))
-            .heartbeatFrequency(toInteger(attrs.get("heartbeatFrequency"), 5000))
-            .minConnectionsPerHost(toInteger(attrs.get("minConnectionsPerHost"), 1))
-            .connectionsPerHost(toInteger(attrs.get("connectionsPerHost"), 4))
-            .build();
-
-        String uri = attrs.getOrDefault("uri", "");
-        if (!uri.isEmpty()) {
-            mongoClient = new MongoClient(new MongoClientURI(uri, MongoClientOptions.builder(options)));
-        } else {
-            MongoCredential credential = null;
-            if (attrs.containsKey("username")) {
-                credential = MongoCredential.createCredential(attrs.getOrDefault("username", ""), attrs.getOrDefault("database", ""), attrs.getOrDefault("password", "").toCharArray());
-            }
-            if (credential == null) {
-                mongoClient = new MongoClient(
-                    new ServerAddress(attrs.getOrDefault("host", "localhost"), toInteger(attrs.get("port"), 27017)), options
-                );
-            } else {
-                mongoClient = new MongoClient(
-                    new ServerAddress(attrs.getOrDefault("host", "localhost"), toInteger(attrs.get("port"), 27017)), credential, options
-                );
-            }
-        }
-        ctx.addSource(mongoClient);
-    }
-
-
-    DiscoveryClient discoveryClient;
-    // @EL(name = "sys.starting")
-    protected void eurekaClient() {
-        Map<String, String> attrs = ctx.env().groupAttr("eureka");
-        MyDataCenterInstanceConfig instanceCfg = new MyDataCenterInstanceConfig();
-        ApplicationInfoManager manager = new ApplicationInfoManager(instanceCfg,
-            InstanceInfo.Builder.newBuilder()
-                .setDataCenterInfo(new MyDataCenterInfo(Netflix))
-                .setLeaseInfo(LeaseInfo.Builder.newBuilder().setDurationInSecs(90).setRenewalIntervalInSecs(30).build())
-                .setInstanceId("192.168.2.100:enet:8080")
-                .setAppName(isEmpty(ctx.getName()) ? "enet" : ctx.getName())
-                .setVIPAddress("enet").setPort(8080)
-                .setHostName("192.168.2.100")
-                .build()
-        );
-        manager.setInstanceStatus(InstanceInfo.InstanceStatus.UP);
-        DefaultEurekaClientConfig cfg = new DefaultEurekaClientConfig() {
-            @Override
-            public boolean shouldFetchRegistry() {
-                return toBoolean(attrs.get("fetchRegistry"), false);
-            }
-            @Override
-            public int getRegistryFetchIntervalSeconds() {
-                return toInteger(attrs.get("registryFetchIntervalSeconds"), 30);
-            }
-            @Override
-            public boolean shouldRegisterWithEureka() {
-                return toBoolean(attrs.get("registerWithEureka"), true);
-            }
-            @Override
-            public List<String> getEurekaServerServiceUrls(String myZone) {
-                return Arrays.stream(attrs.get("client.serviceUrl." + myZone).split(",")).filter(s -> s != null && !s.trim().isEmpty()).collect(Collectors.toList());
-            }
-        };
-        discoveryClient = new DiscoveryClient(manager, cfg);
-        ctx.addSource(discoveryClient);
-    }
-
-
-    @EL(name = "sys.stopping")
-    protected void stop() {
-        if (discoveryClient != null) discoveryClient.shutdown();
-        if (mongoClient != null) mongoClient.close();
     }
 
 
@@ -248,14 +184,7 @@ public class Launcher extends ServerTpl {
 
     @EL(name = "sched.started")
     private void schedStarted() {
-        systemLoadMonitor();
-    }
-
-
-    /**
-     * 系统负载监控
-     */
-    private void systemLoadMonitor() {
+        // 系统负载监控
         try {
             Field f = AppContext.class.getDeclaredField("exec");
             f.setAccessible(true);
@@ -266,6 +195,7 @@ public class Launcher extends ServerTpl {
         } catch (Exception e) {
             log.error(e);
         }
+
     }
 
 

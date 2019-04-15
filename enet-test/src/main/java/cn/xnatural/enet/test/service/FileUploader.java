@@ -1,10 +1,11 @@
 package cn.xnatural.enet.test.service;
 
-import org.apache.commons.io.IOUtils;
 import cn.xnatural.enet.event.EL;
 import cn.xnatural.enet.server.ServerTpl;
 import cn.xnatural.enet.test.common.Async;
+import cn.xnatural.enet.test.common.Monitor;
 import cn.xnatural.enet.test.rest.FileData;
+import org.apache.commons.io.IOUtils;
 
 import java.io.File;
 import java.io.FileOutputStream;
@@ -21,8 +22,8 @@ import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
 import java.util.stream.Collectors;
 
-import static java.util.Collections.emptyList;
 import static cn.xnatural.enet.common.Utils.isEmpty;
+import static java.util.Collections.emptyList;
 
 /**
  * @author xiangxb, 2018-10-14
@@ -34,7 +35,7 @@ public class FileUploader extends ServerTpl {
      */
     private String localDir;
     /**
-     * 文件上传 的访问url前缀. 默认为 /file/**
+     * 文件上传 的访问url前缀
      */
     private URI    urlPrefix;
 
@@ -105,6 +106,7 @@ public class FileUploader extends ServerTpl {
      * 多文件 多线程保存
      * @param files
      */
+    @Monitor(warnTimeOut = 5000)
     public void save(FileData... files) {
         if (files == null || files.length == 0) return;
         // 并发上传

@@ -156,6 +156,7 @@ public class RestTpl extends ServerTpl {
         if (addFile.getAge() == null) throw new IllegalArgumentException("年龄必填");
         uploader.save(addFile.getHeadportrait());
         service.save(addFile);
+        log.info("upload file: {}", addFile.getHeadportrait());
         return ok(uploader.toFullUrl(addFile.getHeadportrait().getResultName()));
         // return ok();
     }

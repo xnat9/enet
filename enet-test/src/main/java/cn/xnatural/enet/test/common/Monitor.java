@@ -17,7 +17,7 @@ public @interface Monitor {
      *
      * @return
      */
-    long warnTimeOut() default 1000;
+    long warnTimeOut() default 2000;
 
     TimeUnit warnTimeUnit() default TimeUnit.MILLISECONDS;
 

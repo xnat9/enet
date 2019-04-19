@@ -123,7 +123,8 @@ public class EP {
         List<Listener> ls = lsMap.get(eName); // 获取需要执行的监听器
         if (ls == null || ls.isEmpty()) {
             log.trace("Not found listener for event name: {}", eName);
-            if (completeFn != null) completeFn.accept(ec); return ec.result;
+            if (completeFn != null) completeFn.accept(ec);
+            return ec.result;
         }
         ec.willPass(ls).ep = this;
         if (trackEvents.contains(eName) || log.isTraceEnabled()) ec.track = true;
@@ -145,8 +146,8 @@ public class EP {
                     else syncLs.add(l);
                 }
             } else {
-                if (ec.async) asyncLs.addAll(ls);
-                else syncLs.addAll(ls);
+                if (ec.async) asyncLs.addAll(ls); // 强制全部异步执行
+                else syncLs.addAll(ls); // 强制全部同步执行
             }
 
             if (completeFn == null) {

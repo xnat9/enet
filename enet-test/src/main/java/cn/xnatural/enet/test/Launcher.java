@@ -151,7 +151,7 @@ public class Launcher extends ServerTpl {
         // 多注解拦截
         return clz -> {
             Method m = Utils.findMethod(clz, mm ->
-                mm.getAnnotation(Trans.class) != null || mm.getAnnotation(Async.class) != null
+                mm.getAnnotation(Trans.class) != null || mm.getAnnotation(Async.class) != null || mm.getAnnotation(Monitor.class) != null
             );
             if (m == null) {
                 try { return clz.newInstance(); }

@@ -23,6 +23,20 @@
 
     <url>https://gitee.com/xnat/enet</url>
 
+    <licenses>
+        <license>
+            <name>The Apache Software License, Version 2.0</name>
+            <url>http://www.apache.org/licenses/LICENSE-2.0.txt</url>
+            <distribution>repo</distribution>
+        </license>
+    </licenses>
+
+
+    <scm>
+        <url>https://gitee.com/xnat/enet</url>
+        <connection>https://gitee.com/xnat/enet.git</connection>
+        <developerConnection>https://gitee.com/xnat/enet</developerConnection>
+    </scm>
 
     <developers>
         <developer>
@@ -48,6 +62,18 @@
         <maven.compiler.source>1.8</maven.compiler.source>
         <maven.compiler.target>1.8</maven.compiler.target>
     </properties>
+
+    <distributionManagement>
+        <snapshotRepository>
+            <id>oss</id>
+            <url>https://oss.sonatype.org/content/repositories/snapshots/</url>
+        </snapshotRepository>
+        <repository>
+            <id>oss</id>
+            <url>https://oss.sonatype.org/service/local/staging/deploy/maven2/</url>
+        </repository>
+    </distributionManagement>
+
 
 
     <build>

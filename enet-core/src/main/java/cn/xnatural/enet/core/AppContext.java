@@ -61,12 +61,12 @@ public class AppContext {
      */
     public void start() {
         log.info("Starting Application on {} with PID {}", getHostname(), getPid());
+        // 1. 初始化事件中心和系统线程池
         if (exec == null) initExecutor();
-        // 1. 初始化事件发布器
         ep = initEp(); ep.addListenerSource(this);
-        sourceMap.forEach((k, v) -> { inject(v); ep.addListenerSource(v); });
+        sourceMap.forEach((k, v) -> { inject(v); ep.addListenerSource(v); }); // 先添加服务是为了可以监听到 env.configured 事件
         // 2. 设置系统环境
-        env = new Environment(); env.setEp(ep); env.loadCfg();
+        env = new Environment(ep); env.loadCfg();
         // 3. 通知所有服务启动
         ep.fire("sys.starting", EC.of(this), (ec) -> {
             autoInject();
@@ -138,8 +138,8 @@ public class AppContext {
         iterateField(o.getClass(), f -> {
             Resource r = f.getAnnotation(Resource.class);
             if (r == null) return;
-            f.setAccessible(true);
             try {
+                f.setAccessible(true);
                 Object v = f.get(o);
                 if (v != null) return; // 已经存在值则不需要再注入
 

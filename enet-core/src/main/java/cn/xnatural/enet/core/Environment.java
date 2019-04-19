@@ -1,12 +1,12 @@
 package cn.xnatural.enet.core;
 
-import org.slf4j.ILoggerFactory;
-import org.slf4j.LoggerFactory;
 import cn.xnatural.enet.common.Log;
 import cn.xnatural.enet.common.Utils;
 import cn.xnatural.enet.event.EC;
 import cn.xnatural.enet.event.EL;
 import cn.xnatural.enet.event.EP;
+import org.slf4j.ILoggerFactory;
+import org.slf4j.LoggerFactory;
 
 import java.io.FileNotFoundException;
 import java.io.InputStream;
@@ -26,7 +26,7 @@ import static cn.xnatural.enet.common.Utils.*;
  * 系统环境
  */
 public class Environment {
-    public final static String                           PROP_ACTIVE      = "env.profiles.active";
+    public final static String                           PROP_ACTIVE      = "enet.profile.active";
     protected           Log                              log              = Log.of(Environment.class);
     protected           EP                               ep;
     /**
@@ -63,7 +63,18 @@ public class Environment {
     protected final     Set<String>                      activeProfiles   = new LinkedHashSet<>(5);
 
 
-    public Environment() {
+    public Environment(EP ep) {
+        if (ep == null) throw new IllegalArgumentException("ep must not be null");
+        this.ep = ep;
+        ep.addListenerSource(this);
+        init();
+    }
+
+
+    /**
+     * 初始化
+     */
+    protected void init() {
         // 按优先级添加. 先添加优先级最低, 越后边越高
         cfgFileLocations.add("classpath:/");
         cfgFileLocations.add("classpath:/config/");
@@ -115,6 +126,7 @@ public class Environment {
                 }
             }
         }
+        // -Denet.profile.active=pro
         if (Utils.isNotEmpty(System.getProperty(PROP_ACTIVE))) {
             activeProfiles.clear();
             activeProfiles.addAll(Arrays.asList(System.getProperty(PROP_ACTIVE).split(",")));
@@ -124,7 +136,7 @@ public class Environment {
             if (profileSources.containsKey(p)) finalAttrs.putAll(profileSources.get(p));
         }
         finalAttrs.put(PROP_ACTIVE, activeProfiles.stream().collect(Collectors.joining(",")));
-        parseValue(finalAttrs, new AtomicInteger(0));
+        parseValue(finalAttrs, new AtomicInteger(0)); // 替换 ${attr} 值
         log.debug("final attrs: {}", finalAttrs);
         log.info("The following profiles are active: {}", finalAttrs.get(PROP_ACTIVE));
         // 初始化日志相关
@@ -234,14 +246,12 @@ public class Environment {
 
 
     public Integer getInteger(String key, Integer defaultValue) {
-        String v = getAttr(key);
-        return Utils.toInteger(v, defaultValue);
+        return Utils.toInteger(getAttr(key), defaultValue);
     }
 
 
     public Long getLong(String key, Long defaultValue) {
-        String v = getAttr(key);
-        return Utils.toLong(v, defaultValue);
+        return Utils.toLong(getAttr(key), defaultValue);
     }
 
 
@@ -252,8 +262,7 @@ public class Environment {
 
 
     public Boolean getBoolean(String name, Boolean defaultValue) {
-        String v = getAttr(name);
-        return Utils.toBoolean(v, defaultValue);
+        return Utils.toBoolean(getAttr(name), defaultValue);
     }
 
 
@@ -311,13 +320,6 @@ public class Environment {
         System.getProperties().forEach((k, v) -> fn.accept(k.toString(), Objects.toString(v, null)));
         runtimeAttrs.forEach(fn);
         return group;
-    }
-
-
-    Environment setEp(EP ep) {
-        this.ep = ep;
-        ep.addListenerSource(this);
-        return this;
     }
 
 

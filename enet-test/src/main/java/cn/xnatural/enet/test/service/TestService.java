@@ -3,6 +3,7 @@ package cn.xnatural.enet.test.service;
 import cn.xnatural.enet.server.ServerTpl;
 import cn.xnatural.enet.server.dao.hibernate.Trans;
 import cn.xnatural.enet.test.common.Async;
+import cn.xnatural.enet.test.common.Monitor;
 import cn.xnatural.enet.test.dao.entity.TestEntity;
 import cn.xnatural.enet.test.dao.entity.UploadFile;
 import cn.xnatural.enet.test.dao.repo.TestRepo;
@@ -21,6 +22,7 @@ public class TestService extends ServerTpl {
     UploadFileRepo uploadFileRepo;
 
 
+    @Monitor
     @Trans
     public PageModel findTestData() {
         TestEntity e = new TestEntity();

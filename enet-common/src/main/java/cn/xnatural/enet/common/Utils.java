@@ -43,13 +43,14 @@ public class Utils {
 
     public static class Http {
         private String              urlStr;
-        private String              contentType = "application/x-www-form-urlencoded";
+        private String              contentType;
         private String              method;
         private String              jsonBody;
         private Map<String, Object> params;
         private Map<String, Object> cookies;
         private Map<String, String> headers;
-        private int                 timeout = 3000;
+        private int                 connectTimeout = 3000;
+        private int                 readTimeout = 10000;
         private int                 responseCode;
 
         public Http get(String url) { this.urlStr = url; this.method = "GET"; return this; }
@@ -61,7 +62,8 @@ public class Utils {
          */
         public Http contentType(String contentType) { this.contentType = contentType; return this; }
         public Http jsonBody(String jsonStr) {this.jsonBody = jsonStr; return this; }
-        public Http timeout(int timeout) { this.timeout = timeout; return this; }
+        public Http readTimeout(int timeout) { this.readTimeout = timeout; return this; }
+        public Http connectTimeout(int timeout) { this.connectTimeout = timeout; return this; }
         /**
          * 添加参数
          * @param name 参数名
@@ -122,15 +124,18 @@ public class Utils {
                     ((HttpsURLConnection) conn).setSSLSocketFactory(sc.getSocketFactory());
                 }
                 conn.setRequestMethod(method);
+                conn.setConnectTimeout(connectTimeout);
+                conn.setReadTimeout(readTimeout);
+
+                // header 设置
+                conn.setRequestProperty("Accept", "*/*"); // 必加
                 conn.setRequestProperty("Charset", "UTF-8");
                 conn.setRequestProperty("Accept-Charset", "UTF-8");
+                conn.setRequestProperty("Connection", "close"); // 不加的话会强制关闭连接
                 // conn.setRequestProperty("User-Agent", "xnatural-http-client");
-                conn.setConnectTimeout(timeout);
-                conn.setReadTimeout(timeout);
-                // header 设置
                 if (isNotEmpty(headers)) {
-                    for (Map.Entry<String, String> entry : headers.entrySet()) {
-                        conn.setRequestProperty(entry.getKey(), entry.getValue());
+                    for (Map.Entry<String, String> e : headers.entrySet()) {
+                        conn.setRequestProperty(e.getKey(), e.getValue());
                     }
                 }
 
@@ -144,7 +149,6 @@ public class Utils {
                         isMulti = true;
                     }
                 }
-                conn.setRequestProperty("Content-Type", contentType);
 
                 // cookie 设置
                 if (isNotEmpty(cookies)) {
@@ -180,11 +184,11 @@ public class Utils {
 //                                os.writeBytes(end);
 //                                IOUtils.copy(((MultipartFile) entry.getValue()).getInputStream(), os);
 //                            }
-                            else {
+                            else if (entry.getValue() instanceof String) {
                                 os.write(("Content-Disposition: form-data; name=\"" + entry.getKey() + "\"" + end).getBytes("utf-8"));
                                 os.writeBytes(end);
                                 os.write(entry.getValue().toString().getBytes("utf-8"));
-                            }
+                            } else throw new IllegalArgumentException("not support parameter");
                             os.writeBytes(end);
                         }
                         os.writeBytes(twoHyphens + boundary + twoHyphens + end);

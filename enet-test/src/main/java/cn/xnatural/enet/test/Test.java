@@ -20,7 +20,11 @@ public class Test {
     public static void main(String[] args) {
         Http http = http();
         long start = System.currentTimeMillis();
-        System.out.println(http.get("http://39.104.28.131:8080/tpl/dao").execute());
+        String url = "http://localhost:8080/dao";
+        http.get(url);
+        System.out.println(http.execute());
+        System.out.println(http.getResponseCode());
+        if (true) return;
         Map<String, Object> cookies = http.cookies();
 
         int threadCunt = 100;
@@ -34,21 +38,17 @@ public class Test {
         };
         for (int i = 0; i < threadCunt; i++) {
             exec.execute(() -> {
-                for (int j = 0; j < 200; j++) {
-                    try {
-                        Http h = http().timeout(10000).header("Connection", "close").cookies(cookies).get("http" + "://39.104.28.131:8080/tpl/dao");
-                        String r = h.execute();
-                        if (h.getResponseCode() == 503) System.out.println("server is busy");
-                        else System.out.println(r);
-                    } catch (Exception ex) {
-                        if (ex instanceof SocketTimeoutException) System.out.println(ex.getMessage());
-                        else {
-                            ex.printStackTrace();
-                        }
+                try {
+                    Http h = http().cookies(cookies).get(url);
+                    String r = h.execute();
+                    if (h.getResponseCode() == 503) System.out.println("server is busy");
+                    else System.out.println(r);
+                } catch (Exception ex) {
+                    if (ex instanceof SocketTimeoutException) System.out.println(ex.getMessage());
+                    else {
+                        ex.printStackTrace();
                     }
-
                 }
-                count.decrementAndGet(); fn.run();
             });
         }
     }

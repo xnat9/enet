@@ -35,6 +35,7 @@ import java.util.Objects;
 import java.util.concurrent.Executor;
 import java.util.concurrent.ThreadPoolExecutor;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicInteger;
 import java.util.function.Function;
 import java.util.function.Supplier;
 
@@ -205,41 +206,25 @@ public class Launcher extends ServerTpl {
      */
     private void monitorExec(ThreadPoolExecutor e) {
         int size = e.getQueue().size();
+        AtomicInteger down = new AtomicInteger(0); // 应该拦截多少个任务进线程池
         if (size > e.getCorePoolSize() * 50) {
-            ep.fire("sys.load", EC.of(this).sync().args(size / 7));
-            log.warn("system is very heavy load running!. {}", "[" + e.toString().split("\\[")[1]);
+            down.set(size / 7); log.warn("system is very heavy load running!. {}", "[" + e.toString().split("\\[")[1]);
         } else if (size > e.getCorePoolSize() * 40) {
-            ep.fire("sys.load", 8);
             log.warn("system is heavy load running. {}", "[" + e.toString().split("\\[")[1]);
-            ep.fire("sched.after", 45, TimeUnit.SECONDS, (Runnable) () -> {
+            ep.fire("sched.after", 25, TimeUnit.SECONDS, (Runnable) () -> {
                 if (e.getQueue().size() > size) {
-                    ep.fire("sys.load", 50);
-                    log.warn("system is heavy(up) load running. {}", "[" + e.toString().split("\\[")[1]);
+                    down.set(20); log.warn("system is heavy(up) load running. {}", "[" + e.toString().split("\\[")[1]);
                 } else if (e.getQueue().size() < size) {
-                    ep.fire("sys.load", 7);
                     log.warn("system is heavy(down) load running. {}", "[" + e.toString().split("\\[")[1]);
                 }
             });
         } else if (size > e.getCorePoolSize() * 20) {
-            ep.fire("sys.load", 5);
             log.warn("system will heavy load running. {}", "[" + e.toString().split("\\[")[1]);
-            ep.fire("sched.after", 30, TimeUnit.SECONDS, (Runnable) () -> {
+            ep.fire("sched.after", 10, TimeUnit.SECONDS, (Runnable) () -> {
                 if (e.getQueue().size() > size) {
-                    ep.fire("sys.load", 20);
-                    log.warn("system will heavy(up) load running. {}", "[" + e.toString().split("\\[")[1]);
+                    down.set(5); log.warn("system will heavy(up) load running. {}", "[" + e.toString().split("\\[")[1]);
                 } else if (e.getQueue().size() < size) {
-                    ep.fire("sys.load", 4);
                     log.warn("system will heavy(down) load running. {}", "[" + e.toString().split("\\[")[1]);
-                }
-            });
-        } else if (size > e.getCorePoolSize() * 10) {
-            log.warn("system is litter heavy load running. {}", "[" + e.toString().split("\\[")[1]);
-            ep.fire("sched.after", 25, TimeUnit.SECONDS, (Runnable) () -> {
-                if (e.getQueue().size() > size) {
-                    ep.fire("sys.load", 7);
-                    log.warn("system is litter heavy(up) load running. {}", "[" + e.toString().split("\\[")[1]);
-                } else if (e.getQueue().size() < size) {
-                    log.warn("system is litter heavy(down) load running. {}", "[" + e.toString().split("\\[")[1]);
                 }
             });
         } else if (size > e.getCorePoolSize() * 5) {
@@ -247,5 +232,6 @@ public class Launcher extends ServerTpl {
         } else if (log.isDebugEnabled() || log.isTraceEnabled()) {
             log.debug("system executor: {}", "[" + e.toString().split("\\[")[1]);
         }
+        if (down.get() > 0) ep.fire("sys.load", EC.of(this).sync().args(down.get()));
     }
 }

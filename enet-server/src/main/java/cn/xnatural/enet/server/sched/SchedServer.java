@@ -50,6 +50,7 @@ public class SchedServer extends ServerTpl {
             AgentThreadPool.exec = exec;
             scheduler = f.getScheduler();
             scheduler.start();
+            exposeBean(scheduler);
         } catch (SchedulerException e) { throw new RuntimeException(e); }
         ep.fire(getName() + ".started");
         log.info("Started {}(Quartz) Server", getName());

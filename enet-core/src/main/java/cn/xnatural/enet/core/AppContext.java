@@ -61,13 +61,14 @@ public class AppContext {
      */
     public void start() {
         log.info("Starting Application on {} with PID {}", getHostname(), getPid());
-        // 1. 初始化事件中心和系统线程池
+        // 1. 初始化系统线程池
         if (exec == null) initExecutor();
+        // 2. 初始化事件中心
         ep = initEp(); ep.addListenerSource(this);
         sourceMap.forEach((k, v) -> { inject(v); ep.addListenerSource(v); }); // 先添加服务是为了可以监听到 env.configured 事件
-        // 2. 设置系统环境
+        // 3. 设置系统环境
         env = new Environment(ep); env.loadCfg();
-        // 3. 通知所有服务启动
+        // 4. 通知所有服务启动
         ep.fire("sys.starting", EC.of(this), (ec) -> {
             autoInject();
             if (shutdownHook != null) Runtime.getRuntime().addShutdownHook(shutdownHook);

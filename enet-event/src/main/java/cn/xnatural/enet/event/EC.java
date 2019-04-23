@@ -131,7 +131,7 @@ public class EC {
 
 
     public EC source(Object s) {
-        if (willPass != null) throw new RuntimeException("事件源不允许更改");
+        if (willPass != null) throw new RuntimeException("not allow change event source!");
         this.source = s;
         return this;
     }

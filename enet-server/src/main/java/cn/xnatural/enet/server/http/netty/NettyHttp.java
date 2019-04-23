@@ -19,8 +19,10 @@ import java.util.Locale;
 import java.util.Map;
 import java.util.concurrent.Executor;
 import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.concurrent.atomic.AtomicInteger;
 
 import static io.netty.handler.codec.http.HttpResponseStatus.SERVICE_UNAVAILABLE;
 import static cn.xnatural.enet.common.Utils.isEmpty;
@@ -45,6 +47,7 @@ public class NettyHttp extends ServerTpl {
         if (!running.compareAndSet(false, true)) {
             log.warn("{} Server is running", getName()); return;
         }
+        if (exec == null) exec = Executors.newFixedThreadPool(2);
         if (ep == null) ep = new EP(exec);
         ep.fire(getName() + ".starting");
         attrs.putAll((Map) ep.fire("env.ns", "http", getName()));
@@ -66,6 +69,10 @@ public class NettyHttp extends ServerTpl {
 
 
     /**
+     * 当前正在处理的连接个数
+     */
+    protected AtomicInteger connCount = new AtomicInteger(0);
+    /**
      * 创建http服务
      */
     protected void createServer() {
@@ -82,8 +89,16 @@ public class NettyHttp extends ServerTpl {
                         ch.pipeline().addLast(new HttpServerCodec());
                         ch.pipeline().addLast(new SimpleChannelInboundHandler<Object>(false) {
                             @Override
+                            public void channelRegistered(ChannelHandlerContext ctx) throws Exception {
+                                connCount.incrementAndGet(); super.channelRegistered(ctx);
+                            }
+                            @Override
                             protected void channelRead0(ChannelHandlerContext ctx, Object msg) throws Exception {
                                 if (!fusing(ctx, msg)) ctx.fireChannelRead(msg);
+                            }
+                            @Override
+                            public void channelInactive(ChannelHandlerContext ctx) throws Exception {
+                                connCount.decrementAndGet(); super.channelInactive(ctx);
                             }
                         });
                         ch.pipeline().addLast(new HttpServerKeepAliveHandler());
@@ -109,15 +124,6 @@ public class NettyHttp extends ServerTpl {
     }
 
 
-    protected int down = 0;
-    /**
-     * 监听系统负载
-     * @param down
-     */
-    @EL(name = "sys.load", async = false)
-    protected void sysLoad(Integer down) { this.down = down; }
-
-
     /**
      * 熔断: 是否拒绝处理请求
      * @param ctx
@@ -126,8 +132,7 @@ public class NettyHttp extends ServerTpl {
      */
     protected boolean fusing(ChannelHandlerContext ctx, Object msg) {
         if (!(msg instanceof DefaultHttpRequest)) return false;
-        if (down > 0) { // 当系统负载过高时拒绝处理
-            down--;
+        if (connCount.get() > getInteger("maxConnection", 200)) { // 最大连接
             DefaultHttpResponse resp = new DefaultHttpResponse(((DefaultHttpRequest) msg).protocolVersion(), SERVICE_UNAVAILABLE);
             ctx.writeAndFlush(resp); ctx.close();
             return true;

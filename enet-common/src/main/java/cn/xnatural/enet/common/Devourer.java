@@ -1,39 +1,33 @@
-package cn.xnatural.enet.common.devourer;
-
-import cn.xnatural.enet.common.Log;
+package cn.xnatural.enet.common;
 
 import java.util.Queue;
 import java.util.concurrent.ConcurrentLinkedQueue;
 import java.util.concurrent.Executor;
+import java.util.concurrent.ExecutorService;
 import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.function.Supplier;
 
 /**
- * 自消化器, 同一时刻只会有一个 执行体被执行
+ * 吞噬器, 同一时刻只会有一个 执行体被执行
  * 核心方法: {@link #trigger()}
  */
 public class Devourer {
-    protected final Log             log     = Log.of(getClass());
-    protected final Executor        exec;
-    protected final AtomicBoolean   running = new AtomicBoolean(false);
-    protected final Queue<Runnable> waiting = new ConcurrentLinkedQueue<>();
-    protected final Object          key;
+    protected final Log               log      = Log.of(getClass());
+    protected final Executor          exec;
+    protected final AtomicBoolean     running  = new AtomicBoolean(false);
+    protected final Queue<Runnable>   waiting  = new ConcurrentLinkedQueue<>();
+    protected final Object            key;
     /**
-     * 如果为空则认为是游离的 {@link Devourer}
+     * 是否应该熔断(暂停执行)
      */
-    protected       DevourerManager dm;
+    protected       Supplier<Boolean> fusing   = () -> Boolean.FALSE;
 
 
     public Devourer(Object key, Executor exec) {
-        this(key, exec, null);
-    }
-
-
-    public Devourer(Object key, Executor exec, DevourerManager dm) {
         if (key == null) throw new NullPointerException("devourer key is null");
         if (exec == null) throw new NullPointerException("executor is null");
         this.key = key;
         this.exec = exec;
-        this.dm = dm;
     }
 
 
@@ -49,9 +43,8 @@ public class Devourer {
      * 不断的从 {@link #waiting} 对列中取出执行
      */
     private final void trigger() {
-        if (waiting.isEmpty()) return;
+        if (waiting.isEmpty() || fusing.get()) return;
         // TODO 会有 cas aba 问题?
-        // 例子: org.springframework.security.config.annotation.AbstractSecurityBuilder.build
         if (!running.compareAndSet(false, true)) return;
         // 1.必须保证这里只有一个线程被执行
         // 2.必须保证不能出现情况: waiting 对列中有值, 但没有被执行
@@ -68,8 +61,30 @@ public class Devourer {
     }
 
 
-    public DevourerManager getDevourerManager() {
-        return dm;
+    /**
+     * 设置运行条件
+     * @param fusing
+     * @return
+     */
+    public Devourer fusing(Supplier<Boolean> fusing) {
+        if (fusing == null) throw new IllegalArgumentException("condition Supplier can not be null");
+        this.fusing = fusing;
+        return this;
+    }
+
+
+    /**
+     * 排对个数
+     * @return
+     */
+    public int getWaitingCount() {
+        return waiting.size();
+    }
+
+
+
+    public void shutdown() {
+        if (exec instanceof ExecutorService) ((ExecutorService) exec).shutdown();
     }
 
 

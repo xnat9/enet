@@ -6,7 +6,8 @@ import java.net.SocketTimeoutException;
 import java.util.Map;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
-import java.util.concurrent.atomic.AtomicInteger;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicBoolean;
 
 import static cn.xnatural.enet.common.Utils.Http;
 import static cn.xnatural.enet.common.Utils.http;
@@ -17,39 +18,37 @@ public class Test {
         Log.init(null);
     }
 
-    public static void main(String[] args) {
-        Http http = http();
-        long start = System.currentTimeMillis();
+    public static void main(String[] args) throws Throwable {
         String url = "http://localhost:8080/dao";
-        http.get(url);
-        System.out.println(http.execute());
-        System.out.println(http.getResponseCode());
-        if (true) return;
+
+        Http http = http().header("Connection", "keep-alive");
+        System.out.println(http.get(url).execute());
+        // if (true) return;
         Map<String, Object> cookies = http.cookies();
+
 
         int threadCunt = 100;
         ExecutorService exec = Executors.newFixedThreadPool(threadCunt);
-        AtomicInteger count = new AtomicInteger(threadCunt);
-        Runnable fn = () -> {
-            if (count.get() == 0) {
-                exec.shutdown();
-                System.out.println("共执行: " + (System.currentTimeMillis() - start) / 1000);
-            }
-        };
+        final AtomicBoolean stop = new AtomicBoolean(false);
         for (int i = 0; i < threadCunt; i++) {
             exec.execute(() -> {
-                try {
-                    Http h = http().cookies(cookies).get(url);
-                    String r = h.execute();
-                    if (h.getResponseCode() == 503) System.out.println("server is busy");
-                    else System.out.println(r);
-                } catch (Exception ex) {
-                    if (ex instanceof SocketTimeoutException) System.out.println(ex.getMessage());
-                    else {
-                        ex.printStackTrace();
+                while (!stop.get()) {
+                    try {
+                        Http h = http().readTimeout(7000).cookies(cookies).get(url);
+                        String r = h.execute();
+                        if (h.getResponseCode() == 503) System.out.println("server is busy");
+                        else System.out.println(r);
+                    } catch (Exception ex) {
+                        if (ex instanceof SocketTimeoutException) System.out.println(ex.getMessage());
+                        else {
+                            ex.printStackTrace();
+                        }
                     }
                 }
             });
         }
+        Thread.sleep(TimeUnit.MINUTES.toMillis(5)); // 压测时间
+        stop.set(true);
+        exec.shutdown();
     }
 }

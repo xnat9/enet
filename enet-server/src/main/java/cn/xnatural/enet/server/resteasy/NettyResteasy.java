@@ -1,5 +1,10 @@
 package cn.xnatural.enet.server.resteasy;
 
+import cn.xnatural.enet.common.Devourer;
+import cn.xnatural.enet.common.Utils;
+import cn.xnatural.enet.event.EL;
+import cn.xnatural.enet.event.EP;
+import cn.xnatural.enet.server.ServerTpl;
 import io.netty.channel.ChannelHandlerContext;
 import io.netty.channel.ChannelPipeline;
 import org.jboss.resteasy.core.InjectorFactoryImpl;
@@ -8,10 +13,6 @@ import org.jboss.resteasy.core.ValueInjector;
 import org.jboss.resteasy.plugins.server.netty.*;
 import org.jboss.resteasy.spi.*;
 import org.jboss.resteasy.spi.metadata.Parameter;
-import cn.xnatural.enet.common.Utils;
-import cn.xnatural.enet.event.EL;
-import cn.xnatural.enet.event.EP;
-import cn.xnatural.enet.server.ServerTpl;
 
 import javax.annotation.PostConstruct;
 import javax.annotation.Resource;
@@ -26,12 +27,15 @@ import java.util.List;
 import java.util.Map;
 import java.util.UUID;
 import java.util.concurrent.Executor;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.concurrent.atomic.AtomicInteger;
 
+import static cn.xnatural.enet.common.Utils.*;
 import static org.jboss.resteasy.plugins.server.netty.RestEasyHttpRequestDecoder.Protocol.HTTP;
 import static org.jboss.resteasy.util.FindAnnotation.findAnnotation;
-import static cn.xnatural.enet.common.Utils.*;
 
 /**
  * netty4 和 resteasy 结合
@@ -59,9 +63,17 @@ public class NettyResteasy extends ServerTpl {
     protected       ResteasyDeployment deployment = new ResteasyDeployment();
     protected       RequestDispatcher  dispatcher;
     /**
+     * 吞噬器.请求执行控制器
+     */
+    protected       Devourer           devourer;
+    /**
      * 关联的所有
      */
     protected       List<Object>       sources    = new LinkedList<>();
+    /**
+     * 正在执行的请求个数
+     */
+    protected final AtomicInteger      ingCount   = new AtomicInteger(0);
 
 
     public NettyResteasy() { super("resteasy"); }
@@ -73,9 +85,11 @@ public class NettyResteasy extends ServerTpl {
         if (!running.compareAndSet(false, true)) {
             log.warn("{} Server is running", getName()); return;
         }
+        if (exec == null) exec = Executors.newFixedThreadPool(2);
         if (ep == null) ep = new EP(exec);
         ep.fire(getName() + ".starting");
         attrs.putAll((Map) ep.fire("env.ns", "mvc", getName()));
+
         enableSession = Utils.toBoolean(ep.fire("env.getAttr", "session.enabled"), false);
         rootPath = getStr("rootPath", "/");
         sessionCookieName = getStr("sessionCookieName", "sId");
@@ -86,7 +100,19 @@ public class NettyResteasy extends ServerTpl {
                 log.error(e);
             }
         }
+        // 初始化请求执行控制器
+        devourer = new Devourer(getClass().getSimpleName(), exec);
+        devourer.fusing(() -> { // 并发处理最大请求数限制条件
+            boolean f = ingCount.get() >= getInteger("maxParallelRequest", 50);
+            if (f) { // 超时并发最大时日志警告
+                int i = devourer.getWaitingCount();
+                if (i > 0 && i % 5 == 0) log.warn("There are currently '{}' requests waiting to be processed.", i);
+            }
+            return f;
+        });
+        // 初始化resteasy组件
         startDeployment(); initDispatcher(); collect();
+
         ep.fire(getName() + ".started");
         log.info("Started {} Server. rootPath: {}", getName(), getRootPath());
     }
@@ -96,6 +122,8 @@ public class NettyResteasy extends ServerTpl {
     public void stop() {
         log.debug("Shutdown '{}' Server", getName());
         dispatcher = null; deployment.stop(); deployment = null;
+        devourer.shutdown();
+        if (exec instanceof ExecutorService) ((ExecutorService) exec).shutdown();
     }
 
 
@@ -108,13 +136,9 @@ public class NettyResteasy extends ServerTpl {
         cp.addLast(new RequestHandler(dispatcher) {
             @Override
             protected void channelRead0(ChannelHandlerContext ctx, Object msg) {
-                exec.execute(() -> process(ctx, msg));
-            }
-
-            @Override
-            public void exceptionCaught(ChannelHandlerContext ctx, Throwable e) throws Exception {
-                if (e instanceof IOException && e.getMessage().contains("Connection reset by peer")) ctx.close();
-                else super.exceptionCaught(ctx, e);
+                devourer.offer(() -> exec.execute(() -> {
+                    ingCount.incrementAndGet(); process(ctx, msg); ingCount.decrementAndGet();
+                }));
             }
         });
     }

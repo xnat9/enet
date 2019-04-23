@@ -3,7 +3,6 @@ package cn.xnatural.enet.test;
 
 import cn.xnatural.enet.common.Utils;
 import cn.xnatural.enet.core.AppContext;
-import cn.xnatural.enet.event.EC;
 import cn.xnatural.enet.event.EL;
 import cn.xnatural.enet.server.ServerTpl;
 import cn.xnatural.enet.server.cache.ehcache.EhcacheServer;
@@ -26,16 +25,12 @@ import cn.xnatural.enet.test.service.FileUploader;
 import cn.xnatural.enet.test.service.TestService;
 
 import javax.annotation.Resource;
-import java.lang.reflect.Field;
 import java.lang.reflect.Method;
 import java.util.Arrays;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.Objects;
 import java.util.concurrent.Executor;
-import java.util.concurrent.ThreadPoolExecutor;
-import java.util.concurrent.TimeUnit;
-import java.util.concurrent.atomic.AtomicInteger;
 import java.util.function.Function;
 import java.util.function.Supplier;
 
@@ -180,58 +175,5 @@ public class Launcher extends ServerTpl {
     @EL(name = "sys.started")
     private void sysStarted() {
         // ctx.stop(); // 测试关闭
-    }
-
-
-    @EL(name = "sched.started")
-    private void schedStarted() {
-        // 系统负载监控
-        try {
-            Field f = AppContext.class.getDeclaredField("exec");
-            f.setAccessible(true);
-            ThreadPoolExecutor v = (ThreadPoolExecutor) f.get(ctx);
-            if (v instanceof ThreadPoolExecutor) {
-                ep.fire("sched.cron", "0 0/1 * * * ?", (Runnable) () -> monitorExec(v));
-            }
-        } catch (Exception e) {
-            log.error(e);
-        }
-
-    }
-
-
-    /**
-     * 监控系统线程池的运行情况
-     * @param e
-     */
-    private void monitorExec(ThreadPoolExecutor e) {
-        int size = e.getQueue().size();
-        AtomicInteger down = new AtomicInteger(0); // 应该拦截多少个任务进线程池
-        if (size > e.getCorePoolSize() * 50) {
-            down.set(size / 7); log.warn("system is very heavy load running!. {}", "[" + e.toString().split("\\[")[1]);
-        } else if (size > e.getCorePoolSize() * 40) {
-            log.warn("system is heavy load running. {}", "[" + e.toString().split("\\[")[1]);
-            ep.fire("sched.after", 25, TimeUnit.SECONDS, (Runnable) () -> {
-                if (e.getQueue().size() > size) {
-                    down.set(20); log.warn("system is heavy(up) load running. {}", "[" + e.toString().split("\\[")[1]);
-                } else if (e.getQueue().size() < size) {
-                    log.warn("system is heavy(down) load running. {}", "[" + e.toString().split("\\[")[1]);
-                }
-            });
-        } else if (size > e.getCorePoolSize() * 20) {
-            log.warn("system will heavy load running. {}", "[" + e.toString().split("\\[")[1]);
-            ep.fire("sched.after", 10, TimeUnit.SECONDS, (Runnable) () -> {
-                if (e.getQueue().size() > size) {
-                    down.set(5); log.warn("system will heavy(up) load running. {}", "[" + e.toString().split("\\[")[1]);
-                } else if (e.getQueue().size() < size) {
-                    log.warn("system will heavy(down) load running. {}", "[" + e.toString().split("\\[")[1]);
-                }
-            });
-        } else if (size > e.getCorePoolSize() * 5) {
-            log.info("system executor: {}", "[" + e.toString().split("\\[")[1]);
-        } else if (log.isDebugEnabled() || log.isTraceEnabled()) {
-            log.debug("system executor: {}", "[" + e.toString().split("\\[")[1]);
-        }
-        if (down.get() > 0) ep.fire("sys.load", EC.of(this).sync().args(down.get()));
     }
 }

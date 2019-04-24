@@ -12,13 +12,17 @@ import java.util.function.Supplier;
  * 核心方法: {@link #trigger()}
  */
 public class Devourer {
-    protected final Log               log      = Log.of(getClass());
+    protected final Log               log     = Log.of(getClass());
     protected final Executor          exec;
-    protected final AtomicBoolean     running  = new AtomicBoolean(false);
-    protected final Queue<Runnable>   waiting  = new ConcurrentLinkedQueue<>();
+    protected final AtomicBoolean     running = new AtomicBoolean(false);
+    protected final Queue<Runnable>   waiting = new ConcurrentLinkedQueue<>();
     protected final Object            key;
     /**
-     * 是否应该熔断(暂停执行)
+     * 是否应该熔断: 暂停执行
+     */
+    protected       Supplier<Boolean> pause   = () -> Boolean.FALSE;
+    /**
+     * 是否应该熔断: 丢弃
      */
     protected       Supplier<Boolean> fusing   = () -> Boolean.FALSE;
 
@@ -32,7 +36,7 @@ public class Devourer {
 
 
     public Devourer offer(Runnable fn) {
-        if (fn == null) return this;
+        if (fn == null && fusing.get()) return this;
         waiting.offer(fn);
         trigger();
         return this;
@@ -43,7 +47,7 @@ public class Devourer {
      * 不断的从 {@link #waiting} 对列中取出执行
      */
     private final void trigger() {
-        if (waiting.isEmpty() || fusing.get()) return;
+        if (waiting.isEmpty() || pause.get()) return;
         // TODO 会有 cas aba 问题?
         if (!running.compareAndSet(false, true)) return;
         // 1.必须保证这里只有一个线程被执行
@@ -61,13 +65,16 @@ public class Devourer {
     }
 
 
-    /**
-     * 设置运行条件
-     * @param fusing
-     * @return
-     */
+
+    public Devourer pause(Supplier<Boolean> pause) {
+        if (pause == null) throw new IllegalArgumentException("pause Supplier can not be null");
+        this.pause = pause;
+        return this;
+    }
+
+
     public Devourer fusing(Supplier<Boolean> fusing) {
-        if (fusing == null) throw new IllegalArgumentException("condition Supplier can not be null");
+        if (fusing == null) throw new IllegalArgumentException("fusing Supplier can not be null");
         this.fusing = fusing;
         return this;
     }

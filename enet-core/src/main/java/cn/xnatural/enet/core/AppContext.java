@@ -291,7 +291,11 @@ public class AppContext {
      * @return
      */
     protected Executor wrapExecForSource(Object source) {
-        return fn -> exec.execute(fn);
+        return new Executor() {
+            @Override
+            public void execute(Runnable cmd) { exec.execute(cmd); }
+            public int getCorePoolSize() { return exec.getCorePoolSize(); }
+        };
     }
 
 

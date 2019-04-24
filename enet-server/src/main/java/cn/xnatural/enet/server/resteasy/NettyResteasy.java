@@ -7,6 +7,8 @@ import cn.xnatural.enet.event.EP;
 import cn.xnatural.enet.server.ServerTpl;
 import io.netty.channel.ChannelHandlerContext;
 import io.netty.channel.ChannelPipeline;
+import io.netty.handler.codec.http.DefaultHttpResponse;
+import io.netty.handler.codec.http.HttpVersion;
 import org.jboss.resteasy.core.InjectorFactoryImpl;
 import org.jboss.resteasy.core.SynchronousDispatcher;
 import org.jboss.resteasy.core.ValueInjector;
@@ -21,7 +23,6 @@ import javax.ws.rs.core.Cookie;
 import javax.ws.rs.core.NewCookie;
 import javax.ws.rs.ext.Provider;
 import java.io.IOException;
-import java.lang.reflect.Method;
 import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
@@ -31,9 +32,9 @@ import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
-import java.util.concurrent.atomic.AtomicInteger;
 
 import static cn.xnatural.enet.common.Utils.*;
+import static io.netty.handler.codec.http.HttpResponseStatus.SERVICE_UNAVAILABLE;
 import static org.jboss.resteasy.plugins.server.netty.RestEasyHttpRequestDecoder.Protocol.HTTP;
 import static org.jboss.resteasy.util.FindAnnotation.findAnnotation;
 
@@ -70,10 +71,6 @@ public class NettyResteasy extends ServerTpl {
      * 关联的所有
      */
     protected       List<Object>       sources    = new LinkedList<>();
-    /**
-     * 正在执行的请求个数
-     */
-    protected final AtomicInteger      ingCount   = new AtomicInteger(0);
 
 
     public NettyResteasy() { super("resteasy"); }
@@ -102,14 +99,6 @@ public class NettyResteasy extends ServerTpl {
         }
         // 初始化请求执行控制器
         devourer = new Devourer(getClass().getSimpleName(), exec);
-        devourer.fusing(() -> { // 并发处理最大请求数限制条件
-            boolean f = ingCount.get() >= getInteger("maxParallelRequest", 50);
-            if (f) { // 超时并发最大时日志警告
-                int i = devourer.getWaitingCount();
-                if (i > 0 && i % 5 == 0) log.warn("There are currently '{}' requests waiting to be processed.", i);
-            }
-            return f;
-        });
         // 初始化resteasy组件
         startDeployment(); initDispatcher(); collect();
 
@@ -136,9 +125,14 @@ public class NettyResteasy extends ServerTpl {
         cp.addLast(new RequestHandler(dispatcher) {
             @Override
             protected void channelRead0(ChannelHandlerContext ctx, Object msg) {
-                devourer.offer(() -> exec.execute(() -> {
-                    ingCount.incrementAndGet(); process(ctx, msg); ingCount.decrementAndGet();
-                }));
+                int i = devourer.getWaitingCount();
+                // 默认值: 线程池的线程个数的两倍
+                if (i >= getInteger("maxWaitRequest", toInteger(invoke(findMethod(exec.getClass(), "getCorePoolSize"), exec), 10) * 2)) {
+                    if (i > 0 && i % 3 == 0) log.warn("There are currently '{}' requests waiting to be processed.", i);
+                    ctx.writeAndFlush(new DefaultHttpResponse(HttpVersion.HTTP_1_1, SERVICE_UNAVAILABLE));
+                } else {
+                    devourer.offer(() -> exec.execute(() -> process(ctx, msg)));
+                }
             }
         });
     }
@@ -310,13 +304,9 @@ public class NettyResteasy extends ServerTpl {
      * @throws Exception
      */
     protected Object createAndInitSource(Class clz) throws Exception {
-        Object o = clz.newInstance();
-
-        ep.fire("inject", o); //注入@Resource注解的字段
-
+        Object o = clz.newInstance(); ep.fire("inject", o); // 注入@Resource注解的字段
         // 调用 PostConstruct 方法
-        Method m = findMethod(clz, mm -> mm.getAnnotation(PostConstruct.class) != null);
-        if (m != null) invoke(m, o);
+        invoke(findMethod(clz, mm -> mm.getAnnotation(PostConstruct.class) != null), o);
 
         return o;
     }

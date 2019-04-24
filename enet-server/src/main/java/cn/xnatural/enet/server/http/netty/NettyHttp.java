@@ -1,5 +1,8 @@
 package cn.xnatural.enet.server.http.netty;
 
+import cn.xnatural.enet.event.EL;
+import cn.xnatural.enet.event.EP;
+import cn.xnatural.enet.server.ServerTpl;
 import io.netty.bootstrap.ServerBootstrap;
 import io.netty.channel.*;
 import io.netty.channel.epoll.EpollEventLoopGroup;
@@ -10,9 +13,6 @@ import io.netty.channel.socket.nio.NioServerSocketChannel;
 import io.netty.handler.codec.http.*;
 import io.netty.handler.stream.ChunkedWriteHandler;
 import io.netty.handler.timeout.IdleStateHandler;
-import cn.xnatural.enet.event.EL;
-import cn.xnatural.enet.event.EP;
-import cn.xnatural.enet.server.ServerTpl;
 
 import javax.annotation.Resource;
 import java.util.Locale;
@@ -24,8 +24,8 @@ import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
 
-import static io.netty.handler.codec.http.HttpResponseStatus.SERVICE_UNAVAILABLE;
 import static cn.xnatural.enet.common.Utils.isEmpty;
+import static io.netty.handler.codec.http.HttpResponseStatus.SERVICE_UNAVAILABLE;
 
 /**
  * 用 netty 实现的 http server
@@ -78,29 +78,26 @@ public class NettyHttp extends ServerTpl {
     protected void createServer() {
         boolean useEpoll = isLinux() && getBoolean("epollEnabled", true);
         boosGroup = useEpoll ? new EpollEventLoopGroup(getInteger("threads-boos", 1), exec) : new NioEventLoopGroup(getInteger("threads-boos", 1), exec);
-        workerGroup = getBoolean("shareLoop", true) ? boosGroup : (useEpoll ? new EpollEventLoopGroup(getInteger("threads-worker", 1)) : new NioEventLoopGroup(getInteger("threads-worker", 1), exec));
+        workerGroup = getBoolean("shareLoop", true) ? boosGroup : (useEpoll ? new EpollEventLoopGroup(getInteger("threads-worker", 1), exec) : new NioEventLoopGroup(getInteger("threads-worker", 1), exec));
         ServerBootstrap sb = new ServerBootstrap()
                 .group(boosGroup, workerGroup)
                 .channel(useEpoll ? EpollServerSocketChannel.class : NioServerSocketChannel.class)
                 .childHandler(new ChannelInitializer<SocketChannel>() {
                     @Override
                     protected void initChannel(SocketChannel ch) throws Exception {
-                        ch.pipeline().addLast(new IdleStateHandler(getLong("readerIdleTime", 2 * 60L), getLong("writerIdleTime", 0L), getLong("allIdleTime", 0L), TimeUnit.SECONDS));
-                        ch.pipeline().addLast(new HttpServerCodec());
-                        ch.pipeline().addLast(new SimpleChannelInboundHandler<Object>(false) {
+                        ch.pipeline().addLast(new ChannelInboundHandlerAdapter() {
                             @Override
                             public void channelRegistered(ChannelHandlerContext ctx) throws Exception {
-                                connCount.incrementAndGet(); super.channelRegistered(ctx);
+                                connCount.incrementAndGet();
+                                if (!fusing(ctx)) { super.channelRegistered(ctx); }
                             }
                             @Override
-                            protected void channelRead0(ChannelHandlerContext ctx, Object msg) throws Exception {
-                                if (!fusing(ctx, msg)) ctx.fireChannelRead(msg);
-                            }
-                            @Override
-                            public void channelInactive(ChannelHandlerContext ctx) throws Exception {
-                                connCount.decrementAndGet(); super.channelInactive(ctx);
+                            public void channelUnregistered(ChannelHandlerContext ctx) throws Exception {
+                                super.channelUnregistered(ctx); connCount.decrementAndGet();
                             }
                         });
+                        ch.pipeline().addLast(new IdleStateHandler(getLong("readerIdleTime", 2 * 60L), getLong("writerIdleTime", 0L), getLong("allIdleTime", 0L), TimeUnit.SECONDS));
+                        ch.pipeline().addLast(new HttpServerCodec());
                         ch.pipeline().addLast(new HttpServerKeepAliveHandler());
                         ch.pipeline().addLast(new HttpObjectAggregator(getInteger("maxContentLength", 65536)));
                         ch.pipeline().addLast(new ChunkedWriteHandler());
@@ -127,14 +124,12 @@ public class NettyHttp extends ServerTpl {
     /**
      * 熔断: 是否拒绝处理请求
      * @param ctx
-     * @param msg
      * @return
      */
-    protected boolean fusing(ChannelHandlerContext ctx, Object msg) {
-        if (!(msg instanceof DefaultHttpRequest)) return false;
-        if (connCount.get() > getInteger("maxConnection", 200)) { // 最大连接
-            DefaultHttpResponse resp = new DefaultHttpResponse(((DefaultHttpRequest) msg).protocolVersion(), SERVICE_UNAVAILABLE);
-            ctx.writeAndFlush(resp); ctx.close();
+    protected boolean fusing(ChannelHandlerContext ctx) {
+        if (connCount.get() >= getInteger("maxConnection", 100)) { // 最大连接
+            ctx.writeAndFlush(new DefaultHttpResponse(HttpVersion.HTTP_1_1, SERVICE_UNAVAILABLE));
+            ctx.close();
             return true;
         }
         return false;

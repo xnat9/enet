@@ -86,7 +86,7 @@ public class Launcher extends ServerTpl {
      * 创建aop函数
      * @return
      */
-    protected Function<Class<?>, ?> createAopFn() {
+    private Function<Class<?>, ?> createAopFn() {
         abstract class AopFn {
             abstract Object run(Method m, Object[] args, Supplier<Object> fn);
         }

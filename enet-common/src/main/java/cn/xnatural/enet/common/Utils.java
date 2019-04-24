@@ -52,6 +52,7 @@ public class Utils {
         private int                 connectTimeout = 3000;
         private int                 readTimeout = 10000;
         private int                 responseCode;
+        private Consumer<HttpURLConnection> preConnect;
 
         public Http get(String url) { this.urlStr = url; this.method = "GET"; return this; }
         public Http post(String url) { this.urlStr = url; this.method = "POST"; return this; }
@@ -64,6 +65,7 @@ public class Utils {
         public Http jsonBody(String jsonStr) {this.jsonBody = jsonStr; return this; }
         public Http readTimeout(int timeout) { this.readTimeout = timeout; return this; }
         public Http connectTimeout(int timeout) { this.connectTimeout = timeout; return this; }
+        public Http preConnect(Consumer<HttpURLConnection> preConnect) { this.preConnect = preConnect; return this; }
         /**
          * 添加参数
          * @param name 参数名
@@ -126,6 +128,7 @@ public class Utils {
                 conn.setRequestMethod(method);
                 conn.setConnectTimeout(connectTimeout);
                 conn.setReadTimeout(readTimeout);
+                //conn.setUseCaches(false);
 
                 // header 设置
                 conn.setRequestProperty("Accept", "*/*"); // 必加
@@ -159,6 +162,7 @@ public class Utils {
                     conn.setRequestProperty("Cookie", sb.toString());
                 }
 
+                if (preConnect != null) preConnect.accept(conn);
                 conn.connect();  // 连接
 
                 if ("POST".equals(method)) {
@@ -177,14 +181,7 @@ public class Utils {
                                 os.write(s.getBytes("utf-8")); // 这样写是为了避免中文文件名乱码
                                 os.writeBytes(end);
                                 IOUtils.copy(new FileInputStream((File) entry.getValue()), os);
-                            }
-//                            else if (entry.getValue() instanceof MultipartFile) {
-//                                String s = "Content-Disposition: form-data; name=\"" + entry.getKey() + "\"; filename=\"" + ((MultipartFile) entry.getValue()).getOriginalFilename() + "\"" + end;
-//                                os.write(s.getBytes("utf-8")); // 这样写是为了避免中文文件名乱码
-//                                os.writeBytes(end);
-//                                IOUtils.copy(((MultipartFile) entry.getValue()).getInputStream(), os);
-//                            }
-                            else if (entry.getValue() instanceof String) {
+                            } else if (entry.getValue() instanceof String) {
                                 os.write(("Content-Disposition: form-data; name=\"" + entry.getKey() + "\"" + end).getBytes("utf-8"));
                                 os.writeBytes(end);
                                 os.write(entry.getValue().toString().getBytes("utf-8"));
@@ -215,7 +212,7 @@ public class Utils {
                 // 取结果
                 if (responseCode == 200) ret = IOUtils.toString(conn.getInputStream(), "UTF-8");
             } catch (Exception e) {
-                log.error(e, "http 错误, url: " + urlStr);
+                log.error(e, "http error, url: " + urlStr);
             } finally {
                 if (conn != null) conn.disconnect();
             }
@@ -367,6 +364,7 @@ public class Utils {
      * @return
      */
     public static Object invoke(Method m, Object target, Object...args) {
+        if (m == null) return null;
         try { m.setAccessible(true); return m.invoke(target, args); }
         catch (Exception e) { log.error(e); }
         return null;

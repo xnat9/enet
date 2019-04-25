@@ -17,7 +17,6 @@ import javax.persistence.spi.ClassTransformer;
 import javax.persistence.spi.PersistenceUnitInfo;
 import javax.persistence.spi.PersistenceUnitTransactionType;
 import javax.sql.DataSource;
-import java.lang.reflect.Method;
 import java.net.URL;
 import java.util.LinkedList;
 import java.util.List;
@@ -231,8 +230,7 @@ public class Hibernate extends ServerTpl {
                 ep.fire("inject", originObj); //注入@Resource注解的字段
 
                 // invoke init method
-                Method mm = findMethod(clz, m -> m.getAnnotation(PostConstruct.class) != null);
-                if (mm != null) invoke(mm, originObj);
+                invoke(findMethod(clz, m -> m.getAnnotation(PostConstruct.class) != null), originObj);
 
                 // 增强 repo 对象
                 Object inst = Utils.proxy(clz, (obj, method, args, proxy) -> {
@@ -258,35 +256,25 @@ public class Hibernate extends ServerTpl {
             log.warn("New Datasource and close old Datasource");
             closeDs();
         }
-        Map<String, String> r = (Map) ep.fire("env.ns", getName() + ".ds");
-        boolean f = false;
+        Map<String, String> attr = (Map) ep.fire("env.ns", getName() + ".ds");
         // druid 数据源
         try {
-            Class<?> c = Class.forName("com.alibaba.druid.pool.DruidDataSourceFactory");
-            Method m = c.getDeclaredMethod("createDataSource", Map.class);
-            ds = (DataSource) m.invoke(null, r);
+            ds = (DataSource) invoke(findMethod(Class.forName("com.alibaba.druid.pool.DruidDataSourceFactory"), "createDataSource", Map.class), null, attr);
         } catch (ClassNotFoundException e) {
-            // log.error(e, "datasource create error! properties: {}", ec.result);
-            f = true;
         } catch (Exception e) {
             throw new RuntimeException(e);
         }
         // dbcp2 数据源
-        if (f) {
-            f = false;
+        if (ds == null) {
             try {
-                Class<?> c = Class.forName("org.apache.commons.dbcp2.BasicDataSourceFactory");
-                Method m = c.getDeclaredMethod("createDataSource", Properties.class);
-                Properties p = new Properties(); p.putAll(r);
-                ds = (DataSource) m.invoke(null, p);
+                Properties p = new Properties(); p.putAll(attr);
+                ds = (DataSource) invoke(findMethod(Class.forName("org.apache.commons.dbcp2.BasicDataSourceFactory"), "createDataSource", Properties.class), null, p);
             } catch (ClassNotFoundException e) {
-                // log.error(e, "datasource create error! properties: {}", ec.result);
-                f = true;
             } catch (Exception e) {
                 throw new RuntimeException(e);
             }
         }
-        if (f) throw new RuntimeException("Not found DataSource implement class");
+        if (ds == null) throw new RuntimeException("Not found DataSource implement class");
         log.debug("Created datasource for {} Server. {}", getName(), ds);
     }
 
@@ -295,13 +283,7 @@ public class Hibernate extends ServerTpl {
      * 关闭 数据源
      */
     protected void closeDs() {
-        try {
-            Method m = ds.getClass().getDeclaredMethod("close");
-            if (m != null) m.invoke(ds);
-        } catch (NoSuchMethodException e) {
-        } catch (Exception e) {
-            log.error(e, "close datasource error");
-        }
+        invoke(findMethod(ds.getClass(), "close"), ds);
     }
 
 

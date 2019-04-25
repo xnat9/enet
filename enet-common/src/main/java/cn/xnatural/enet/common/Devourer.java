@@ -36,7 +36,7 @@ public class Devourer {
 
 
     public Devourer offer(Runnable fn) {
-        if (fn == null && fusing.get()) return this;
+        if (fn == null || fusing.get()) return this;
         waiting.offer(fn);
         trigger();
         return this;

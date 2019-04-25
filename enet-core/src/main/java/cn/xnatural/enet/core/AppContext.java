@@ -66,12 +66,12 @@ public class AppContext {
         // 2. 初始化事件中心
         ep = initEp(); ep.addListenerSource(this);
         sourceMap.forEach((k, v) -> { inject(v); ep.addListenerSource(v); }); // 先添加服务是为了可以监听到 env.configured 事件
-        // 3. 设置系统环境
+        // 3. 初始化系统环境
         env = new Environment(ep); env.loadCfg();
         // 4. 通知所有服务启动
         ep.fire("sys.starting", EC.of(this), (ec) -> {
-            autoInject();
             if (shutdownHook != null) Runtime.getRuntime().addShutdownHook(shutdownHook);
+            autoInject();
             log.info("Started Application in {} seconds (JVM running for {})",
                 (System.currentTimeMillis() - startup.getTime()) / 1000.0,
                 ManagementFactory.getRuntimeMXBean().getUptime() / 1000.0
@@ -122,7 +122,7 @@ public class AppContext {
 
 
     /**
-     * 初始化. 自动为所有对象源注入
+     * 初始化. 自动为所有对象源注入所需的对象
      */
     protected void autoInject() {
         log.debug("Auto inject @Resource field");

@@ -90,11 +90,11 @@ public class EC {
 
 
     /**
-     * 是否都执行成功
+     * 事件是否执行成功
      * @return
      */
     public boolean isSuccess() {
-        return willPass != null && willPass.size() == passed.size();
+        return isNoListener() || willPass.size() == passed.size();
     }
 
 

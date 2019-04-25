@@ -1,13 +1,13 @@
 package cn.xnatural.enet.server.cache.ehcache;
 
+import cn.xnatural.enet.event.EL;
+import cn.xnatural.enet.event.EP;
+import cn.xnatural.enet.server.ServerTpl;
 import org.ehcache.Cache;
 import org.ehcache.CacheManager;
 import org.ehcache.config.builders.CacheManagerBuilder;
 import org.ehcache.config.builders.ExpiryPolicyBuilder;
 import org.ehcache.config.builders.ResourcePoolsBuilder;
-import cn.xnatural.enet.event.EL;
-import cn.xnatural.enet.event.EP;
-import cn.xnatural.enet.server.ServerTpl;
 
 import java.time.Duration;
 import java.util.Map;
@@ -42,7 +42,7 @@ public class EhcacheServer extends ServerTpl {
         attrs.putAll((Map) ep.fire("env.ns", "cache", getName()));
 
         cm = CacheManagerBuilder.newCacheManagerBuilder().build(true);
-        exposeBean(cm, "ehcacheManager");
+        exposeBean(cm);
 
         ep.fire(getName() + ".started");
         log.info("Started {} Server", getName());
@@ -69,7 +69,7 @@ public class EhcacheServer extends ServerTpl {
                     else if (heapOfEntries != null) b = b.heap(heapOfEntries, ENTRIES);
                     else if (heapOfMB != null) b = b.heap(heapOfMB, MB);
                     cache = cm.createCache(cName, newCacheConfigurationBuilder(Object.class, Object.class, b.build())
-                        .withExpiry(ExpiryPolicyBuilder.timeToLiveExpiration(expire == null ? Duration.ofSeconds(getInteger("expire." + cName, 60 * 30)) : expire))
+                        .withExpiry(ExpiryPolicyBuilder.timeToLiveExpiration(expire == null ? Duration.ofSeconds(getInteger("expire." + cName, getInteger("defaultExpire", 60 * 30))) : expire))
                     );
                 }
             }

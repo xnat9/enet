@@ -195,6 +195,7 @@ public class Log {
         String msg; Object[] args; Throwable th;
     }
 
+    // 早期日志
     private static Queue<LogData> earlyLog = new ConcurrentLinkedQueue<>();
     private void doLog(final Level level, final String loggerClassName, final String msg, final Object[] args, final Throwable th) {
         if (early) {

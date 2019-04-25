@@ -1,5 +1,8 @@
 package cn.xnatural.enet.server.swagger;
 
+import cn.xnatural.enet.event.EL;
+import cn.xnatural.enet.event.EP;
+import cn.xnatural.enet.server.ServerTpl;
 import io.swagger.v3.jaxrs2.integration.JaxrsApplicationAndAnnotationScanner;
 import io.swagger.v3.jaxrs2.integration.JaxrsOpenApiContext;
 import io.swagger.v3.oas.integration.OpenApiConfigurationException;
@@ -8,16 +11,13 @@ import io.swagger.v3.oas.integration.SwaggerConfiguration;
 import io.swagger.v3.oas.models.OpenAPI;
 import io.swagger.v3.oas.models.PathItem;
 import io.swagger.v3.oas.models.tags.Tag;
-import cn.xnatural.enet.event.EL;
-import cn.xnatural.enet.event.EP;
-import cn.xnatural.enet.server.ServerTpl;
 
 import java.lang.reflect.Field;
 import java.util.*;
 import java.util.concurrent.atomic.AtomicBoolean;
 
-import static java.util.Collections.singletonList;
 import static cn.xnatural.enet.common.Utils.isEmpty;
+import static java.util.Collections.singletonList;
 
 public class OpenApiDoc extends ServerTpl {
     protected final AtomicBoolean running = new AtomicBoolean(false);
@@ -62,16 +62,18 @@ public class OpenApiDoc extends ServerTpl {
 
     @EL(name = "${name}.addJaxrsDoc")
     public void addJaxrsDoc(Object source, String path, String tag, String desc) {
-        log.debug("add jaxr rest api doc. source: {}, path: {}, tag: {}, desc: {}", source, path, tag, desc);
+        log.debug("Add jaxr rest api doc. source: {}, path: {}, tag: {}, desc: {}", source, path, tag, desc);
         // 参照: SwaggerLoader
         HashSet<String> rs = new HashSet<>(1); rs.add(source.getClass().getName());
         OpenAPI openApi = null;
         try {
-            openApi = new JaxrsOpenApiContext<>().id(getName()).cacheTTL(0L).resourceClasses(rs).openApiConfiguration(
+            openApi = new JaxrsOpenApiContext<>().id(getName()).cacheTTL(0L)
+                .resourceClasses(rs)
+                .openApiConfiguration(
                     new SwaggerConfiguration()
                             .scannerClass(JaxrsApplicationAndAnnotationScanner.class.getName())
                             .resourceClasses(rs).cacheTTL(0L)
-            ).init().read();
+                ).init().read();
         } catch (OpenApiConfigurationException e) {
             log.error(e);
         }
@@ -92,7 +94,7 @@ public class OpenApiDoc extends ServerTpl {
             it.remove();
         }
         openApi.getPaths().putAll(rPaths);
-        log.trace("addJaxrsDoc. openApi: {}", openApi);
+        log.trace("Add jaxr rest api doc. openApi: {}", openApi);
         this.apis.add(openApi);
     }
 

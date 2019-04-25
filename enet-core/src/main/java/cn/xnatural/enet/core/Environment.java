@@ -65,8 +65,7 @@ public class Environment {
 
     public Environment(EP ep) {
         if (ep == null) throw new IllegalArgumentException("ep must not be null");
-        this.ep = ep;
-        ep.addListenerSource(this);
+        this.ep = ep; ep.addListenerSource(this);
         init();
     }
 
@@ -99,10 +98,10 @@ public class Environment {
 
     /**
      * 加载配置
-     * 支持: properties 文件
+     * 支持: properties 文件. 可替换类似字符串 ${attr}
      */
     protected void loadCfg() {
-        log.trace("start loading cgf file");
+        log.trace("start loading configuration file");
         // 先加载默认配置文件
         for (String l : cfgFileLocations) {
             if (l == null || l.isEmpty()) continue;
@@ -137,10 +136,12 @@ public class Environment {
         }
         finalAttrs.put(PROP_ACTIVE, activeProfiles.stream().collect(Collectors.joining(",")));
         parseValue(finalAttrs, new AtomicInteger(0)); // 替换 ${attr} 值
-        log.debug("final attrs: {}", finalAttrs);
-        log.info("The following profiles are active: {}", finalAttrs.get(PROP_ACTIVE));
         // 初始化日志相关
         Log.init(() -> initLog());
+
+        log.debug("final attrs: {}", finalAttrs);
+        log.trace("System attrs: {}", System.getProperties());
+        log.info("The following profiles are active: {}", finalAttrs.get(PROP_ACTIVE));
         ep.fire("env.configured", EC.of(this));
     }
 
@@ -165,12 +166,20 @@ public class Environment {
                 m = findMethod(o.getClass(), "doConfigure", InputStream.class);
                 boolean f = false;
                 for (String p : activeProfiles) {
-                    InputStream in = getClass().getClassLoader().getResourceAsStream("logback-" + p + ".xml");
-                    if (in != null) { m.invoke(o, in); f = true; }
+                    String fName = "logback-" + p + ".xml";
+                    InputStream in = getClass().getClassLoader().getResourceAsStream(fName);
+                    if (in != null) {
+                        log.debug("Configure logback file: {}", fName);
+                        m.invoke(o, in); f = true;
+                    }
                 }
                 if (!f) {// 如果没有和 profile相关的配置 就加载默认的配置文件
-                    InputStream in = getClass().getClassLoader().getResourceAsStream("logback.xml");
-                    if (in != null) m.invoke(o, in);
+                    String fName = "logback.xml";
+                    InputStream in = getClass().getClassLoader().getResourceAsStream(fName);
+                    if (in != null) {
+                        log.debug("Configure logback file: {}", fName);
+                        m.invoke(o, in);
+                    }
                 }
                 // 设置日志级别
                 Method setLevel = findMethod(Class.forName("ch.qos.logback.classic.Logger"), "setLevel", Class.forName("ch.qos.logback.classic.Level"));
@@ -229,7 +238,7 @@ public class Environment {
 
     protected Pattern p = Pattern.compile("(\\$\\{(?<attr>[\\w\\._]+)\\})+");
     /**
-     * 替换 值包含 ${attr}的字符串
+     * 替换 值包含${attr}的字符串
      * @param attrs
      */
     protected void parseValue(Map<String, String> attrs, AtomicInteger count) {
@@ -282,32 +291,31 @@ public class Environment {
 
     /**
      * 用于运行时改变属性
-     * @param key
-     * @param value
+     * @param key 属性名
+     * @param value 属性值
      * @return
      */
     public Environment setAttr(String key, String value) {
         if (PROP_ACTIVE.equals(key)) throw new RuntimeException("not allow change this property '" + PROP_ACTIVE + "'");
-        ep.fire(
-                "env.updateAttr",
-                EC.of(this).args(key, value),
-                ec -> {
-                    if (ec.isSuccess()) runtimeAttrs.put(key, value);
-                }
-        );
+        // 即时通知
+        ep.fire("env.updateAttr", EC.of(this).args(key, value), ec -> { if (ec.isSuccess()) runtimeAttrs.put(key, value); });
         return this;
     }
 
 
     /**
-     * 取一组属性集合
+     * 取一组属性集合.
+     * 例:
+     *  http.port: 8080, http-netty: 8000
+     *  Map<String, String> attrs = groupAttr("http", "http-netty");
+     *  System.out.println(attrs.get("port")); // 8000
      * @param keys 属性前缀
      * @return
      */
     @EL(name = "env.ns", async = false)
     public Map<String, String> groupAttr(String... keys) {
         Map<String, String> group = new HashMap<>();
-        if (keys == null) return group;
+        if (keys == null || keys.length < 1) return group;
         BiConsumer<String, String> fn = (k, v) -> {
             for (String key : keys) {
                 if (!k.startsWith(key)) continue;

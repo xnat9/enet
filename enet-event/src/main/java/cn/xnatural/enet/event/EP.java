@@ -71,28 +71,6 @@ public class EP {
     /**
      * 触发事件
      * @param eName 事件名
-     * @param completeFn 所有事件执行完后回调
-     */
-    public Object fire(String eName, Consumer<EC> completeFn) {
-        return fire(eName, new EC(), completeFn);
-    }
-
-
-    /**
-     *
-     * @param eName
-     * @param completeFn
-     * @param args 监听器方法的参数列表
-     * @return
-     */
-    public Object fire(String eName, Consumer<EC> completeFn, Object...args) {
-        return fire(eName, new EC().args(args), completeFn);
-    }
-
-
-    /**
-     * 触发事件
-     * @param eName 事件名
      * @param ec 事件执行上下文(包括参数传递)
      */
     public Object fire(String eName, EC ec) {

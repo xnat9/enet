@@ -31,7 +31,7 @@
 ## 简单用例
 可参照模块: enet-test
 
-入口: [Launcher](https://gitee.com/xnat/enet/blob/master/enet-test/src/main/java/org/xnatural/enet/test/Launcher.java) 类
+入口: [Launcher](https://gitee.com/xnat/enet/blob/master/enet-test/src/main/java/cn/xnatural/enet/test/Launcher.java) 类
 ```
 public class Launcher extends ServerTpl {
 

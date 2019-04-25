@@ -1,5 +1,6 @@
 package cn.xnatural.enet.server.http.netty;
 
+import cn.xnatural.enet.event.EC;
 import cn.xnatural.enet.event.EL;
 import cn.xnatural.enet.event.EP;
 import cn.xnatural.enet.server.ServerTpl;
@@ -39,7 +40,7 @@ public class NettyHttp extends ServerTpl {
 
 
     public NettyHttp() { this("http-netty"); }
-    public NettyHttp(String name) { super(name); setPort(8080);}
+    public NettyHttp(String name) { super(name); setPort(8080); }
 
 
     @EL(name = "sys.starting")
@@ -101,18 +102,18 @@ public class NettyHttp extends ServerTpl {
                         ch.pipeline().addLast(new HttpServerKeepAliveHandler());
                         ch.pipeline().addLast(new HttpObjectAggregator(getInteger("maxContentLength", 65536)));
                         ch.pipeline().addLast(new ChunkedWriteHandler());
-                        ep.fire("http-netty.addHandler", ec -> {
+                        ep.fire("http-netty.addHandler", new EC().args(ch.pipeline()), ec -> {
                             if (ec.isNoListener()) {
                                 log.error("'{}' server not available handler", getName());
                                 stop();
                             }
-                        }, ch.pipeline());
+                        });
                     }
                 })
                 .option(ChannelOption.SO_BACKLOG, getInteger("backlog", 100))
                 .childOption(ChannelOption.SO_KEEPALIVE, true);
         try {
-            if (isEmpty(getHostname())) sb.bind(getPort()).sync(); // 默认绑定本地所有地址
+            if (attrs.containsKey("hostname")) sb.bind(getPort()).sync(); // 如果没有配置hostname, 默认绑定本地所有地址
             else sb.bind(getHostname(), getPort()).sync();
             log.info("Started {} Server. hostname: {}, port: {}, type: {}", getName(), isEmpty(getHostname()) ? "0.0.0.0" : getHostname(), getPort(), (useEpoll ? "epoll" : "nio"));
         } catch (Exception ex) {
@@ -147,7 +148,7 @@ public class NettyHttp extends ServerTpl {
 
     @EL(name = "http.getHostname", async = false)
     public String getHostname() {
-        return getStr("hostname", "");
+        return getStr("hostname", "localhost");
     }
 
 

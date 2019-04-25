@@ -62,11 +62,7 @@ public class XMemcached extends ServerTpl {
     @EL(name = "sys.stopping")
     public void stop() {
         log.info("Shutdown '{}' Server", getName());
-        try {
-            client.shutdown();
-        } catch (IOException e) {
-            log.error(e);
-        }
+        try { client.shutdown(); } catch (IOException e) { log.error(e); }
     }
 
 
@@ -76,7 +72,7 @@ public class XMemcached extends ServerTpl {
         log.trace("{}.set. cName: {}, key: {}, value: {}", getName(), cName, key, value);
         try {
             client.withNamespace(cName, c -> {
-                c.setWithNoReply(key, getInteger("expire." + cName, 60 * 30), value); return null;
+                c.setWithNoReply(key, getInteger("expire." + cName, getInteger("defaultExpire", 60 * 30)), value); return null;
             });
         } catch (Exception e) {
             log.error(e);

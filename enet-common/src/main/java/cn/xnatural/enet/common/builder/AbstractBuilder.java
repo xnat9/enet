@@ -47,7 +47,7 @@ public abstract class AbstractBuilder<T> implements Builder<T> {
      * Validate the current context. Return false if fails
      *
      * @param ctx GeneratorContext
-     * @return
+     * @return true if can continue to build
      */
     protected boolean isValid(Context ctx) {
         return true;
@@ -57,7 +57,7 @@ public abstract class AbstractBuilder<T> implements Builder<T> {
     /**
      * check whether params exists in pGeneratorContext.
      *
-     * @param ctx generatorContext
+     * @param ctx Context
      * @param keys
      * @return valid
      */

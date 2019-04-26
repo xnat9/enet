@@ -29,7 +29,7 @@
 ```
 
 ## 简单用例
-可参照模块: enet-test
+项目模板: enet-test
 
 入口: [Launcher](https://gitee.com/xnat/enet/blob/master/enet-test/src/main/java/cn/xnatural/enet/test/Launcher.java) 类
 ```

@@ -1,7 +1,8 @@
-package cn.xnatural.enet.test;
-
 import cn.xnatural.enet.common.Log;
+import cn.xnatural.enet.test.service.TestService;
 
+import java.lang.annotation.Annotation;
+import java.lang.reflect.Method;
 import java.net.SocketTimeoutException;
 import java.util.Map;
 import java.util.concurrent.ExecutorService;
@@ -11,6 +12,7 @@ import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
 
 import static cn.xnatural.enet.common.Utils.Http;
+import static cn.xnatural.enet.common.Utils.findMethod;
 import static cn.xnatural.enet.common.Utils.http;
 
 public class Test {
@@ -20,6 +22,15 @@ public class Test {
     }
 
     public static void main(String[] args) throws Throwable {
+        Method m = findMethod(TestService.class, mm -> mm.getName().equals("findTestData"));
+        for (Annotation anno : m.getAnnotations()) {
+            System.out.println(anno.annotationType());
+        }
+        // 压测();
+    }
+
+
+    static void 压测() throws Throwable {
         String url = "http://localhost:8080/dao";
 
         Http http = http();
@@ -27,11 +38,11 @@ public class Test {
         // if (true) return;
         Map<String, Object> cookies = http.cookies();
 
-        int threadCunt = 10;
-        ExecutorService exec = Executors.newFixedThreadPool(threadCunt);
+        int threadCnt = 10;
+        ExecutorService exec = Executors.newFixedThreadPool(threadCnt);
         final AtomicBoolean stop = new AtomicBoolean(false);
         AtomicInteger c = new AtomicInteger(0);
-        for (int i = 0; i < threadCunt; i++) {
+        for (int i = 0; i < threadCnt; i++) {
             exec.execute(() -> {
                 while (!stop.get()) {
                     try {

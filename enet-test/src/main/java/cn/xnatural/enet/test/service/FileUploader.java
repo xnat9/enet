@@ -105,7 +105,7 @@ public class FileUploader extends ServerTpl {
      * 多文件 多线程保存
      * @param files
      */
-    @Monitor(warnTimeOut = 5000)
+    @Monitor(warnTimeOut = 7000)
     public void save(FileData... files) {
         if (files == null || files.length == 0) return;
         // 并发上传

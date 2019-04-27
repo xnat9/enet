@@ -29,6 +29,7 @@ public class TestService extends ServerTpl {
         e.setName("aaaa" + new SimpleDateFormat("yyyy-MM-dd HH:mm:ss").format(new Date()));
         e.setAge(111);
         testRepo.saveOrUpdate(e);
+        // if (true) throw new IllegalArgumentException("xxx");
         return PageModel.of(
             testRepo.findPage(0, 5, (root, query, cb) -> {query.orderBy(cb.desc(root.get("id"))); return null;}),
             ee -> ee

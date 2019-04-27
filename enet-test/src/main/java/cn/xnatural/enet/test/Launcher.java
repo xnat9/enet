@@ -25,11 +25,9 @@ import cn.xnatural.enet.test.service.FileUploader;
 import cn.xnatural.enet.test.service.TestService;
 
 import javax.annotation.Resource;
+import java.lang.annotation.Annotation;
 import java.lang.reflect.Method;
-import java.util.Arrays;
-import java.util.HashMap;
-import java.util.Map;
-import java.util.Objects;
+import java.util.*;
 import java.util.concurrent.Executor;
 import java.util.function.Function;
 import java.util.function.Supplier;
@@ -87,83 +85,84 @@ public class Launcher extends ServerTpl {
      * @return
      */
     private Function<Class<?>, ?> createAopFn() {
-        abstract class AopFn {
-            abstract Object run(Method m, Object[] args, Supplier<Object> fn);
+        abstract class AopFnCreator {
+            abstract Supplier<Object> create(Method m, Object[] args, Supplier<Object> fn);
         }
-        Map<Class, AopFn> aopFn = new HashMap<>();
-        aopFn.put(Trans.class, new AopFn() { // 事务方法拦截
+        Map<Class, AopFnCreator> aopFnCreator = new HashMap<>();
+        aopFnCreator.put(Trans.class, new AopFnCreator() { // 事务方法拦截
             @Override
-            Object run(Method m, Object[] args, Supplier<Object> fn) {
-                if (m.getAnnotation(Trans.class) != null) {
-                    return bean(TransWrapper.class).trans(fn);
-                } else return fn.get();
+            Supplier<Object> create(Method m, Object[] args, Supplier<Object> fn) {
+                return () -> bean(TransWrapper.class).trans(fn);
             }
         });
-        aopFn.put(Async.class, new AopFn() { // 异步方法拦截
+        aopFnCreator.put(Async.class, new AopFnCreator() { // 异步方法拦截
             @Override
-            Object run(Method m, Object[] args, Supplier<Object> fn) {
-                if (m.getAnnotation(Async.class) != null) {
-                    exec.execute(fn::get); return null;
-                } else return fn.get();
+            Supplier<Object> create(Method m, Object[] args, Supplier<Object> fn) {
+                return () -> { exec.execute(fn::get); return null; };
             }
         });
-        aopFn.put(Monitor.class, new AopFn() { // 方法监视执行
+        aopFnCreator.put(Monitor.class, new AopFnCreator() { // 方法监视执行
             @Override
-            Object run(Method m, Object[] args, Supplier<Object> fn) {
-                Monitor anno = m.getAnnotation(Monitor.class);
-                if (anno == null) return fn.get();
+            Supplier<Object> create(Method m, Object[] args, Supplier<Object> fn) {
+                return () -> {
+                    Monitor anno = m.getAnnotation(Monitor.class);
+                    long start = System.currentTimeMillis();
+                    Object ret = null;
+                    try { ret = fn.get();}
+                    catch (Throwable t) { throw t; }
+                    finally {
+                        long end = System.currentTimeMillis();
+                        boolean warn = (end - start >= anno.warnTimeUnit().toMillis(anno.warnTimeOut()));
+                        if (anno.trace() || warn) {
+                            StringBuilder sb = new StringBuilder(anno.logPrefix());
+                            sb.append(m.getDeclaringClass().getName()).append(".").append(m.getName());
+                            if (anno.printArgs() && args.length > 0) {
+                                sb.append("(");
+                                for (int i = 0; i < args.length; i++) {
+                                    String s;
+                                    if (args[i].getClass().isArray()) s = Arrays.toString((Object[]) args[i]);
+                                    else s = Objects.toString(args[i], "");
 
-                long start = System.currentTimeMillis();
-                Object ret = null;
-                try { ret = fn.get();}
-                catch (Throwable t) { throw t; }
-                finally {
-                    long end = System.currentTimeMillis();
-                    boolean warn = (end - start >= anno.warnTimeUnit().toMillis(anno.warnTimeOut()));
-                    if (anno.trace() || warn) {
-                        StringBuilder sb = new StringBuilder(anno.logPrefix());
-                        sb.append(m.getDeclaringClass().getName()).append(".").append(m.getName());
-                        if (anno.printArgs() && args.length > 0) {
-                            sb.append("(");
-                            for (int i = 0; i < args.length; i++) {
-                                String s;
-                                if (args[i].getClass().isArray()) s = Arrays.toString((Object[]) args[i]);
-                                else s = Objects.toString(args[i], "");
-
-                                if (i == 0) sb.append(s);
-                                else sb.append(";").append(s);
+                                    if (i == 0) sb.append(s);
+                                    else sb.append(";").append(s);
+                                }
+                                sb.append(")");
                             }
-                            sb.append(")");
+                            sb.append(", time: ").append(end - start).append("ms");
+                            if (warn) log.warn(sb.append(anno.logSuffix()).toString());
+                            else log.info(sb.append(anno.logSuffix()).toString());
                         }
-                        sb.append(", time: ").append(end - start).append("ms");
-                        if (warn) log.warn(sb.append(anno.logSuffix()).toString());
-                        else log.info(sb.append(anno.logSuffix()).toString());
                     }
-                }
-                return ret;
+                    return ret;
+                };
             }
         });
 
         // 多注解拦截
         return clz -> {
-            Method m = Utils.findMethod(clz, mm ->
-                mm.getAnnotation(Trans.class) != null || mm.getAnnotation(Async.class) != null || mm.getAnnotation(Monitor.class) != null
-            );
+            Method m = Utils.findMethod(clz, mm -> {
+                for (Iterator<Class> it = aopFnCreator.keySet().iterator(); it.hasNext(); ) {
+                    if (mm.getAnnotation(it.next()) != null) return true;
+                }
+                return false;
+            });
             if (m == null) {
-                try { return clz.newInstance(); }
-                catch (Exception e) { log.error(e); }
+                try { return clz.newInstance(); } catch (Exception e) { log.error(e); }
                 return null;
             }
             return proxy(clz, (obj, method, args, proxy) -> {
-                Supplier fn = () -> {
+                Supplier originFn = () -> {
                     try { return proxy.invokeSuper(obj, args); }
                     catch (Throwable t) { throw new RuntimeException(t); }
                 };
-                return aopFn.get(Async.class).run(method, args, () ->
-                    aopFn.get(Monitor.class).run(method, args, () ->
-                        aopFn.get(Trans.class).run(method, args, fn)
-                    )
-                );
+                Supplier fn = originFn;
+                Annotation[] arr = method.getAnnotations(); // 最外面包裹最里面执行
+                for (int i = arr.length - 1; i >= 0; i--) {
+                    AopFnCreator aopFn = aopFnCreator.get(arr[i].annotationType());
+                    if (aopFn == null) continue;
+                    fn = aopFn.create(method, args, fn);
+                }
+                return fn.get();
             });
         };
     }

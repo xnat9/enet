@@ -24,11 +24,11 @@ public class EP {
     protected Log                         log;
     protected Executor                    exec;
     /**
-     * 事件名 -> 监听器
+     * 事件名 -> 监听器{@link Listener}
      */
     protected Map<String, List<Listener>> lsMap;
     /**
-     * 需要追踪的事件名字
+     * 需要追踪执行的事件名字
      */
     protected Set<String>                 trackEvents;
 
@@ -161,7 +161,7 @@ public class EP {
 
 
     /**
-     * 添加监听源.
+     * 添加对象源(解析出监听器)
      * @param source
      * @return
      */
@@ -173,7 +173,7 @@ public class EP {
 
     /**
      * 设置某个事件需要追踪执行
-     * @param eNames
+     * @param eNames 事件名字(可以多个)
      * @return
      */
     public EP addTrackEvent(String... eNames) {
@@ -202,6 +202,7 @@ public class EP {
      * @return this
      */
     public EP removeEvent(String eName, Object source) {
+        log.debug("remove event '{}' with source: {}", eName, source);
         if (source == null) lsMap.remove(eName);
         else {
             for (Iterator<Listener> it = lsMap.get(eName).iterator(); it.hasNext(); ) {
@@ -296,7 +297,7 @@ public class EP {
          */
         protected String name;
         /**
-         * 排序. 一个事件对应多个监听器时生效. {@link #doPublish(String, EC, Consumer)}
+         * 排序. 一个事件对应多个监听器时生效. {@link #resolve(Object)} {@link #doPublish(String, EC, Consumer)}
          */
         protected float order;
         /**

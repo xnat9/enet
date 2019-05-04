@@ -20,7 +20,8 @@ public class Context {
 
     public Context put(Object pValue) {
         if (pValue == null) return this;
-        attrs.put(pValue.getClass(), pValue);
+        if (pValue instanceof Class) attrs.put(pValue, pValue);
+        else attrs.put(pValue.getClass(), pValue);
         return this;
     }
 

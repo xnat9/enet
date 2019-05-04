@@ -162,9 +162,9 @@ public class AppContext {
     /**
      * 查找对象
      * @param ec
-     * @param beanType
-     * @param beanName
-     * @return
+     * @param beanType bean的类型
+     * @param beanName bean 名字
+     * @return bean 对象
      */
     @EL(name = {"bean.get", "sys.bean.get"}, async = false, order = 1)
     protected Object findLocalBean(EC ec, Class beanType, String beanName) {
@@ -242,35 +242,33 @@ public class AppContext {
 
     @EL(name = "env.configured")
     protected void envConfigured() {
-        // 重置 exec 相关属性
+        //1. 重置 exec 相关属性
         Integer c = env.getInteger("sys.exec.corePoolSize", null);
         if (c != null) exec.setCorePoolSize(c);
         Integer m = env.getInteger("sys.exec.maximumPoolSize", null);
         if (m != null) exec.setMaximumPoolSize(m);
-        // 如果 maximumPoolSize 小于 corePoolSize 则设置为相等
-        if (exec.getCorePoolSize() > exec.getMaximumPoolSize()) exec.setMaximumPoolSize(exec.getCorePoolSize());
         Long k = env.getLong("sys.exec.keepAliveTime", null);
         if (k != null) exec.setKeepAliveTime(k, TimeUnit.SECONDS);
 
-        // 添加 ep 跟踪事件
+        //2. 添加 ep 跟踪事件
         ep.addTrackEvent(env.getString("ep.track", "").split(","));
     }
 
 
     @EL(name = "env.updateAttr")
     protected void updateAttr(String k, String v) {
-        if (k.startsWith("sys.exec")) {
+        if (k.startsWith("sys.exec")) { // 更改sys线程池属性
             if ("sys.exec.corePoolSize".equals(k)) {
                 Integer i = toInteger(v, null);
-                if (i == null) throw new IllegalArgumentException("sys.exec.corePoolSize属性值只能是整数");
+                if (i == null) throw new IllegalArgumentException("'sys.exec.corePoolSize' only can be int. " + v);
                 exec.setCorePoolSize(i);
             } else if ("sys.exec.maximumPoolSize".equals(k)) {
                 Integer i = toInteger(v, null);
-                if (i == null) throw new IllegalArgumentException("sys.exec.maximumPoolSize属性值只能是整数");
+                if (i == null) throw new IllegalArgumentException("'sys.exec.maximumPoolSize' only can be int. " + v);
                 exec.setCorePoolSize(i);
             } else if ("sys.exec.keepAliveTime".equals(k)) {
                 Long l = toLong(v, null);
-                if (l == null) throw new IllegalArgumentException("sys.exec.keepAliveTime属性值只能是整数");
+                if (l == null) throw new IllegalArgumentException("'sys.exec.keepAliveTime' only can be int. " + v);
                 exec.setKeepAliveTime(l, TimeUnit.SECONDS);
             } else log.warn("Not allow change property '{}'", k);
         }
@@ -288,7 +286,7 @@ public class AppContext {
     /**
      * 为 source 包装 Executor
      * @param source
-     * @return
+     * @return {@link Executor}
      */
     protected Executor wrapExecForSource(Object source) {
         return new Executor() {
@@ -302,20 +300,27 @@ public class AppContext {
     /**
      * 为每个Source包装EP
      * @param source
-     * @return
+     * @return {@link EP}
      */
     protected EP wrapEpForSource(Object source) {
         return new EP() {
             @Override
             protected void init(Executor exec) {}
             @Override
+            public EP addTrackEvent(String... eNames) { ep.addTrackEvent(eNames); return this; }
+            @Override
+            public EP delTrackEvent(String... eNames) { ep.delTrackEvent(eNames); return this; }
+            @Override
+            public EP removeEvent(String eName, Object s) {
+                if (source != null && s != null && source != s) throw new UnsupportedOperationException("Only allow remove event of this source: " + source);
+                ep.removeEvent(eName, s); return this;
+            }
+            @Override
+            public EP addListenerSource(Object source) { ep.addListenerSource(source); return this; }
+            @Override
             public Object fire(String eName, EC ec, Consumer<EC> completeFn) {
                 if (ec.source() == null) ec.source(source);
                 return ep.fire(eName, ec, completeFn);
-            }
-            @Override
-            public EP addListenerSource(Object source) {
-                ep.addListenerSource(source); return this;
             }
             @Override
             public String toString() {
@@ -325,14 +330,10 @@ public class AppContext {
     }
 
 
-    public Environment env() {
-        return env;
-    }
+    public Environment env() { return env; }
 
 
-    public String getName() {
-        return name;
-    }
+    public String getName() { return name; }
 
 
     public AppContext setName(String name) {

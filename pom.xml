@@ -12,7 +12,7 @@
         <module>enet-core</module>
         <module>enet-event</module>
         <module>enet-server</module>
-        <module>enet-test</module>
+        <module>enet-demo</module>
     </modules>
 
     <packaging>pom</packaging>

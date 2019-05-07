@@ -29,9 +29,9 @@
 ```
 
 ## 简单用例
-项目模板: enet-test
+项目模板: enet-demo
 
-入口: [Launcher](https://gitee.com/xnat/enet/blob/master/enet-test/src/main/java/cn/xnatural/enet/test/Launcher.java) 类
+入口: [Launcher](https://gitee.com/xnat/enet/blob/master/enet-demo/src/main/java/cn/xnatural/enet/demo/Launcher.java) 类
 ```
 public class Launcher extends ServerTpl {
 

@@ -15,18 +15,18 @@ import java.util.function.Function;
 /**
  * redis
  */
-public class RedisServer extends ServerTpl {
+public class RedisClient extends ServerTpl {
     protected final AtomicBoolean running = new AtomicBoolean(false);
     protected       JedisPool     pool;
 
-    public RedisServer() { super("redis"); }
-    public RedisServer(String name) { super(name); }
+    public RedisClient() { super("redis"); }
+    public RedisClient(String name) { super(name); }
 
 
     @EL(name = "sys.starting")
     public void start() {
         if (!running.compareAndSet(false, true)) {
-            log.warn("{} Server is running", getName()); return;
+            log.warn("{} Client is running", getName()); return;
         }
         if (ep == null) ep = new EP();
         ep.fire(getName() + ".starting");
@@ -48,13 +48,13 @@ public class RedisServer extends ServerTpl {
 
         exposeBean(pool);
         ep.fire(getName() + ".started");
-        log.info("Started {} Server", getName());
+        log.info("Started {} Client", getName());
     }
 
 
     @EL(name = "sys.stopping")
     public void stop() {
-        log.info("Shutdown '{}' Server", getName());
+        log.info("Shutdown '{}' Client", getName());
         pool.close();
     }
 
@@ -64,7 +64,7 @@ public class RedisServer extends ServerTpl {
         log.trace("{}.hset. cName: {}, key: {}, value: {}, seconds: {}", getName(), cName, key, value, seconds);
         execute(c -> {
             c.hset(cName, key, value.toString());
-            c.expire(cName, seconds == null ? getInteger("expire." + cName, 60 * 30) : seconds);
+            c.expire(cName, seconds == null ? getInteger("expire." + cName, getInteger("defaultExpire", 60 * 30)) : seconds);
             return null;
         });
     }
@@ -90,17 +90,10 @@ public class RedisServer extends ServerTpl {
     }
 
 
-    @EL(name = "${name}.exec")
+    @EL(name = "${name}.exec", async = false)
     protected Object execute(Function<Jedis, Object> fn) {
-        Jedis c = null;
-        try {
-            c = pool.getResource();
+        try (Jedis c = pool.getResource()) {
             return fn.apply(c);
-        } catch (Throwable t) {
-            log.error(t);
-        } finally {
-            if (c != null) c.close();
-        }
-        return null;
+        } catch (Throwable t) { throw t; }
     }
 }

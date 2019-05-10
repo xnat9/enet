@@ -22,10 +22,8 @@ public class Test {
     }
 
     public static void main(String[] args) throws Throwable {
-        Method m = findMethod(TestService.class, mm -> mm.getName().equals("findTestData"));
-        for (Annotation anno : m.getAnnotations()) {
-            System.out.println(anno.annotationType());
-        }
+        System.out.println(http().get("http://localhost:8080/dao").header("Connection", "keep-alive").execute());
+        Thread.sleep(TimeUnit.SECONDS.toMillis(15));
         // 压测();
     }
 

@@ -33,7 +33,7 @@ public class XMemcached extends ServerTpl {
     @EL(name = "sys.starting")
     public void start() {
         if (!running.compareAndSet(false, true)) {
-            log.warn("{} Server is running", getName()); return;
+            log.warn("{} Client is running", getName()); return;
         }
         if (ep == null) ep = new EP();
         ep.fire(getName() + ".starting");
@@ -55,13 +55,13 @@ public class XMemcached extends ServerTpl {
         }
 
         ep.fire(getName() + ".started");
-        log.info("Started {} Server", getName());
+        log.info("Started {} Client", getName());
     }
 
 
     @EL(name = "sys.stopping")
     public void stop() {
-        log.info("Shutdown '{}' Server", getName());
+        log.info("Shutdown '{}' Client", getName());
         try { client.shutdown(); } catch (IOException e) { log.error(e); }
     }
 

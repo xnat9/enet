@@ -57,7 +57,7 @@ public class Hibernate extends ServerTpl {
     @EL(name = "sys.starting")
     public void start() {
         if (!running.compareAndSet(false, true)) {
-            log.warn("{} Server is running", getName()); return;
+            log.warn("{} Client is running", getName()); return;
         }
         if (ep == null) ep = new EP();
         ep.fire(getName() + ".starting");
@@ -87,14 +87,14 @@ public class Hibernate extends ServerTpl {
         exposeBean(sf);
         tm = new TransWrapper(); exposeBean(tm); ep.fire("inject", tm);
         repoCollect();
-        log.info("Started {}(Hibernate) Server", getName());
+        log.info("Started {}(Hibernate) Client", getName());
         ep.fire(getName() + ".started");
     }
 
 
     @EL(name = "sys.stopping")
     public void stop() {
-        log.info("Shutdown '{}(Hibernate)' Server", getName());
+        log.info("Shutdown '{}(Hibernate)' Client", getName());
         sf.close(); closeDs();
     }
 

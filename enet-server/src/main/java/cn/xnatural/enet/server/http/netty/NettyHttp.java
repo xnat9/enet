@@ -97,12 +97,12 @@ public class NettyHttp extends ServerTpl {
                                 super.channelUnregistered(ctx); connCount.decrementAndGet();
                             }
                         });
-                        ch.pipeline().addLast(new IdleStateHandler(getLong("readerIdleTime", 2 * 60L), getLong("writerIdleTime", 0L), getLong("allIdleTime", 0L), TimeUnit.SECONDS));
+                        ch.pipeline().addLast(new IdleStateHandler(getLong("readerIdleTime", 30L), getLong("writerIdleTime", 0L), getLong("allIdleTime", 0L), TimeUnit.SECONDS));
                         ch.pipeline().addLast(new HttpServerCodec());
                         ch.pipeline().addLast(new HttpServerKeepAliveHandler());
                         ch.pipeline().addLast(new HttpObjectAggregator(getInteger("maxContentLength", 65536)));
                         ch.pipeline().addLast(new ChunkedWriteHandler());
-                        ep.fire("http-netty.addHandler", new EC().args(ch.pipeline()), ec -> {
+                        ep.fire("http-netty.addHandler", new EC().args(ch.pipeline()).sync(), ec -> {
                             if (ec.isNoListener()) {
                                 log.error("'{}' server not available handler", getName());
                                 stop();
@@ -113,9 +113,10 @@ public class NettyHttp extends ServerTpl {
                 .option(ChannelOption.SO_BACKLOG, getInteger("backlog", 100))
                 .childOption(ChannelOption.SO_KEEPALIVE, true);
         try {
-            if (attrs.containsKey("hostname")) sb.bind(getPort()).sync(); // 如果没有配置hostname, 默认绑定本地所有地址
-            else sb.bind(getHostname(), getPort()).sync();
-            log.info("Started {} Server. hostname: {}, port: {}, type: {}", getName(), isEmpty(getHostname()) ? "0.0.0.0" : getHostname(), getPort(), (useEpoll ? "epoll" : "nio"));
+            boolean f = attrs.containsKey("hostname");
+            if (f) sb.bind(getHostname(), getPort()).sync(); // 如果没有配置hostname, 默认绑定本地所有地址
+            else sb.bind(getPort()).sync();
+            log.info("Started {} Server. hostname: {}, port: {}, type: {}", getName(), (f ? getHostname() : "0.0.0.0"), getPort(), (useEpoll ? "epoll" : "nio"));
         } catch (Exception ex) {
             log.error(ex);
         }
@@ -128,7 +129,7 @@ public class NettyHttp extends ServerTpl {
      * @return
      */
     protected boolean fusing(ChannelHandlerContext ctx) {
-        if (connCount.get() >= getInteger("maxConnection", 100)) { // 最大连接
+        if (connCount.get() >= getInteger("maxConnection", 200)) { // 最大连接
             ctx.writeAndFlush(new DefaultHttpResponse(HttpVersion.HTTP_1_1, SERVICE_UNAVAILABLE));
             ctx.close();
             return true;

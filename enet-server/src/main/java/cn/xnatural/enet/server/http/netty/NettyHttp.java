@@ -70,7 +70,7 @@ public class NettyHttp extends ServerTpl {
 
 
     /**
-     * 当前正在处理的连接个数
+     * 当前连接数
      */
     protected AtomicInteger connCount = new AtomicInteger(0);
     /**
@@ -89,15 +89,19 @@ public class NettyHttp extends ServerTpl {
                         ch.pipeline().addLast(new ChannelInboundHandlerAdapter() {
                             @Override
                             public void channelRegistered(ChannelHandlerContext ctx) throws Exception {
-                                connCount.incrementAndGet();
-                                if (!fusing(ctx)) { super.channelRegistered(ctx); }
+                                if (!fusing(ctx)) {
+                                    connCount.incrementAndGet();
+                                    log.debug("Connection registered: {}", connCount);
+                                    super.channelRegistered(ctx);
+                                }
                             }
                             @Override
                             public void channelUnregistered(ChannelHandlerContext ctx) throws Exception {
                                 super.channelUnregistered(ctx); connCount.decrementAndGet();
+                                log.debug("Connection unregistered: {}", connCount);
                             }
                         });
-                        ch.pipeline().addLast(new IdleStateHandler(getLong("readerIdleTime", 30L), getLong("writerIdleTime", 0L), getLong("allIdleTime", 0L), TimeUnit.SECONDS));
+                        ch.pipeline().addLast(new IdleStateHandler(getLong("readerIdleTime", 20L), getLong("writerIdleTime", 0L), getLong("allIdleTime", 0L), TimeUnit.SECONDS));
                         ch.pipeline().addLast(new HttpServerCodec());
                         ch.pipeline().addLast(new HttpServerKeepAliveHandler());
                         ch.pipeline().addLast(new HttpObjectAggregator(getInteger("maxContentLength", 65536)));
@@ -116,7 +120,10 @@ public class NettyHttp extends ServerTpl {
             boolean f = attrs.containsKey("hostname");
             if (f) sb.bind(getHostname(), getPort()).sync(); // 如果没有配置hostname, 默认绑定本地所有地址
             else sb.bind(getPort()).sync();
-            log.info("Started {} Server. hostname: {}, port: {}, type: {}", getName(), (f ? getHostname() : "0.0.0.0"), getPort(), (useEpoll ? "epoll" : "nio"));
+            log.info(
+                "Started {} Server. hostname: {}, port: {}, type: {}, shareEventLoop: {}",
+                getName(), (f ? getHostname() : "0.0.0.0"), getPort(), (useEpoll ? "epoll" : "nio"), (boosGroup == workerGroup)
+            );
         } catch (Exception ex) {
             log.error(ex);
         }

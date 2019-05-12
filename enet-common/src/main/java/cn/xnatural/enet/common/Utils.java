@@ -128,13 +128,13 @@ public class Utils {
                 conn.setRequestMethod(method);
                 conn.setConnectTimeout(connectTimeout);
                 conn.setReadTimeout(readTimeout);
-                //conn.setUseCaches(false);
 
                 // header 设置
                 conn.setRequestProperty("Accept", "*/*"); // 必加
                 conn.setRequestProperty("Charset", "UTF-8");
                 conn.setRequestProperty("Accept-Charset", "UTF-8");
-                conn.setRequestProperty("Connection", "close"); // 不加的话会强制关闭连接
+                // conn.setRequestProperty("Connection", "close");
+                // conn.setRequestProperty("Connection", "keep-alive");
                 // conn.setRequestProperty("User-Agent", "xnatural-http-client");
                 if (isNotEmpty(headers)) {
                     for (Map.Entry<String, String> e : headers.entrySet()) {

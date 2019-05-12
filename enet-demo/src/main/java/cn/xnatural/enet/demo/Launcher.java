@@ -3,6 +3,13 @@ package cn.xnatural.enet.demo;
 
 import cn.xnatural.enet.common.Utils;
 import cn.xnatural.enet.core.AppContext;
+import cn.xnatural.enet.demo.common.Async;
+import cn.xnatural.enet.demo.common.Monitor;
+import cn.xnatural.enet.demo.dao.entity.TestEntity;
+import cn.xnatural.enet.demo.dao.repo.TestRepo;
+import cn.xnatural.enet.demo.rest.RestTpl;
+import cn.xnatural.enet.demo.service.FileUploader;
+import cn.xnatural.enet.demo.service.TestService;
 import cn.xnatural.enet.event.EL;
 import cn.xnatural.enet.server.ServerTpl;
 import cn.xnatural.enet.server.cache.ehcache.EhcacheServer;
@@ -16,13 +23,6 @@ import cn.xnatural.enet.server.sched.SchedServer;
 import cn.xnatural.enet.server.session.MemSessionManager;
 import cn.xnatural.enet.server.session.RedisSessionManager;
 import cn.xnatural.enet.server.swagger.OpenApiDoc;
-import cn.xnatural.enet.demo.common.Async;
-import cn.xnatural.enet.demo.common.Monitor;
-import cn.xnatural.enet.demo.dao.entity.TestEntity;
-import cn.xnatural.enet.demo.dao.repo.TestRepo;
-import cn.xnatural.enet.demo.rest.RestTpl;
-import cn.xnatural.enet.demo.service.FileUploader;
-import cn.xnatural.enet.demo.service.TestService;
 
 import javax.annotation.Resource;
 import java.lang.annotation.Annotation;
@@ -49,7 +49,7 @@ public class Launcher extends ServerTpl {
         app.addSource(new Hibernate().scanEntity(TestEntity.class).scanRepo(TestRepo.class));
         app.addSource(new SchedServer());
         app.addSource(new EhcacheServer());
-        // app.addSource(new RedisServer());
+        // app.addSource(new RedisClient());
         // app.addSource(new XMemcached());
         // app.addSource(new MongoClient("localhost", 27017));
         app.addSource(new Launcher());
@@ -68,7 +68,7 @@ public class Launcher extends ServerTpl {
      */
     @EL(name = "env.configured", async = false)
     private void envConfigured() {
-        if (Utils.toBoolean(ep.fire("session.isEnabled"), false)) {
+        if (ctx.env().getBoolean("session.enabled", false)) {
             String t = ctx.env().getString("session.type", "memory");
             // 根据配置来启动用什么session管理
             if ("memory".equalsIgnoreCase(t)) ctx.addSource(new MemSessionManager());

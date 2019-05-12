@@ -14,6 +14,7 @@ import java.util.Date;
 import java.util.Map;
 import java.util.Properties;
 import java.util.concurrent.Executor;
+import java.util.concurrent.ExecutorService;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
 
@@ -27,9 +28,8 @@ public class SchedServer extends ServerTpl {
     protected       Executor      exec;
     protected       Scheduler     scheduler;
 
-    public SchedServer() {
-        super("sched");
-    }
+
+    public SchedServer() { super("sched"); }
     public SchedServer(String name) { super(name); }
 
 
@@ -66,6 +66,7 @@ public class SchedServer extends ServerTpl {
             log.error(e);
         }
         AgentThreadPool.exec = null;
+        if (exec instanceof ExecutorService) ((ExecutorService) exec).shutdown();
     }
 
 
@@ -169,8 +170,9 @@ public class SchedServer extends ServerTpl {
     public static class AgentThreadPool implements ThreadPool {
         static Executor exec;
         @Override
-        public boolean runInThread(Runnable runnable) {
-            exec.execute(runnable);
+        public boolean runInThread(Runnable fn) {
+            if (exec == null) fn.run();
+            else exec.execute(fn);
             return true;
         }
 

@@ -50,14 +50,6 @@ public class NettyResteasy extends ServerTpl {
      */
     protected       String             rootPath;
     /**
-     * 表示 session 的 cookie 名字
-     */
-    protected       String             sessionCookieName;
-    /**
-     * session 是否可用
-     */
-    protected       boolean            enableSession;
-    /**
      * see: {@link #collect()}
      */
     protected       List<Class>        scan       = new LinkedList<>();
@@ -86,10 +78,11 @@ public class NettyResteasy extends ServerTpl {
         if (ep == null) ep = new EP(exec);
         ep.fire(getName() + ".starting");
         attrs.putAll((Map) ep.fire("env.ns", "mvc", getName()));
+        attr("session.enabled", Utils.toBoolean(ep.fire("env.getAttr", "session.enabled"), false));
+        String cName = (String) ep.fire("env.getAttr", "session.cookieName");
+        attr("session.cookieName", isEmpty(cName) ? "sId" : cName);
 
-        enableSession = Utils.toBoolean(ep.fire("env.getAttr", "session.enabled"), false);
         rootPath = getStr("rootPath", "/");
-        sessionCookieName = getStr("sessionCookieName", "sId");
         for (String c : getStr("scan", "").split(",")) {
             try {
                 if (isNotBlank(c)) scan.add(Class.forName(c.trim()));
@@ -126,9 +119,9 @@ public class NettyResteasy extends ServerTpl {
             @Override
             protected void channelRead0(ChannelHandlerContext ctx, Object msg) {
                 int i = devourer.getWaitingCount();
-                // 默认值: 线程池的线程个数的两倍
-                if (i >= getInteger("maxWaitRequest", toInteger(invoke(findMethod(exec.getClass(), "getCorePoolSize"), exec), 10) * 2)) {
-                    if (i > 0 && i % 3 == 0) log.warn("There are currently '{}' requests waiting to be processed.", i);
+                // 默认值: 线程池的线程个数的3倍
+                if (i >= getInteger("maxWaitRequest", toInteger(invoke(findMethod(exec.getClass(), "getCorePoolSize"), exec), 10) * 3)) {
+                    if (i > 0 && i % 3 == 0) log.warn("There are currently {} requests waiting to be processed.", i);
                     ctx.writeAndFlush(new DefaultHttpResponse(HttpVersion.HTTP_1_1, SERVICE_UNAVAILABLE));
                 } else {
                     devourer.offer(() -> exec.execute(() -> process(ctx, msg)));
@@ -147,8 +140,9 @@ public class NettyResteasy extends ServerTpl {
         if (msg instanceof NettyHttpRequest) {
             NettyHttpRequest req = (NettyHttpRequest) msg;
             NettyHttpResponse resp = req.getResponse();
+            log.trace("Start process new request: {}", req.getUri().getPath());
             try {
-                if (isEnableSession()) { // 添加session控制
+                if (getBoolean("session.enabled", false)) { // 添加session控制
                     Cookie c = req.getHttpHeaders().getCookies().get(getSessionCookieName());
                     String sId;
                     if (c == null || Utils.isEmpty(c.getValue())) {
@@ -166,8 +160,8 @@ public class NettyResteasy extends ServerTpl {
                 }
 
                 dispatcher.service(ctx, req, resp, true);
-            } catch (Failure e1) {
-                resp.reset(); resp.setStatus(e1.getErrorCode());
+            } catch (Failure ex) {
+                resp.reset(); resp.setStatus(ex.getErrorCode());
             } catch (UnhandledException e) {
                 resp.reset(); resp.setStatus(500);
                 if (e.getCause() != null) log.error(e.getCause());
@@ -191,7 +185,7 @@ public class NettyResteasy extends ServerTpl {
      */
     @EL(name = "sys.started", async = false)
     protected void autoInject() {
-        log.debug("auto inject @Resource field");
+        log.trace("auto inject @Resource field");
         sources.forEach(o -> ep.fire("inject", o));
     }
 
@@ -325,20 +319,6 @@ public class NettyResteasy extends ServerTpl {
 
 
     public String getSessionCookieName() {
-        return sessionCookieName;
-    }
-
-
-    public NettyResteasy setSessionCookieName(String sessionCookieName) {
-        if (running.get()) throw new RuntimeException("不允许运行时更改");
-        if (sessionCookieName == null || sessionCookieName.isEmpty()) throw new NullPointerException("参数为空");
-        this.sessionCookieName = sessionCookieName;
-        return this;
-    }
-
-
-    @EL(name = "session.isEnabled", async = false)
-    public boolean isEnableSession() {
-        return enableSession;
+        return (String) attrs.get("session.cookieName");
     }
 }

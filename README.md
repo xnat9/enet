@@ -52,7 +52,7 @@ public class Launcher extends ServerTpl {
     // 环境配置完成后执行
     @EL(name = "env.configured", async = false)
     private void envConfigured() {
-        if (Utils.toBoolean(ep.fire("session.isEnabled"), false)) {
+        if (ctx.env().getBoolean("session.enabled", false)) {
             String t = ctx.env().getString("session.type", "memory");
             // 根据配置来添加session管理功能
             if ("memory".equalsIgnoreCase(t)) ctx.addSource(new MemSessionManager());

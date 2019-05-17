@@ -293,6 +293,7 @@ public class AppContext {
             @Override
             public void execute(Runnable cmd) { exec.execute(cmd); }
             public int getCorePoolSize() { return exec.getCorePoolSize(); }
+            public int getWaitingCount() { return exec.getQueue().size(); }
         };
     }
 

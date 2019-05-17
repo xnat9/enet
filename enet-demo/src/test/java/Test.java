@@ -25,14 +25,14 @@ public class Test {
 
 
     static void 压测() throws Throwable {
-        String urlPrefix = "http://localhost:8080";
+        String urlPrefix = "http://localhost:8080/tpl";
 
         Http http = http();
         System.out.println(http.get(urlPrefix + "/dao").execute());
         // if (true) return;
         Map<String, Object> cookies = http.cookies();
 
-        int threadCnt = 20;
+        int threadCnt = 10;
         ExecutorService exec = Executors.newFixedThreadPool(threadCnt);
         final AtomicBoolean stop = new AtomicBoolean(false);
         AtomicInteger c = new AtomicInteger(0);

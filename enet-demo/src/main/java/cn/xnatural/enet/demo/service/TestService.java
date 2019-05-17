@@ -1,15 +1,13 @@
 package cn.xnatural.enet.demo.service;
 
-import cn.xnatural.enet.server.ServerTpl;
-import cn.xnatural.enet.server.dao.hibernate.Trans;
-import cn.xnatural.enet.demo.common.Async;
-import cn.xnatural.enet.demo.common.Monitor;
 import cn.xnatural.enet.demo.dao.entity.TestEntity;
 import cn.xnatural.enet.demo.dao.entity.UploadFile;
 import cn.xnatural.enet.demo.dao.repo.TestRepo;
 import cn.xnatural.enet.demo.dao.repo.UploadFileRepo;
 import cn.xnatural.enet.demo.rest.PageModel;
 import cn.xnatural.enet.demo.rest.request.AddFileDto;
+import cn.xnatural.enet.server.ServerTpl;
+import cn.xnatural.enet.server.dao.hibernate.Trans;
 
 import javax.annotation.Resource;
 import java.text.SimpleDateFormat;
@@ -22,7 +20,6 @@ public class TestService extends ServerTpl {
     UploadFileRepo uploadFileRepo;
 
 
-    @Monitor
     @Trans
     public PageModel findTestData() {
         TestEntity e = new TestEntity();
@@ -37,7 +34,6 @@ public class TestService extends ServerTpl {
     }
 
 
-    @Async
     @Trans
     public void save(AddFileDto dto) {
         UploadFile e = new UploadFile();

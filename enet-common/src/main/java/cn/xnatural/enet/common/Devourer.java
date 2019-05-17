@@ -65,7 +65,6 @@ public class Devourer {
     }
 
 
-
     public Devourer pause(Supplier<Boolean> pause) {
         if (pause == null) throw new IllegalArgumentException("pause Supplier can not be null");
         this.pause = pause;

@@ -38,7 +38,7 @@ import static cn.xnatural.enet.demo.rest.ApiResp.ok;
 /**
  * @author xiangxb, 2019-01-13
  */
-@Path("")
+@Path("tpl")
 //@Hidden // 不加入到 swagger doc
 public class RestTpl extends ServerTpl {
 
@@ -155,7 +155,12 @@ public class RestTpl extends ServerTpl {
         AddFileDto addFile = extractFormDto(formData, AddFileDto.class);
         if (addFile.getAge() == null) throw new IllegalArgumentException("年龄必填");
         uploader.save(addFile.getHeadportrait());
-        service.save(addFile);
+        try {
+            service.save(addFile);
+        } catch (Exception ex) {
+            uploader.delete(addFile.getHeadportrait().getResultName());
+            throw ex;
+        }
         log.info("upload file: {}", addFile.getHeadportrait());
         return ok(uploader.toFullUrl(addFile.getHeadportrait().getResultName()));
         // return ok();

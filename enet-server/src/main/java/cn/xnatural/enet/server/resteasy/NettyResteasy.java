@@ -32,6 +32,7 @@ import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.concurrent.atomic.AtomicInteger;
 
 import static cn.xnatural.enet.common.Utils.*;
 import static io.netty.handler.codec.http.HttpResponseStatus.SERVICE_UNAVAILABLE;
@@ -59,6 +60,10 @@ public class NettyResteasy extends ServerTpl {
      * 吞噬器.请求执行控制器
      */
     protected       Devourer           devourer;
+    /**
+     * 正在处理的请求个数
+     */
+    protected       AtomicInteger      ing        = new AtomicInteger(0);
     /**
      * 关联的所有
      */
@@ -92,6 +97,13 @@ public class NettyResteasy extends ServerTpl {
         }
         // 初始化请求执行控制器
         devourer = new Devourer(getClass().getSimpleName(), exec);
+        devourer.pause(() -> {
+            // 避免让线程池里面全是请求任务在执行
+            if (toInteger(invoke(findMethod(exec.getClass(), "getWaitingCount"), exec), 0) >
+                Math.min(Runtime.getRuntime().availableProcessors(), toInteger(invoke(findMethod(exec.getClass(), "getCorePoolSize"), exec), 4) * 2)
+            ) return true;
+            return false;
+        });
         // 初始化resteasy组件
         startDeployment(); initDispatcher(); collect();
 
@@ -124,7 +136,11 @@ public class NettyResteasy extends ServerTpl {
                     if (i > 0 && i % 3 == 0) log.warn("There are currently {} requests waiting to be processed.", i);
                     ctx.writeAndFlush(new DefaultHttpResponse(HttpVersion.HTTP_1_1, SERVICE_UNAVAILABLE));
                 } else {
-                    devourer.offer(() -> exec.execute(() -> process(ctx, msg)));
+                    devourer.offer(() -> {
+                        ing.incrementAndGet();
+                        log.info("当前正在处理的请求个数: " + ing);
+                        exec.execute(() -> {process(ctx, msg); ing.decrementAndGet();});
+                    });
                 }
             }
         });

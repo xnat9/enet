@@ -77,12 +77,21 @@ public class NettyHttp extends ServerTpl {
      * 创建http服务
      */
     protected void createServer() {
-        boolean useEpoll = isLinux() && getBoolean("epollEnabled", true);
-        boosGroup = useEpoll ? new EpollEventLoopGroup(getInteger("threads-boos", 1), exec) : new NioEventLoopGroup(getInteger("threads-boos", 1), exec);
-        workerGroup = getBoolean("shareLoop", true) ? boosGroup : (useEpoll ? new EpollEventLoopGroup(getInteger("threads-worker", 1), exec) : new NioEventLoopGroup(getInteger("threads-worker", 1), exec));
+        String loopType = getStr("loopType", (isLinux() ? "epoll" : "nio"));
+        Boolean shareLoop = getBoolean("shareLoop", true);
+        Class ch = null;
+        if ("epoll".equalsIgnoreCase(loopType)) {
+            boosGroup = new EpollEventLoopGroup(getInteger("threads-boos", 1), exec);
+            workerGroup = (shareLoop ? boosGroup : new EpollEventLoopGroup(getInteger("threads-worker", 1), exec));
+            ch = EpollServerSocketChannel.class;
+        } else if ("nio".equalsIgnoreCase(loopType)) {
+            boosGroup = new NioEventLoopGroup(getInteger("threads-boos", 1), exec);
+            workerGroup = (shareLoop ? boosGroup : new NioEventLoopGroup(getInteger("threads-worker", 1), exec));
+            ch = NioServerSocketChannel.class;
+        }
         ServerBootstrap sb = new ServerBootstrap()
                 .group(boosGroup, workerGroup)
-                .channel(useEpoll ? EpollServerSocketChannel.class : NioServerSocketChannel.class)
+                .channel(ch)
                 .childHandler(new ChannelInitializer<SocketChannel>() {
                     @Override
                     protected void initChannel(SocketChannel ch) throws Exception {
@@ -106,12 +115,12 @@ public class NettyHttp extends ServerTpl {
                         ch.pipeline().addLast(new HttpServerKeepAliveHandler());
                         ch.pipeline().addLast(new HttpObjectAggregator(getInteger("maxContentLength", 65536)));
                         ch.pipeline().addLast(new ChunkedWriteHandler());
-                        ep.fire("http-netty.addHandler", new EC().args(ch.pipeline()).sync(), ec -> {
+                        ep.fire("http-netty.addHandler", new EC().sync().args(ch.pipeline()).completeFn(ec -> {
                             if (ec.isNoListener()) {
                                 log.error("'{}' server not available handler", getName());
                                 stop();
                             }
-                        });
+                        }));
                     }
                 })
                 .option(ChannelOption.SO_BACKLOG, getInteger("backlog", 100))
@@ -122,7 +131,7 @@ public class NettyHttp extends ServerTpl {
             else sb.bind(getPort()).sync();
             log.info(
                 "Started {} Server. hostname: {}, port: {}, type: {}, shareEventLoop: {}",
-                getName(), (f ? getHostname() : "0.0.0.0"), getPort(), (useEpoll ? "epoll" : "nio"), (boosGroup == workerGroup)
+                getName(), (f ? getHostname() : "0.0.0.0"), getPort(), loopType, shareLoop
             );
         } catch (Exception ex) {
             log.error(ex);

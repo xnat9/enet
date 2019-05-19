@@ -1,10 +1,10 @@
 package cn.xnatural.enet.server.swagger;
 
-import io.swagger.v3.oas.models.OpenAPI;
-import io.swagger.v3.oas.models.Paths;
 import cn.xnatural.enet.common.Log;
 import cn.xnatural.enet.event.EC;
 import cn.xnatural.enet.event.EP;
+import io.swagger.v3.oas.models.OpenAPI;
+import io.swagger.v3.oas.models.Paths;
 
 import javax.ws.rs.GET;
 import javax.ws.rs.Path;
@@ -39,7 +39,7 @@ public class Controller {
     public void data(@Suspended final AsyncResponse resp) {
         OpenAPI openApi = new OpenAPI();
         openApi.setPaths(new Paths()); openApi.setTags(new LinkedList<>());
-        ep.fire("swagger.openApi", EC.of(this).result(new LinkedList<OpenAPI>()),
+        ep.fire("swagger.openApi", EC.of(this).result(new LinkedList<OpenAPI>()).completeFn(
                 ec -> {
                     server.apis.forEach(o -> {
                         openApi.getPaths().putAll(o.getPaths());
@@ -50,7 +50,8 @@ public class Controller {
                         openApi.getTags().addAll(o.getTags());
                     });
                     resp.resume(openApi);
-                });
+                })
+        );
     }
 
 

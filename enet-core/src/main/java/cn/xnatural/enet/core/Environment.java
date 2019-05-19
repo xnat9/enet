@@ -298,7 +298,7 @@ public class Environment {
     public Environment setAttr(String key, String value) {
         if (PROP_ACTIVE.equals(key)) throw new RuntimeException("not allow change this property '" + PROP_ACTIVE + "'");
         // 即时通知
-        ep.fire("env.updateAttr", EC.of(this).args(key, value), ec -> { if (ec.isSuccess()) runtimeAttrs.put(key, value); });
+        ep.fire("env.updateAttr", EC.of(this).args(key, value).completeFn(ec -> { if (ec.isSuccess()) runtimeAttrs.put(key, value); }));
         return this;
     }
 

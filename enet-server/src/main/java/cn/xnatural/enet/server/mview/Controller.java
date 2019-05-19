@@ -1,10 +1,10 @@
 package cn.xnatural.enet.server.mview;
 
-import com.alibaba.fastjson.JSON;
-import org.apache.commons.io.IOUtils;
 import cn.xnatural.enet.common.Log;
 import cn.xnatural.enet.event.EC;
 import cn.xnatural.enet.event.EP;
+import com.alibaba.fastjson.JSON;
+import org.apache.commons.io.IOUtils;
 
 import javax.ws.rs.GET;
 import javax.ws.rs.Path;
@@ -34,9 +34,9 @@ public class Controller {
     public Response index() throws Exception {
         Map<String, Object> model = new TreeMap<>(Comparator.naturalOrder());
         model.put("rootPath", server.getPath());
-        ep.fire("sys.info", EC.of(this).sync(), ec -> {
+        ep.fire("sys.info", EC.of(this).sync().completeFn(ec -> {
             ((Map<String, Object>) ec.result).forEach((k, v) -> model.put(k, JSON.toJSONString(v)));
-        });
+        }));
         return Response.ok(render(IOUtils.toString(findViewFile("index.html"), "utf-8"), model))
                 .type("text/html; charset=utf-8")
                 // .header("Cache-Control", "max-age=1")
@@ -52,14 +52,14 @@ public class Controller {
         Map<String, Object> model = new HashMap<>();
         model.put("rootPath", server.getPath());
         model.put("serverName", sName);
-        ep.fire("server." + sName +".info", EC.of(this).sync(), ec -> { // 获取模块服务的信息
+        ep.fire("server." + sName +".info", EC.of(this).sync().completeFn(ec -> { // 获取模块服务的信息
             Map<String, Object> m = (Map<String, Object>) ec.result;
             if (m != null) {
                 model.put("_this", m.get("_this").toString());
                 model.put("properties", JSON.toJSONString(m.get("properties")));
                 model.put("methods", JSON.toJSONString(m.get("methods")));
             }
-        });
+        }));
         return Response.ok(render(IOUtils.toString(findViewFile("serverTpl.html"), "utf-8"), model))
                 .type("text/html; charset=utf-8")
                 .build();

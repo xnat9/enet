@@ -6,11 +6,11 @@
     <modelVersion>4.0.0</modelVersion>
     <groupId>cn.xnatural.enet</groupId>
     <artifactId>enet</artifactId>
-    <version>0.0.8</version>
+    <version>0.0.9</version>
     <modules>
         <module>enet-common</module>
-        <module>enet-core</module>
         <module>enet-event</module>
+        <module>enet-core</module>
         <module>enet-server</module>
         <module>enet-demo</module>
     </modules>

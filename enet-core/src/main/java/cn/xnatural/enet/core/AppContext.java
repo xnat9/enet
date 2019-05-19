@@ -17,7 +17,6 @@ import java.util.Map;
 import java.util.TreeSet;
 import java.util.concurrent.*;
 import java.util.concurrent.atomic.AtomicInteger;
-import java.util.function.Consumer;
 
 import static cn.xnatural.enet.common.Utils.*;
 
@@ -69,15 +68,15 @@ public class AppContext {
         // 3. 初始化系统环境
         env = new Environment(ep); env.loadCfg();
         // 4. 通知所有服务启动
-        ep.fire("sys.starting", EC.of(this), (ec) -> {
+        ep.fire("sys.starting", EC.of(this).completeFn((ec) -> {
             if (shutdownHook != null) Runtime.getRuntime().addShutdownHook(shutdownHook);
             autoInject();
-            log.info("Started Application in {} seconds (JVM running for {})",
+            log.info("Started Application" + (isBlank(getName()) ? "" : " '" + getName() +"' ") + "in {} seconds (JVM running for {})",
                 (System.currentTimeMillis() - startup.getTime()) / 1000.0,
                 ManagementFactory.getRuntimeMXBean().getUptime() / 1000.0
             );
             ep.fire("sys.started", EC.of(this));
-        });
+        }));
     }
 
 
@@ -86,10 +85,10 @@ public class AppContext {
      */
     public void stop() {
         // 通知各个模块服务关闭
-        ep.fire("sys.stopping", EC.of(this), (ce) -> {
+        ep.fire("sys.stopping", EC.of(this).completeFn((ce) -> {
             if (shutdownHook != null) Runtime.getRuntime().removeShutdownHook(shutdownHook);
             exec.shutdown();
-        });
+        }));
     }
 
 
@@ -106,7 +105,7 @@ public class AppContext {
         Method m = findMethod(source.getClass(), mm -> Modifier.isPublic(mm.getModifiers()) && "getName".equals(mm.getName()) && mm.getParameterCount() == 0 && String.class.equals(mm.getReturnType()));
         String name;
         if (m == null) {
-            name = source.getClass().getSimpleName().replace("$$EnhancerByCGLIB$$", "@");
+            name = source.getClass().getSimpleName().replace("$$EnhancerByCGLIB$$", "@").split("@")[0];
             name = name.substring(0, 1).toLowerCase() + name.substring(1);
         } else name = (String) invoke(m, source);
         if (Utils.isEmpty(name)) { log.warn("Get name property is empty from '{}'", source); return; }
@@ -194,14 +193,14 @@ public class AppContext {
     protected EP initEp() {
         return new EP(exec) {
             @Override
-            protected Object doPublish(String eName, EC ec, Consumer<EC> completeFn) {
+            protected Object doPublish(String eName, EC ec) {
                 if ("sys.starting".equals(eName) || "sys.stopping".equals(eName) || "sys.started".equals(eName)) {
                     if (ec.source() != AppContext.this) throw new UnsupportedOperationException("not allow fire event '" + eName + "'");
                 }
                 if ("env.updateAttr".equals(eName)) {
                     if (ec.source() != env) throw new UnsupportedOperationException("not allow fire event '" + eName + "'");
                 }
-                return super.doPublish(eName, ec, completeFn);
+                return super.doPublish(eName, ec);
             }
             @Override
             public String toString() { return "coreEp"; }
@@ -216,7 +215,7 @@ public class AppContext {
      */
     protected void initExecutor() {
         exec = new ThreadPoolExecutor(
-                4, 8, 60, TimeUnit.MINUTES, new LinkedBlockingQueue<>(),
+                8, 8, 60, TimeUnit.MINUTES, new LinkedBlockingQueue<>(),
                 new ThreadFactory() {
                     final AtomicInteger i = new AtomicInteger(1);
                     @Override
@@ -240,37 +239,49 @@ public class AppContext {
     }
 
 
-    @EL(name = "env.configured")
+    @EL(name = "env.configured", async = false)
     protected void envConfigured() {
-        //1. 重置 exec 相关属性
+        // 1. 设置app名字
+        String n = env.getAttr("sys.name");
+        if (isNotEmpty(n)) name = n.trim();
+
+        // 2. 重置 exec 相关属性
         Integer c = env.getInteger("sys.exec.corePoolSize", null);
-        if (c != null) exec.setCorePoolSize(c);
+        if (c != null) {
+            if (c > exec.getMaximumPoolSize()) exec.setMaximumPoolSize(c);
+            exec.setCorePoolSize(c);
+        }
         Integer m = env.getInteger("sys.exec.maximumPoolSize", null);
-        if (m != null) exec.setMaximumPoolSize(m);
+        if (m != null && m > exec.getCorePoolSize()) exec.setMaximumPoolSize(m);
         Long k = env.getLong("sys.exec.keepAliveTime", null);
         if (k != null) exec.setKeepAliveTime(k, TimeUnit.SECONDS);
 
-        //2. 添加 ep 跟踪事件
+        // 3. 添加 ep 跟踪事件
         ep.addTrackEvent(env.getString("ep.track", "").split(","));
     }
 
 
     @EL(name = "env.updateAttr")
     protected void updateAttr(String k, String v) {
-        if (k.startsWith("sys.exec")) { // 更改sys线程池属性
+        if (k.startsWith("sys.exec.")) { // 更改sys线程池属性
             if ("sys.exec.corePoolSize".equals(k)) {
                 Integer i = toInteger(v, null);
                 if (i == null) throw new IllegalArgumentException("'sys.exec.corePoolSize' only can be int. " + v);
+                if (i > exec.getMaximumPoolSize()) exec.setMaximumPoolSize(i);
                 exec.setCorePoolSize(i);
             } else if ("sys.exec.maximumPoolSize".equals(k)) {
                 Integer i = toInteger(v, null);
                 if (i == null) throw new IllegalArgumentException("'sys.exec.maximumPoolSize' only can be int. " + v);
-                exec.setCorePoolSize(i);
+                if (i < exec.getCorePoolSize()) exec.setCorePoolSize(i);
+                exec.setMaximumPoolSize(i);
             } else if ("sys.exec.keepAliveTime".equals(k)) {
                 Long l = toLong(v, null);
                 if (l == null) throw new IllegalArgumentException("'sys.exec.keepAliveTime' only can be int. " + v);
                 exec.setKeepAliveTime(l, TimeUnit.SECONDS);
             } else log.warn("Not allow change property '{}'", k);
+        } else if (k.equals("ep.track")) {
+            // TODO 删除事件名
+            ep.addTrackEvent(env.getString("ep.track", "").split(","));
         }
     }
 
@@ -319,9 +330,9 @@ public class AppContext {
             @Override
             public EP addListenerSource(Object source) { ep.addListenerSource(source); return this; }
             @Override
-            public Object fire(String eName, EC ec, Consumer<EC> completeFn) {
+            public Object fire(String eName, EC ec) {
                 if (ec.source() == null) ec.source(source);
-                return ep.fire(eName, ec, completeFn);
+                return ep.fire(eName, ec);
             }
             @Override
             public String toString() {

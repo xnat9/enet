@@ -6,6 +6,7 @@ import cn.xnatural.enet.demo.dao.repo.TestRepo;
 import cn.xnatural.enet.demo.dao.repo.UploadFileRepo;
 import cn.xnatural.enet.demo.rest.PageModel;
 import cn.xnatural.enet.demo.rest.request.AddFileDto;
+import cn.xnatural.enet.event.EC;
 import cn.xnatural.enet.server.ServerTpl;
 import cn.xnatural.enet.server.dao.hibernate.Trans;
 
@@ -40,5 +41,11 @@ public class TestService extends ServerTpl {
         e.setOriginName(dto.getHeadportrait().getOriginName());
         e.setThirdFileId(dto.getHeadportrait().getResultName());
         uploadFileRepo.saveOrUpdate(e);
+    }
+
+
+    public void remote(EC ec) {
+        // 远程调用
+        ep.fire("remote", "app1", "eName1");
     }
 }

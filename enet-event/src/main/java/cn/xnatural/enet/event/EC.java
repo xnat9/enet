@@ -18,7 +18,7 @@ public class EC {
     /**
      * 一次事件执行的id. 用于追踪执行的是哪次事件
      */
-    String   id;
+    protected String   id;
     /**
      * 是否追踪执行.用于调试
      */
@@ -26,7 +26,7 @@ public class EC {
     /**
      * 强制异步. 如果设置了就会忽略 @EL中的设置
      */
-    Boolean  async;
+    protected Boolean  async;
     /**
      * 目标方法的参数
      */
@@ -35,6 +35,10 @@ public class EC {
      * 是由哪个事件发布器发布的
      */
     EP       ep;
+    /**
+     * 是否 暂停
+     */
+    protected boolean            pause;
     /**
      * 此次执行的事件名
      */
@@ -112,7 +116,7 @@ public class EC {
      * 此次事件执行完成
      */
     void tryFinish() {
-        if (stopped.get()) return;
+        if (stopped.get() || pause) return;
         if (isNoListener())  ep.log.trace("Not found listener for event '{}'. id: {}", eName, id);
         else count.decrementAndGet();
         if (count.get() == 0 && stopped.compareAndSet(false, true)) { // 防止并发时被执行多遍
@@ -133,6 +137,7 @@ public class EC {
         passed.add(l);
         return this;
     }
+
 
     /**
      * 事件是否执行成功
@@ -169,23 +174,51 @@ public class EC {
 
 
     /**
-     * 同步执行
+     * 挂起 和 {@link #resume()} 配套执行
      * @return
      */
-    public EC sync() { async = false; return this; }
+    public EC suspend() { this.pause = true; return this; }
 
 
     /**
-     * 异步执行
+     * 恢复 和 {@link #suspend()} 配套执行
      * @return
      */
-    public EC async() { async = true; return this; }
+    public EC resume() {this.pause = false; return this;}
+
+
+    /**
+     * 强制同步执行
+     * @return
+     */
+    public EC sync() { return async(false); }
+
+
+    public EC async(boolean async) { this.async = async; return this; }
+
+
+    /**
+     * 是否为异步执行
+     * @return
+     */
+    public boolean isAsync() {return this.async;}
 
 
     public EC debug() { track = true; return this; }
 
 
     public EC args(Object... args) { this.args = args; return this; }
+
+
+    /**
+     * 设置id
+     * @param id
+     * @return
+     */
+    public EC id(String id) {this.id = id; return this;}
+
+
+    public String id() {return this.id;}
 
 
     public Object source() { return source; }

@@ -43,7 +43,7 @@ public class ServerTpl {
 
 
     public ServerTpl() {
-        String n = getClass().getSimpleName().replace("$$EnhancerByCGLIB$$", "@");
+        String n = getClass().getSimpleName().replace("$$EnhancerByCGLIB$$", "@").split("@")[0];
         this.name = n.substring(0, 1).toLowerCase() + n.substring(1);
         log = Log.of(getClass());
     }

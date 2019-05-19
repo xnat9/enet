@@ -138,7 +138,6 @@ public class NettyResteasy extends ServerTpl {
                 } else {
                     devourer.offer(() -> {
                         ing.incrementAndGet();
-                        log.info("当前正在处理的请求个数: " + ing);
                         exec.execute(() -> {process(ctx, msg); ing.decrementAndGet();});
                     });
                 }

@@ -1,9 +1,15 @@
 package cn.xnatural.enet.event;
 
+import cn.xnatural.enet.event.EP.Listener;
+
 import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
+import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.concurrent.atomic.AtomicInteger;
+import java.util.function.Consumer;
 
 /**
  * event context: 事件执行的上下文
@@ -30,6 +36,14 @@ public class EC {
      */
     EP       ep;
     /**
+     * 此次执行的事件名
+     */
+    protected String              eName;
+    /**
+     * 事件执行完成的回调函数
+     */
+    protected Consumer<EC>        completeFn;
+    /**
      * 事件源
      */
     private   Object              source;
@@ -45,12 +59,23 @@ public class EC {
     /**
      * 要执行的事件链
      */
-    protected List<EP.Listener>   willPass;
+    protected List<Listener>      willPass;
     /**
      * 执行过的事件链
      */
-    protected List<EP.Listener>   passed = new LinkedList<>();
-    protected Map<Object, Object> attrs  = new ConcurrentHashMap<>(7);
+    protected List<Listener>      passed  = new LinkedList<>();
+    /**
+     * 执行完一个计数减一
+     */
+    protected AtomicInteger       count   = new AtomicInteger(0);
+    /**
+     * 是否结束
+     */
+    protected AtomicBoolean       stopped = new AtomicBoolean(false);
+    /**
+     * 属性集
+     */
+    protected Map<Object, Object> attrs   = new ConcurrentHashMap<>(7);
 
 
     public static EC of(Object source) {
@@ -68,14 +93,35 @@ public class EC {
 
 
     /**
-     * 此条事件执行链的要执行的所有监听
+     * 开始执行,初始化
+     * @param eName
      * @param ls
-     * @return
+     * @param ep
      */
-    EC willPass(List<EP.Listener> ls) {
-        willPass = ls;
-        return this;
+    void start(String eName, List<Listener> ls, EP ep) {
+        this.eName = eName; willPass = ls; this.ep = ep;
+        if (ls != null) count.set(ls.size());
+        if (track) { // 是否要追踪此条事件链的执行
+            id = UUID.randomUUID().toString();
+            ep.log.info("Starting listener chain for event '{}'. id: {}, event source: {}", eName, id, source());
+        }
     }
+
+
+    /**
+     * 此次事件执行完成
+     */
+    void tryFinish() {
+        if (stopped.get()) return;
+        if (isNoListener())  ep.log.trace("Not found listener for event '{}'. id: {}", eName, id);
+        else count.decrementAndGet();
+        if (count.get() == 0 && stopped.compareAndSet(false, true)) { // 防止并发时被执行多遍
+            if (track) ep.log.info("End listener chain for event '{}'. id: {}, result: {}", eName, id, result);
+            Consumer<EC> fn = completeFn();
+            if (fn != null) fn.accept(this);
+        }
+    }
+
 
 
     /**
@@ -83,11 +129,10 @@ public class EC {
      * @param l
      * @return
      */
-    EC passed(EP.Listener l) {
+    EC passed(Listener l) {
         passed.add(l);
         return this;
     }
-
 
     /**
      * 事件是否执行成功
@@ -103,7 +148,23 @@ public class EC {
      * @return
      */
     public boolean isNoListener() {
-        return willPass == null;
+        return willPass == null || willPass.isEmpty();
+    }
+
+
+    /**
+     * 设置完成时回调函数
+     * @param completeFn
+     * @return
+     */
+    public EC completeFn(Consumer<EC> completeFn) {
+        this.completeFn = completeFn;
+        return this;
+    }
+
+
+    public Consumer<EC> completeFn() {
+        return completeFn;
     }
 
 
@@ -131,7 +192,7 @@ public class EC {
 
 
     public EC source(Object s) {
-        if (willPass != null) throw new RuntimeException("not allow change event source!");
+        if (eName != null) throw new RuntimeException("not allow change event source!");
         this.source = s;
         return this;
     }

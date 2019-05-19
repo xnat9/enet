@@ -10,9 +10,6 @@ import java.lang.reflect.Modifier;
 import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.Executor;
-import java.util.concurrent.atomic.AtomicBoolean;
-import java.util.concurrent.atomic.AtomicInteger;
-import java.util.function.Consumer;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
@@ -50,74 +47,55 @@ public class EP {
 
 
     /**
-     * {@link #fire(String, EC, Consumer)}
+     * {@link #doPublish(String, EC)}
+     * @param eName 事件名
      */
     public Object fire(String eName) {
-        return fire(eName, new EC(), null);
+        return fire(eName, new EC());
     }
 
 
     /**
-     * {@link #fire(String, EC, Consumer)}
+     * {@link #doPublish(String, EC)}
      * @param eName 事件名
      * @param args 监听器方法的参数列表
-     * @return
      */
     public Object fire(String eName, Object...args) {
-        return fire(eName, new EC().args(args), null);
+        return fire(eName, new EC().args(args));
     }
 
 
     /**
      * 触发事件
      * @param eName 事件名
-     * @param ec 事件执行上下文(包括参数传递)
+     * @param ec 事件执行上下文
      */
     public Object fire(String eName, EC ec) {
-        return fire(eName, ec, null);
+        return doPublish(eName, ec);
     }
 
 
     /**
-     * 触发事件
-     * @param eName 事件名
-     * @param ec 事件执行上下文(包括参数传递)
-     * @param completeFn 所有事件执行完后回调
-     * @return
-     */
-    public Object fire(String eName, EC ec, Consumer<EC> completeFn) {
-        return doPublish(eName, (ec == null ? new EC() : ec), completeFn);
-    }
-
-
-    /**
-     * 发布事件到各个监听者
+     * 发布事件到各个监听者并执行
      * @param eName 事件名
      * @param ec {@link EC} 事件执行过程上下文
-     * @param completeFn 所有事件执行完后回调
-     * @return Note: 取返回值时, 要注意是同步执行还是异步执行
+     * @return 事件执行结果. Note: 取返回值时, 要注意是同步执行还是异步执行
      */
-    protected Object doPublish(String eName, EC ec, Consumer<EC> completeFn) {
-        List<Listener> ls = lsMap.get(eName); // 获取需要执行的监听器
-        if (ls == null || ls.isEmpty()) {
-            log.trace("Not found listener for event name: {}", eName);
-            if (completeFn != null) completeFn.accept(ec);
-            return ec.result;
-        }
-        ec.willPass(ls).ep = this;
+    protected Object doPublish(String eName, EC ec) {
         if (trackEvents.contains(eName) || log.isTraceEnabled()) ec.track = true;
-        if (ec.track) { // 是否要追踪此条事件链的执行
-            ec.id = UUID.randomUUID().toString();
-            log.info("Starting executing listener chain for event name '{}'. id: {}, event source: {}", eName, ec.id, ec.source());
-        }
+
+        List<Listener> ls = lsMap.get(eName); // 获取需要执行的监听器
+        ls = new ArrayList<>(ls == null ? Collections.emptyList() : ls); // 避免在执行的过程中动态增删事件的监听器而导致个数错误
+        ec.start(eName, ls, this); // 开始执行
+
+        if (ec.isNoListener()) { ec.tryFinish(); return ec.result; } // 没有监听器的情况
+
         if (exec == null) { // 只能同步执行
             for (Listener l : ls) l.invoke(ec);
-            if (ec.track) log.info("End executing listener chain for event name '{}'. id: {}, result: {}", eName, ec.id, ec.result);
-            if (completeFn != null) completeFn.accept(ec);
         } else {
             // 异步, 同步执行的监听器, 分开执行
-            List<Listener> asyncLs = new LinkedList<>(); // 异步执行的监听器
-            List<Listener> syncLs = new LinkedList<>(); // 同步执行的监听器
+            List<Listener> asyncLs = new ArrayList<>(ls.size()); // 异步执行的监听器
+            List<Listener> syncLs = new ArrayList<>(ls.size()); // 同步执行的监听器
             if (ec.async == null) {
                 for (Listener l : ls) {
                     if (l.async) asyncLs.add(l);
@@ -128,33 +106,8 @@ public class EP {
                 else syncLs.addAll(ls); // 强制全部同步执行
             }
 
-            if (completeFn == null) {
-                if (ec.track) {
-                    AtomicInteger i = new AtomicInteger(ls.size());
-                    AtomicBoolean f = new AtomicBoolean(false); // 防止被执行多遍
-                    Runnable fn = () -> {
-                        if (i.get() == 0 && f.compareAndSet(false, true)) {
-                            if (ec.track) log.info("End executing listener chain for event name '{}'. id: {}, result: {}", eName, ec.id, ec.result);
-                        }
-                    };
-                    syncLs.forEach(l -> {l.invoke(ec); i.decrementAndGet(); fn.run();});
-                    asyncLs.forEach(l -> exec.execute(() -> {l.invoke(ec); i.decrementAndGet(); fn.run();}));
-                } else {
-                    syncLs.forEach(l -> l.invoke(ec));
-                    asyncLs.forEach(l -> exec.execute(() -> l.invoke(ec)));
-                }
-            } else {
-                AtomicInteger i = new AtomicInteger(ls.size());
-                AtomicBoolean f = new AtomicBoolean(false); // 防止被执行多遍
-                Runnable fn = () -> { // 两个列表都执行完后才执行completeFn函数
-                    if (i.get() == 0 && f.compareAndSet(false, true)) {
-                        if (ec.track) log.info("End executing listener chain for event name '{}'. id: {}, result: {}", eName, ec.id, ec.result);
-                        completeFn.accept(ec);
-                    }
-                };
-                syncLs.forEach(l -> {l.invoke(ec); i.decrementAndGet(); fn.run();});
-                asyncLs.forEach(l -> exec.execute(() -> {l.invoke(ec); i.decrementAndGet(); fn.run();}));
-            }
+            syncLs.forEach(l -> l.invoke(ec)); // 先执行同步监听器
+            asyncLs.forEach(l -> exec.execute(() -> l.invoke(ec)));
         }
         return ec.result;
     }
@@ -297,7 +250,7 @@ public class EP {
          */
         protected String name;
         /**
-         * 排序. 一个事件对应多个监听器时生效. {@link #resolve(Object)} {@link #doPublish(String, EC, Consumer)}
+         * 排序. 一个事件对应多个监听器时生效. {@link #resolve(Object)} {@link #doPublish(String, EC)}
          */
         protected float order;
         /**
@@ -349,6 +302,8 @@ public class EP {
                     (m == null ? "" : source.getClass().getSimpleName() + "." + m.getName()),
                     (ec.source() == null ? null : ec.source().getClass().getSimpleName())
                 );
+            } finally {
+                ec.tryFinish();
             }
         }
     }

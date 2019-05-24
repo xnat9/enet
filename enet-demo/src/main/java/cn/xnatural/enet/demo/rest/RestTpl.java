@@ -1,8 +1,13 @@
 package cn.xnatural.enet.demo.rest;
 
+import cn.xnatural.enet.common.Log;
 import cn.xnatural.enet.demo.rest.request.AddFileDto;
 import cn.xnatural.enet.demo.service.FileUploader;
 import cn.xnatural.enet.demo.service.TestService;
+import cn.xnatural.enet.event.EL;
+import cn.xnatural.enet.server.ServerTpl;
+import cn.xnatural.enet.server.resteasy.SessionAttr;
+import cn.xnatural.enet.server.resteasy.SessionId;
 import com.alibaba.fastjson.JSON;
 import com.mongodb.MongoClient;
 import io.swagger.v3.oas.annotations.Operation;
@@ -10,11 +15,6 @@ import io.swagger.v3.oas.annotations.Parameter;
 import org.apache.commons.lang3.BooleanUtils;
 import org.jboss.resteasy.plugins.providers.multipart.InputPart;
 import org.jboss.resteasy.plugins.providers.multipart.MultipartFormDataInput;
-import cn.xnatural.enet.common.Log;
-import cn.xnatural.enet.event.EL;
-import cn.xnatural.enet.server.ServerTpl;
-import cn.xnatural.enet.server.resteasy.SessionAttr;
-import cn.xnatural.enet.server.resteasy.SessionId;
 
 import javax.annotation.Resource;
 import javax.ws.rs.*;
@@ -53,6 +53,15 @@ public class RestTpl extends ServerTpl {
     @EL(name = "sys.started")
     public void init() {
         attrs.putAll((Map<? extends String, ?>) ep.fire("env.ns", "mvc"));
+    }
+
+
+    @GET
+    @Path("remote")
+    @Produces("application/json")
+    public void remote(@Suspended final AsyncResponse resp) {
+        resp.setTimeout(1, TimeUnit.MINUTES);
+        service.remote(o -> resp.resume(ApiResp.ok(o)));
     }
 
 

@@ -2,6 +2,7 @@ import cn.xnatural.enet.common.Log;
 
 import java.net.SocketTimeoutException;
 import java.util.Map;
+import java.util.Random;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
@@ -18,9 +19,10 @@ public class Test {
     }
 
     public static void main(String[] args) throws Throwable {
+        System.out.println(new Random().nextInt(3));
 //        System.out.println(http().get("http://localhost:8080/dao").header("Connection", "keep-alive").execute());
 //        Thread.sleep(TimeUnit.SECONDS.toMillis(15));
-        压测();
+        // 压测();
     }
 
 
@@ -59,7 +61,7 @@ public class Test {
                 }
             });
         }
-        Thread.sleep(TimeUnit.MINUTES.toMillis(5)); // 压测时间
+        Thread.sleep(TimeUnit.MINUTES.toMillis(1)); // 压测时间
         stop.set(true);
         exec.shutdown();
         System.out.println("共执行请求: " + c.get());

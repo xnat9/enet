@@ -59,7 +59,7 @@ public class EC {
     /**
      * 用于临时存放, 上一个Listener的执行异常
      */
-    public    Throwable           ex;
+    protected Throwable           ex;
     /**
      * 要执行的事件链
      */
@@ -115,7 +115,7 @@ public class EC {
     /**
      * 此次事件执行完成
      */
-    void tryFinish() {
+    public void tryFinish() {
         if (stopped.get() || pause) return;
         if (isNoListener())  ep.log.trace("Not found listener for event '{}'. id: {}", eName, id);
         else count.decrementAndGet();
@@ -201,7 +201,7 @@ public class EC {
      * 是否为异步执行
      * @return
      */
-    public boolean isAsync() {return this.async;}
+    public Boolean isAsync() {return this.async;}
 
 
     public EC debug() { track = true; return this; }
@@ -219,6 +219,9 @@ public class EC {
 
 
     public String id() {return this.id;}
+
+
+    public EC ex(Throwable t) {this.ex = t; return this;}
 
 
     public Object source() { return source; }

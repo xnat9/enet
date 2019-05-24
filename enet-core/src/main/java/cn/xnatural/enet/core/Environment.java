@@ -169,7 +169,7 @@ public class Environment {
                     String fName = "logback-" + p + ".xml";
                     InputStream in = getClass().getClassLoader().getResourceAsStream(fName);
                     if (in != null) {
-                        log.debug("Configure logback file: {}", fName);
+                        log.info("Configure logback file: {}", fName);
                         m.invoke(o, in); f = true;
                     }
                 }
@@ -177,7 +177,7 @@ public class Environment {
                     String fName = "logback.xml";
                     InputStream in = getClass().getClassLoader().getResourceAsStream(fName);
                     if (in != null) {
-                        log.debug("Configure logback file: {}", fName);
+                        log.info("Configure logback file: {}", fName);
                         m.invoke(o, in);
                     }
                 }

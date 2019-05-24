@@ -11,6 +11,7 @@ import javax.annotation.Resource;
 import java.lang.reflect.Method;
 import java.lang.reflect.Modifier;
 import java.util.*;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.function.Supplier;
 import java.util.stream.Collectors;
@@ -33,7 +34,7 @@ public class ServerTpl {
     /**
      * 可配置属性集.
      */
-    protected     Map<String, Object> attrs = new HashMap<>(7);
+    protected     Map<String, Object> attrs = new ConcurrentHashMap<>(7);
     /**
      * 1. 当此服务被加入核心时, 此值会自动设置为核心的EP.
      * 2. 如果要服务独立运行时, 请手动设置

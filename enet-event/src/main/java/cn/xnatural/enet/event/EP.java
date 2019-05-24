@@ -13,6 +13,8 @@ import java.util.concurrent.Executor;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
+import static java.util.Collections.*;
+
 /**
  * event publisher 事件发布器.事件分发中心
  * TODO 事件死锁. 事件执行链
@@ -85,7 +87,7 @@ public class EP {
         if (trackEvents.contains(eName) || log.isTraceEnabled()) ec.track = true;
 
         List<Listener> ls = lsMap.get(eName); // 获取需要执行的监听器
-        ls = new ArrayList<>(ls == null ? Collections.emptyList() : ls); // 避免在执行的过程中动态增删事件的监听器而导致个数错误
+        ls = new ArrayList<>(ls == null ? emptyList() : ls); // 避免在执行的过程中动态增删事件的监听器而导致个数错误
         ec.start(eName, ls, this); // 开始执行
 
         if (ec.isNoListener()) { ec.tryFinish(); return ec.result; } // 没有监听器的情况
@@ -296,7 +298,7 @@ public class EP {
                     ec.id, ec.result
                 );
             } catch (Throwable e) {
-                ec.ex = e.getCause() == null ? e : e.getCause();
+                ec.ex(e.getCause() == null ? e : e.getCause());
                 log.error(ec.ex, "Listener invoke error! name: {}, id: {}, method: {}, event source: {}",
                     name, ec.id,
                     (m == null ? "" : source.getClass().getSimpleName() + "." + m.getName()),

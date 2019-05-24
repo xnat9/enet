@@ -7,12 +7,14 @@ import cn.xnatural.enet.demo.dao.repo.UploadFileRepo;
 import cn.xnatural.enet.demo.rest.PageModel;
 import cn.xnatural.enet.demo.rest.request.AddFileDto;
 import cn.xnatural.enet.event.EC;
+import cn.xnatural.enet.event.EL;
 import cn.xnatural.enet.server.ServerTpl;
 import cn.xnatural.enet.server.dao.hibernate.Trans;
 
 import javax.annotation.Resource;
 import java.text.SimpleDateFormat;
 import java.util.Date;
+import java.util.function.Consumer;
 
 public class TestService extends ServerTpl {
     @Resource
@@ -44,8 +46,14 @@ public class TestService extends ServerTpl {
     }
 
 
-    public void remote(EC ec) {
+    public void remote(Consumer fn) {
         // 远程调用
-        ep.fire("remote", "app1", "eName1");
+        ep.fire("remote", EC.of(this).args("app1", "eName1").completeFn(ec -> fn.accept(ec.result)));
+    }
+
+
+    @EL(name = "eName1", async = false)
+    private String testEvent() {
+        return "xxxxxxxxxxxxxxxxxxx";
     }
 }

@@ -190,7 +190,7 @@ public class Log {
     /**
      * 日志数据结构
      */
-    private static class LogData {
+    protected static class LogData {
         Log log; Level level; String loggerClassName;
         String msg; Object[] args; Throwable th;
     }
@@ -207,7 +207,7 @@ public class Log {
                     earlyLog.offer(d);
                     if (earlyLog.size() > 200) {
                         earlyLog.poll(); System.err.println("early log too much");
-                }
+                    }
                     return;
                 }
             }
@@ -338,11 +338,11 @@ public class Log {
             logger = (LocationAwareLogger) LoggerFactory.getLogger(name); name = null;
         }
         if (level != null) switch (level) {
-            case ERROR: return logger.isErrorEnabled();
-            case WARN:  return logger.isWarnEnabled();
-            case INFO:  return logger.isInfoEnabled();
-            case DEBUG: return logger.isDebugEnabled();
-            case TRACE: return logger.isTraceEnabled();
+            case ERROR: return logger == null ? true : logger.isErrorEnabled();
+            case WARN:  return logger == null ? true : logger.isWarnEnabled();
+            case INFO:  return logger == null ? true : logger.isInfoEnabled();
+            case DEBUG: return logger == null ? false : logger.isDebugEnabled();
+            case TRACE: return logger == null ? false : logger.isTraceEnabled();
         }
         return true;
     }

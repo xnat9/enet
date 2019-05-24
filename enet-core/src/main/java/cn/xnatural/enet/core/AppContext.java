@@ -345,6 +345,7 @@ public class AppContext {
     public Environment env() { return env; }
 
 
+    @EL(name = "sysName", async = false)
     public String getName() { return name; }
 
 

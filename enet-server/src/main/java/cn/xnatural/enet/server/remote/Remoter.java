@@ -1,6 +1,5 @@
 package cn.xnatural.enet.server.remote;
 
-import cn.xnatural.enet.common.Utils;
 import cn.xnatural.enet.event.EC;
 import cn.xnatural.enet.event.EL;
 import cn.xnatural.enet.event.EP;
@@ -22,30 +21,51 @@ import io.netty.util.ReferenceCountUtil;
 
 import javax.annotation.Resource;
 import java.math.BigDecimal;
-import java.util.Locale;
-import java.util.Map;
-import java.util.UUID;
+import java.util.*;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.Executor;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
 
-import static cn.xnatural.enet.common.Utils.isEmpty;
+import static cn.xnatural.enet.common.Utils.*;
 
 /**
  * @author xiangxb, 2019-05-18
  */
 public class Remoter extends ServerTpl {
-    protected final AtomicBoolean  running = new AtomicBoolean(false);
+    protected final AtomicBoolean              running   = new AtomicBoolean(false);
     @Resource
-    protected       Executor       exec;
+    protected       Executor                   exec;
     /**
      * 暴露的远程调用端口
      */
-    protected       Integer        exposePort;
-    protected       EventLoopGroup boosGroup;
-    protected       EventLoopGroup workerGroup;
+    protected       Integer                    exposePort;
+    protected       EventLoopGroup             clientBoosGroup;
+    protected       Bootstrap                  boot;
+    protected       EventLoopGroup             serverBoos;
+    protected       EventLoopGroup             serverWorker;
+    /**
+     * 当前连接数
+     */
+    protected       AtomicInteger              connCount = new AtomicInteger(0);
+    /**
+     * ecId -> EC
+     */
+    protected       Map<String, EC>            ecMap;
+    /**
+     * appName -> list Channel
+     */
+    protected       Map<String, List<Channel>> appNameChannelMap;
+    /**
+     * host:port -> list Channel
+     */
+    protected       Map<String, List<Channel>> hostChannelMap;
+    /**
+     * 系统名字(标识)
+     */
+    protected       String                     sysName;
 
 
     public Remoter() { super("remote"); }
@@ -60,7 +80,10 @@ public class Remoter extends ServerTpl {
         if (ep == null) ep = new EP();
         ep.fire(getName() + ".starting");
         attrs.putAll((Map) ep.fire("env.ns", getName()));
+        sysName = (String) ep.fire("sysName");
         exposePort = getInteger("exposePort", null);
+
+        createServer();
 
         ep.fire(getName() + ".started");
         log.info("Started {} Server.", getName());
@@ -70,55 +93,173 @@ public class Remoter extends ServerTpl {
     @EL(name = "sys.stopping")
     public void stop() {
         log.info("Shutdown '{}' Server", getName());
-        if (boosGroup != null) boosGroup.shutdownGracefully();
-        if (workerGroup != null && workerGroup != boosGroup) workerGroup.shutdownGracefully();
+        if (serverBoos != null) serverBoos.shutdownGracefully();
+        if (serverWorker != null && serverWorker != serverBoos) serverWorker.shutdownGracefully();
+        if (clientBoosGroup != null) clientBoosGroup.shutdownGracefully();
+        boot = null;
         if (exec instanceof ExecutorService) ((ExecutorService) exec).shutdown();
     }
 
 
     @EL(name = "remote")
-    protected Object invoke(EC ec, String appName, String eName, Object[] remoteMethodArgs) {
+    protected void invoke(EC ec, String appName, String eName, Object[] remoteMethodArgs) throws Exception {
         ec.suspend();
-        JSONObject params = new JSONObject(4);
-        if (isEmpty(ec.id())) ec.id(UUID.randomUUID().toString());
-        params.put("eId", ec.id());
-        params.put("async", ec.isAsync());
-        params.put("eName", eName);
-        if (remoteMethodArgs != null) {
-            JSONArray args = new JSONArray(remoteMethodArgs.length);
-            params.put("args", args);
-            for (Object arg : remoteMethodArgs) {
-                args.add(new JSONObject(2).fluentPut("type", arg.getClass().getName()).fluentPut("value", arg));
+        try {
+            JSONObject params = new JSONObject(4);
+            if (isEmpty(ec.id())) ec.id(UUID.randomUUID().toString());
+            params.put("eId", ec.id());
+            params.put("reply", ec.completeFn() != null); // 是否需要远程响应执行结果(有完成回调函数就需要远程响应调用结果)
+            params.put("async", ec.isAsync());
+            params.put("eName", eName);
+            if (remoteMethodArgs != null) {
+                JSONArray args = new JSONArray(remoteMethodArgs.length);
+                params.put("args", args);
+                for (Object arg : remoteMethodArgs) {
+                    args.add(new JSONObject(2).fluentPut("type", arg.getClass().getName()).fluentPut("value", arg));
+                }
             }
-        }
-        // new Bootstrap()
-        return null;
+            ecMap.put(ec.id(), ec);
+            // 发送请求给远程应用appName执行
+            channel(appName).writeAndFlush(new JSONObject(2).fluentPut("type", "event").fluentPut("data", params).toJSONString());
+        } catch (Throwable ex) { ec.resume(); throw ex; }
     }
 
 
     /**
-     * 当前连接数
+     * 得到一个指向 appName 的Channel
+     * @param appName
+     * @return
+     * @throws Exception
      */
-    protected AtomicInteger connCount = new AtomicInteger(0);
+    protected Channel channel(String appName) {
+        if (boot == null) {
+            synchronized (this) {
+                if (boot == null) createClient();
+            }
+        }
+
+        // 一个 app 可能被部署多个实例, 每个实例可以创建多个连接
+        List<Channel> chs = appNameChannelMap.get(appName);
+        if (chs == null) {
+            synchronized (this) {
+                if (chs == null) {
+                    chs = new ArrayList<>(7); appNameChannelMap.put(appName, chs);
+                    adaptChannel(appName, true);
+                }
+            }
+        } else if (chs.isEmpty()) adaptChannel(appName, true);
+
+        if (chs.isEmpty()) throw new IllegalArgumentException("没有可用的Channel");
+        else if (chs.size() == 1) return chs.get(0);
+        return chs.get(new Random().nextInt(chs.size()));
+    }
+
+
+    /**
+     * 为每个连接配置 适配 连接
+     * @param appName
+     * @param once 是否创建一条连接就立即返回
+     */
+    protected void adaptChannel(String appName, boolean once) {
+        String hosts = getStr(appName + ".hosts", null);
+        if (isEmpty(hosts)) {
+            throw new IllegalArgumentException("未发现应用 '" + appName + "' 的连接信息配置");
+        }
+        List<Channel> chs = appNameChannelMap.get(appName);
+        String[] arr = hosts.split(",");
+
+        try {
+            for (String hp : arr) {
+                if (isBlank(hp.trim()) || !hp.contains(":")) {
+                    log.warn("配置错误 {}", hosts); continue;
+                }
+                if (hostChannelMap.get(hp).size() > 1) continue;
+                String[] a = hp.trim().split(":");
+                Channel ch = boot.connect(a[0], Integer.valueOf(a[1])).sync().channel();
+                chs.add(ch);
+                hostChannelMap.computeIfAbsent(hp, s -> new LinkedList<>()).add(ch);
+                log.info("New connection for '{}'[{}]", appName, hp);
+                if (once) break;
+            }
+        } catch (Exception ex) {
+            log.error(ex);
+        }
+
+        if (once && arr.length > chs.size()) {
+            exec.execute(() -> adaptChannel(appName, false));
+        }
+    }
+
+
+    /**
+     * 创建客户端
+     */
+    protected void createClient() {
+        if (ecMap == null) ecMap = new ConcurrentHashMap<>();
+        if (appNameChannelMap == null) appNameChannelMap = new ConcurrentHashMap<>();
+        String loopType = getStr("loopType", (isLinux() ? "epoll" : "nio"));
+        Class ch = null;
+        if ("epoll".equalsIgnoreCase(loopType)) {
+            clientBoosGroup = new EpollEventLoopGroup(getInteger("client-threads-boos", 1), exec);
+            ch = EpollServerSocketChannel.class;
+        } else if ("nio".equalsIgnoreCase(loopType)) {
+            clientBoosGroup = new NioEventLoopGroup(getInteger("client-threads-boos", 1), exec);
+            ch = NioServerSocketChannel.class;
+        }
+        boot = new Bootstrap().group(clientBoosGroup).channel(ch)
+            .option(ChannelOption.SO_KEEPALIVE, true)
+            .option(ChannelOption.TCP_NODELAY, true)
+            .handler(new ChannelInitializer<SocketChannel>() {
+                @Override
+                protected void initChannel(SocketChannel ch) throws Exception {
+                    ch.pipeline().addLast(new ChannelInboundHandlerAdapter() {
+                        @Override
+                        public void channelUnregistered(ChannelHandlerContext ctx) throws Exception {
+                            removeClientChannel(ch);
+                        }
+                        @Override
+                        public void channelRead(ChannelHandlerContext ctx, Object msg) throws Exception {
+                            ByteBuf buf = (ByteBuf) msg;
+                            try {
+                                if (buf.readableBytes() <= 0) return;
+                                byte[] bs = new byte[buf.readableBytes()];
+                                buf.readBytes(bs);
+                                JSONObject data = JSON.parseObject(new String(bs));
+                                if ("event".equals(data.getString("type"))) {
+                                    JSONObject jo = data.getJSONObject("data");
+                                    EC ec = ecMap.remove(jo.getString("eId"));
+                                    if (ec != null) ec.result(jo.get("result")).resume().tryFinish();
+                                }
+                            } finally {
+                                ReferenceCountUtil.release(msg);
+                            }
+                        }
+                    });
+                }
+            });
+    }
+
+
+
     /**
      * 创建监听
      */
     protected void createServer() {
-        if (exposePort == null) return;
+        if (exposePort == null || isEmpty(sysName)) return;
         String loopType = getStr("loopType", (isLinux() ? "epoll" : "nio"));
         Boolean shareLoop = getBoolean("shareLoop", true);
         Class ch = null;
         if ("epoll".equalsIgnoreCase(loopType)) {
-            boosGroup = new EpollEventLoopGroup(getInteger("threads-boos", 1), exec);
-            workerGroup = (shareLoop ? boosGroup : new EpollEventLoopGroup(getInteger("threads-worker", 1), exec));
+            serverBoos = new EpollEventLoopGroup(getInteger("threads-boos", 1), exec);
+            serverWorker = (shareLoop ? serverBoos : new EpollEventLoopGroup(getInteger("threads-worker", 1), exec));
             ch = EpollServerSocketChannel.class;
         } else if ("nio".equalsIgnoreCase(loopType)) {
-            boosGroup = new NioEventLoopGroup(getInteger("threads-boos", 1), exec);
-            workerGroup = (shareLoop ? boosGroup : new NioEventLoopGroup(getInteger("threads-worker", 1), exec));
+            serverBoos = new NioEventLoopGroup(getInteger("threads-boos", 1), exec);
+            serverWorker = (shareLoop ? serverBoos : new NioEventLoopGroup(getInteger("threads-worker", 1), exec));
             ch = NioServerSocketChannel.class;
         }
         ServerBootstrap sb = new ServerBootstrap()
-            .group(boosGroup, workerGroup)
+            .group(serverBoos, serverWorker)
             .channel(ch)
             .childHandler(new ChannelInitializer<SocketChannel>() {
                 @Override
@@ -147,7 +288,9 @@ public class Remoter extends ServerTpl {
                                 if (buf.readableBytes() <= 0) return;
                                 byte[] bs = new byte[buf.readableBytes()];
                                 buf.readBytes(bs);
-                                receiveEvent(ctx, JSON.parseObject(new String(bs)));
+                                handleReceive(ctx, JSON.parseObject(new String(bs)));
+                            } catch (Exception ex) {
+                                ctx.close(); log.error(ex);
                             } finally {
                                 ReferenceCountUtil.release(msg);
                             }
@@ -158,16 +301,54 @@ public class Remoter extends ServerTpl {
             .option(ChannelOption.SO_BACKLOG, getInteger("backlog", 100))
             .childOption(ChannelOption.SO_KEEPALIVE, true);
         try {
-            String host  = getStr("hostname", null);
-            if (Utils.isNotEmpty(host)) sb.bind(host, exposePort).sync(); // 如果没有配置hostname, 默认绑定本地所有地址
+            String host = getStr("hostname", null);
+            if (isNotEmpty(host)) sb.bind(host, exposePort).sync(); // 如果没有配置hostname, 默认绑定本地所有地址
             else sb.bind(exposePort).sync();
             log.info(
                 "Started {} Server. hostname: {}, port: {}, type: {}, shareEventLoop: {}",
-                getName(), (Utils.isNotEmpty(host) ? host : "0.0.0.0"), exposePort, loopType, shareLoop
+                getName(), (isNotEmpty(host) ? host : "0.0.0.0"), exposePort, loopType, shareLoop
             );
         } catch (Exception ex) {
             log.error(ex);
         }
+    }
+
+
+    /**
+     * 删除客户端连接
+     * @param ch
+     */
+    protected void removeClientChannel(Channel ch) {
+        String appName = "";
+        String hp = "";
+        loop: for (Iterator<Map.Entry<String, List<Channel>>> it = appNameChannelMap.entrySet().iterator(); it.hasNext(); ) {
+            Map.Entry<String, List<Channel>> e = it.next();
+            for (Iterator<Channel> it1 = e.getValue().iterator(); it1.hasNext(); ) {
+                if (it1.next() == ch) {it1.remove(); appName = e.getKey(); break loop;}
+            }
+        }
+        loop: for (Iterator<Map.Entry<String, List<Channel>>> it = hostChannelMap.entrySet().iterator(); it.hasNext(); ) {
+            Map.Entry<String, List<Channel>> e = it.next();
+            for (Iterator<Channel> it1 = e.getValue().iterator(); it1.hasNext(); ) {
+                if (it1.next() == ch) { it1.remove(); hp = e.getKey(); break loop; }
+            }
+        }
+        log.info("Remove connection for '{}'[{}]", appName, hp);
+    }
+
+
+    /**
+     * 处理数据接收
+     * @param ctx
+     * @param data
+     */
+    protected void handleReceive(ChannelHandlerContext ctx, JSONObject data) {
+        String t = data.getString("type");
+        if ("event".equals(t)) {
+            receiveEvent(ctx, data.getJSONObject("data"));
+        } else if ("ping".equals(t)) { // 用来验证此条连接是否还可用
+            ctx.writeAndFlush(new JSONObject(2).fluentPut("type", "ping").fluentPut("status", "yes").toJSONString());
+        } else throw new IllegalArgumentException("Not support exchange data type '" + t +"'");
     }
 
 
@@ -177,9 +358,14 @@ public class Remoter extends ServerTpl {
      * @param data
      */
     protected void receiveEvent(ChannelHandlerContext ctx, JSONObject data) {
+        String from = data.getString("source");
+        String eId = data.getString("eId");
+        String eName = data.getString("eName");
+        if (isEmpty(from)) throw new IllegalArgumentException("未知调用来源");
+        else if (Objects.equals(sysName, from)) log.warn("发现循环调用链. id: {}, eName: {}", eId, eName);
+
         EC ec = new EC();
-        ec.id(data.getString("eId"));
-        ec.async(Boolean.TRUE.equals(data.getBoolean("async")));
+        ec.id(eId).async(data.getBoolean("async"));
         ec.args(data.getJSONArray("args") == null ? null : data.getJSONArray("args").stream().map(o -> {
             JSONObject jo = (JSONObject) o;
             String t = jo.getString("type");
@@ -194,14 +380,17 @@ public class Remoter extends ServerTpl {
             else if (JSONObject.class.getName().equals(t)) return jo.getJSONObject("value");
             else throw new IllegalArgumentException("Not support parameter type '" + t + "'");
         }).toArray());
-        ep.fire(data.getString("eName"), ec);
-        if (!ec.isAsync()) { // 远程的异步事件不响应
-            JSONObject r = new JSONObject();
-            r.put("success", ec.isSuccess());
-            r.put("result", ec.result);
-            r.put("eId", ec.id());
-            ctx.writeAndFlush(r.toJSONString());
+
+        if (Boolean.TRUE.equals(data.getBoolean("reply"))) {
+            ec.completeFn(ec1 -> {
+                JSONObject r = new JSONObject(3);
+                r.put("eId", ec.id());
+                r.put("success", ec.isSuccess());
+                r.put("result", ec.result);
+                ctx.writeAndFlush(new JSONObject(2).fluentPut("type", "event").fluentPut("data", r).toJSONString());
+            });
         }
+        ep.fire(eName, ec);
     }
 
 
@@ -211,7 +400,7 @@ public class Remoter extends ServerTpl {
      * @return
      */
     protected boolean fusing(ChannelHandlerContext ctx) {
-        if (connCount.get() >= getInteger("maxConnection", 200)) { // 最大连接
+        if (connCount.get() >= getInteger("maxConnection", 100)) { // 最大连接
             ctx.writeAndFlush(new JSONObject().fluentPut("msg", "xxx").toJSONString());
             ctx.close();
             return true;

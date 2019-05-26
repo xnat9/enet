@@ -18,6 +18,8 @@ import java.util.concurrent.ExecutorService;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
 
+import static cn.xnatural.enet.common.Utils.isEmpty;
+
 /**
  * 时间任务调度器
  * @author xiangxb, 2019-02-16
@@ -77,7 +79,8 @@ public class SchedServer extends ServerTpl {
      */
     @EL(name = "sched.cron")
     public void sched(String cron, Runnable fn) {
-        if (Utils.isEmpty(cron) || fn == null) throw new IllegalArgumentException("参数错误");
+        if (!running.get()) return;
+        if (isEmpty(cron) || fn == null) throw new IllegalArgumentException("'cron' and 'fn' must not be empty");
         JobDataMap data = new JobDataMap();
         data.put("fn", fn);
         String id = cron + "_" + System.currentTimeMillis();
@@ -104,7 +107,8 @@ public class SchedServer extends ServerTpl {
      */
     @EL(name = "sched.after")
     public void sched(Integer time, TimeUnit unit, Runnable fn) {
-        if (time == null || unit == null || fn == null) throw new IllegalArgumentException("参数错误");
+        if (!running.get()) return;
+        if (time == null || unit == null || fn == null) throw new NullPointerException("'time', 'unit' and 'fn' must not be null");
         JobDataMap data = new JobDataMap();
         data.put("fn", fn);
         String id = time + "_" + unit + "_" + System.currentTimeMillis();
@@ -132,7 +136,8 @@ public class SchedServer extends ServerTpl {
      */
     @EL(name = "sched.time")
     public void sched(Date time, Runnable fn) {
-        if (time == null || fn == null) throw new IllegalArgumentException("参数错误");
+        if (!running.get()) return;
+        if (time == null || fn == null) throw new NullPointerException("'time' and 'fn' must not be null");
         JobDataMap data = new JobDataMap();
         data.put("fn", fn);
         String id = time + "_" + System.currentTimeMillis();

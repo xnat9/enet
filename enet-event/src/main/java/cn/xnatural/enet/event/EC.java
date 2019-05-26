@@ -194,7 +194,7 @@ public class EC {
     public EC sync() { return async(false); }
 
 
-    public EC async(boolean async) { this.async = async; return this; }
+    public EC async(Boolean async) { this.async = async; return this; }
 
 
     /**

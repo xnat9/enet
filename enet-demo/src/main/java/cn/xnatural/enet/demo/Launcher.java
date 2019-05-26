@@ -18,6 +18,7 @@ import cn.xnatural.enet.server.dao.hibernate.Trans;
 import cn.xnatural.enet.server.dao.hibernate.TransWrapper;
 import cn.xnatural.enet.server.http.netty.NettyHttp;
 import cn.xnatural.enet.server.mview.MViewServer;
+import cn.xnatural.enet.server.remote.Remoter;
 import cn.xnatural.enet.server.resteasy.NettyResteasy;
 import cn.xnatural.enet.server.sched.SchedServer;
 import cn.xnatural.enet.server.session.MemSessionManager;
@@ -52,15 +53,16 @@ public class Launcher extends ServerTpl {
         // app.addSource(new RedisClient());
         // app.addSource(new XMemcached());
         // app.addSource(new MongoClient("localhost", 27017));
+        app.addSource(new Remoter());
         app.addSource(new Launcher());
         app.start();
     }
 
 
     @Resource
-    AppContext ctx;
+    AppContext      ctx;
     @Resource
-    Executor   exec;
+    Executor        exec;
 
 
     /**

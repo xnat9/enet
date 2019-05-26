@@ -11,14 +11,12 @@ import javax.annotation.Resource;
 import java.lang.management.ManagementFactory;
 import java.lang.reflect.Method;
 import java.lang.reflect.Modifier;
-import java.util.Date;
-import java.util.HashMap;
-import java.util.Map;
-import java.util.TreeSet;
+import java.util.*;
 import java.util.concurrent.*;
 import java.util.concurrent.atomic.AtomicInteger;
 
 import static cn.xnatural.enet.common.Utils.*;
+import static java.util.Collections.emptyList;
 
 /**
  * 系统运行上下文
@@ -300,7 +298,41 @@ public class AppContext {
      * @return {@link Executor}
      */
     protected Executor wrapExecForSource(Object source) {
-        return new Executor() {
+        return new ExecutorService() {
+            @Override
+            public void shutdown() {}
+            @Override
+            public List<Runnable> shutdownNow() { return emptyList(); }
+            @Override
+            public boolean isShutdown() { return exec.isShutdown(); }
+            @Override
+            public boolean isTerminated() { return exec.isTerminated(); }
+            @Override
+            public boolean awaitTermination(long timeout, TimeUnit unit) throws InterruptedException {
+                return exec.awaitTermination(timeout, unit);
+            }
+            @Override
+            public <T> Future<T> submit(Callable<T> task) { return exec.submit(task); }
+            @Override
+            public <T> Future<T> submit(Runnable task, T result) { return exec.submit(task, result); }
+            @Override
+            public Future<?> submit(Runnable task) { return exec.submit(task); }
+            @Override
+            public <T> List<Future<T>> invokeAll(Collection<? extends Callable<T>> tasks) throws InterruptedException {
+                return exec.invokeAll(tasks);
+            }
+            @Override
+            public <T> List<Future<T>> invokeAll(Collection<? extends Callable<T>> tasks, long timeout, TimeUnit unit) throws InterruptedException {
+                return exec.invokeAll(tasks, timeout, unit);
+            }
+            @Override
+            public <T> T invokeAny(Collection<? extends Callable<T>> tasks) throws InterruptedException, ExecutionException {
+                return exec.invokeAny(tasks);
+            }
+            @Override
+            public <T> T invokeAny(Collection<? extends Callable<T>> tasks, long timeout, TimeUnit unit) throws InterruptedException, ExecutionException, TimeoutException {
+                return exec.invokeAny(tasks, timeout, unit);
+            }
             @Override
             public void execute(Runnable cmd) { exec.execute(cmd); }
             public int getCorePoolSize() { return exec.getCorePoolSize(); }

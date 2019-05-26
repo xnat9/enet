@@ -13,6 +13,8 @@
     <packaging>jar</packaging>
     <version>0.0.9</version>
 
+    <url>https://gitee.com/xnat/enet</url>
+
     <properties>
         <version.resteasy>3.6.3.Final</version.resteasy>
     </properties>

@@ -11,6 +11,8 @@
     <artifactId>enet-demo</artifactId>
     <packaging>jar</packaging>
 
+    <url>https://gitee.com/xnat/enet</url>
+
     <dependencies>
         <dependency>
             <groupId>cn.xnatural.enet</groupId>

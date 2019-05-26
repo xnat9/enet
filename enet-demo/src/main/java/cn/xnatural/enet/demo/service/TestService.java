@@ -46,14 +46,19 @@ public class TestService extends ServerTpl {
     }
 
 
-    public void remote(Consumer fn) {
+    public void remote(String app, String eName, String ret, Consumer fn) {
         // 远程调用
-        ep.fire("remote", EC.of(this).args("app1", "eName1").completeFn(ec -> fn.accept(ec.result)));
+        ep.fire("remote", EC.of(this).args(app, eName, new Object[]{ret}).completeFn(ec -> fn.accept(ec.result)));
     }
 
 
     @EL(name = "eName1", async = false)
-    private String testEvent() {
-        return "xxxxxxxxxxxxxxxxxxx";
+    private String testEvent(String p) {
+//        try {
+//            Thread.sleep(10000L);
+//        } catch (InterruptedException e) {
+//            e.printStackTrace();
+//        }
+        return "xxxxxxxxxxxxxxxxxxx_" + p;
     }
 }

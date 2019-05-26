@@ -84,6 +84,8 @@ public class EP {
      * @return 事件执行结果. Note: 取返回值时, 要注意是同步执行还是异步执行
      */
     protected Object doPublish(String eName, EC ec) {
+        if (eName == null || eName.isEmpty()) throw new IllegalArgumentException("eName is empty");
+        if (ec == null) throw new NullPointerException("ec must not be null");
         if (trackEvents.contains(eName) || log.isTraceEnabled()) ec.track = true;
 
         List<Listener> ls = lsMap.get(eName); // 获取需要执行的监听器
@@ -112,6 +114,20 @@ public class EP {
             asyncLs.forEach(l -> exec.execute(() -> l.invoke(ec)));
         }
         return ec.result;
+    }
+
+
+    /**
+     * 是否存在事件监听器
+     * @param eNames
+     * @return
+     */
+    public boolean exist(String...eNames) {
+        if (eNames == null) return false;
+        for (String n : eNames) {
+            if (!lsMap.containsKey(n)) return false;
+        }
+        return true;
     }
 
 

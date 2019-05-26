@@ -8,6 +8,7 @@ import io.netty.bootstrap.ServerBootstrap;
 import io.netty.channel.*;
 import io.netty.channel.epoll.EpollEventLoopGroup;
 import io.netty.channel.epoll.EpollServerSocketChannel;
+import io.netty.channel.epoll.Native;
 import io.netty.channel.nio.NioEventLoopGroup;
 import io.netty.channel.socket.SocketChannel;
 import io.netty.channel.socket.nio.NioServerSocketChannel;
@@ -100,14 +101,14 @@ public class NettyHttp extends ServerTpl {
                             public void channelRegistered(ChannelHandlerContext ctx) throws Exception {
                                 if (!fusing(ctx)) {
                                     connCount.incrementAndGet();
-                                    log.debug("Connection registered: {}", connCount);
+                                    log.debug("HTTP Connection registered: {}", connCount);
                                     super.channelRegistered(ctx);
                                 }
                             }
                             @Override
                             public void channelUnregistered(ChannelHandlerContext ctx) throws Exception {
                                 super.channelUnregistered(ctx); connCount.decrementAndGet();
-                                log.debug("Connection unregistered: {}", connCount);
+                                log.debug("HTTP Connection unregistered: {}", connCount);
                             }
                         });
                         ch.pipeline().addLast(new IdleStateHandler(getLong("readerIdleTime", 20L), getLong("writerIdleTime", 0L), getLong("allIdleTime", 0L), TimeUnit.SECONDS));
@@ -130,8 +131,8 @@ public class NettyHttp extends ServerTpl {
             if (f) sb.bind(getHostname(), getPort()).sync(); // 如果没有配置hostname, 默认绑定本地所有地址
             else sb.bind(getPort()).sync();
             log.info(
-                "Started {} Server. hostname: {}, port: {}, type: {}, shareEventLoop: {}",
-                getName(), (f ? getHostname() : "0.0.0.0"), getPort(), loopType, shareLoop
+                "Start listen HTTP {}:{}, type: {}, shareEventLoop: {}",
+                (f ? getHostname() : "0.0.0.0"), getPort(), loopType, shareLoop
             );
         } catch (Exception ex) {
             log.error(ex);
@@ -145,6 +146,7 @@ public class NettyHttp extends ServerTpl {
      * @return
      */
     protected boolean fusing(ChannelHandlerContext ctx) {
+        // TODO 每个ip连接限制?
         if (connCount.get() >= getInteger("maxConnection", 200)) { // 最大连接
             ctx.writeAndFlush(new DefaultHttpResponse(HttpVersion.HTTP_1_1, SERVICE_UNAVAILABLE));
             ctx.close();
@@ -156,6 +158,7 @@ public class NettyHttp extends ServerTpl {
 
     /**
      * 判断系统是否为 linux 系统
+     * 判断方法来源 {@link Native#loadNativeLibrary()}
      * @return
      */
     protected boolean isLinux() {

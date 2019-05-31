@@ -198,10 +198,10 @@ public class EC {
 
 
     /**
-     * 是否为异步执行
+     * 是否为强制异步执行
      * @return
      */
-    public Boolean isAsync() {return this.async;}
+    public Boolean isForceAsync() {return this.async;}
 
 
     public EC debug() { track = true; return this; }

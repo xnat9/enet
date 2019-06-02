@@ -14,6 +14,7 @@ import io.netty.channel.epoll.EpollSocketChannel;
 import io.netty.channel.nio.NioEventLoopGroup;
 import io.netty.channel.socket.SocketChannel;
 import io.netty.channel.socket.nio.NioSocketChannel;
+import io.netty.util.AttributeKey;
 import io.netty.util.ReferenceCountUtil;
 
 import javax.annotation.Resource;
@@ -21,6 +22,8 @@ import java.nio.charset.Charset;
 import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.Executor;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicInteger;
 
 import static cn.xnatural.enet.common.Utils.isBlank;
 import static cn.xnatural.enet.common.Utils.isEmpty;
@@ -33,14 +36,7 @@ class TCPClient extends ServerTpl {
     @Resource
     protected       Executor                   exec;
     protected final Remoter                    remoter;
-    /**
-     * appName -> list Channel
-     */
-    protected       Map<String, List<Channel>> appNameChannelMap;
-    /**
-     * host:port -> list Channel
-     */
-    protected       Map<String, List<Channel>> hostChannelMap;
+    protected Map<String, AppInfo>             appInfoMap = new ConcurrentHashMap<>();
     protected       EventLoopGroup             boos;
     protected       Bootstrap                  boot;
 
@@ -53,13 +49,18 @@ class TCPClient extends ServerTpl {
 
     public void start() {
         attrs.putAll((Map) ep.fire("env.ns", getName()));
+        attrs.forEach((k, v) -> {
+            if (k.endsWith(".hosts")) { // 例: app1.hosts=ip1:8201,ip2:8202,ip2:8203
+                appInfoMap.computeIfAbsent(k.split("\\.")[0].trim(), (s) -> new AppInfo(s)).hps.add(((String) v).trim());
+            }
+        });
     }
 
 
     protected void stop() {
         if (boos != null) boos.shutdownGracefully();
         boot = null;
-        appNameChannelMap = null; hostChannelMap = null;
+        appInfoMap = null;
     }
 
 
@@ -68,8 +69,21 @@ class TCPClient extends ServerTpl {
      * @param appName
      * @param data
      */
-    protected void send(String appName, Object data) {
-        channel(appName).writeAndFlush(toByteBuf(data));
+    public void send(String appName, Object data) {
+        ByteBuf msg = toByteBuf(data);
+        Channel ch = channel(appName, null);
+        LinkedList<Long> record = appInfoMap.get(appName).hpErrorRecord.get(ch.attr(AttributeKey.valueOf("hp")).get());
+        try {
+            ch.writeAndFlush(msg, ch.newPromise().addListener(f -> {
+                // 如果成功 则清除之前的错误记录
+                if (f.isSuccess() && !record.isEmpty()) record.clear();
+            }));
+        } catch (Exception ex) {
+            log.error("send tcp data error: {}. try again", ex.getMessage());
+            record.addFirst(System.currentTimeMillis());
+            ch = channel(appName, ch);
+            ch.writeAndFlush(msg);
+        }
     }
 
 
@@ -79,7 +93,7 @@ class TCPClient extends ServerTpl {
      * @return
      * @throws Exception
      */
-    protected Channel channel(String appName) {
+    protected Channel channel(String appName, Channel unexpected) {
         if (boot == null) {
             synchronized (this) {
                 if (boot == null) create();
@@ -87,52 +101,93 @@ class TCPClient extends ServerTpl {
         }
 
         // 一个 app 可能被部署多个实例, 每个实例可以创建多个连接
-        List<Channel> chs = appNameChannelMap.get(appName);
+        AppInfo info = appInfoMap.get(appName);
+        List<Channel> chs = info == null ? null : info.chs;
         if (chs == null) {
             synchronized (this) {
                 if (chs == null) {
-                    chs = new ArrayList<>(7); appNameChannelMap.put(appName, chs);
-                    adaptChannel(appName, true);
+                    chs = info.chs = new ArrayList<>(7);
+                    adaptChannel(info, true);
                 }
             }
-        } else if (chs.isEmpty()) adaptChannel(appName, true);
+        } else if (chs.isEmpty()) adaptChannel(info, true);
 
+        Channel ch = null;
         if (chs.isEmpty()) throw new IllegalArgumentException("Not found available channel for '" + appName +"'");
-        else if (chs.size() == 1) return chs.get(0);
-        return chs.get(new Random().nextInt(chs.size()));
+        else if (chs.size() == 1) ch = chs.get(0);
+        else if (chs.size() == 2 && unexpected != null) {
+            ch = chs.get(0);
+            if (ch == unexpected) ch = chs.get(1);
+        } else {
+            while (true) {
+                ch = chs.get(new Random().nextInt(chs.size()));
+                if (unexpected == null) break;
+                if (unexpected != ch) break;
+            }
+        }
+        return ch;
     }
 
 
     /**
      * 为每个连接配置 适配 连接
-     * 配置例子: ip1:8201,ip2:8202,ip2:8203
-     * @param appName 应用名
+     * @param appInfo 应用名
      * @param once 是否创建一条连接就立即返回
      */
-    protected void adaptChannel(String appName, boolean once) {
-        String hosts = getStr(appName + ".hosts", null);
-        if (isEmpty(hosts)) {
-            throw new IllegalArgumentException("Not found connection config for '" + appName + "'");
+    protected void adaptChannel(AppInfo appInfo, boolean once) {
+        if (isEmpty(appInfo.hps)) {
+            log.warn("Not found connection config for '{}'", appInfo.name); return;
         }
-        List<Channel> chs = appNameChannelMap.get(appName);
-        String[] arr = hosts.split(",");
-
-        for (String hp : arr) {
+        Integer maxConnectionPerHp = getInteger("maxConnectionPerHp", 1); // 每个host:port最多可以建立多少个连接
+        for (Iterator<String> it = appInfo.hps.iterator(); it.hasNext(); ) {
+            String hp = it.next();
             try {
-                if (isBlank(hp.trim()) || !hp.contains(":")) {
-                    log.warn("Config error {}", hosts); continue;
+                if (isBlank(hp) || !hp.contains(":")) {
+                    log.warn("Config error {}", appInfo.hps); continue;
                 }
-                if (hostChannelMap.get(hp.trim()) != null && hostChannelMap.get(hp.trim()).size() >= getInteger("maxConnectionPerHost", 1)) continue;
-                String[] a = hp.trim().split(":");
-                Channel ch = boot.connect(a[0], Integer.valueOf(a[1])).sync().channel();
-                chs.add(ch);
-                hostChannelMap.computeIfAbsent(hp, s -> new LinkedList<>()).add(ch);
-                log.info("New TCP Connection to '{}'[{}]", appName, hp);
+                AtomicInteger count = appInfo.hpChannelCount.get(hp);
+                if (count == null) {
+                    synchronized (this) {
+                        if (count == null) {
+                            count = new AtomicInteger(0); appInfo.hpChannelCount.put(hp, count);
+                        }
+                    }
+                }
+                if (count.get() >= maxConnectionPerHp) continue;
+                LinkedList<Long> errRecord = appInfo.hpErrorRecord.get(hp);
+                if (errRecord == null) {
+                    synchronized (this) {
+                        if (errRecord == null) {
+                            errRecord = new LinkedList<>(); appInfo.hpErrorRecord.put(hp, errRecord);
+                        }
+                    }
+                }
+                Long lastRefuse = errRecord.peekFirst(); // 上次被连接被拒时间
+                if (lastRefuse != null && (System.currentTimeMillis() - lastRefuse < 2000)) { // 距上次连接被拒还没超过2秒, 则不必再连接
+                    continue;
+                }
+                String[] arr = hp.split(":");
+                Channel ch;
+                try {
+                    ch = boot.connect(arr[0], Integer.valueOf(arr[1])).sync().channel();
+                } catch (Exception ex) {
+                    errRecord.addFirst(System.currentTimeMillis());
+                    synchronized (this) {
+                        // 连接(hp(host:port))多次发生错误, 则移除此条连接配置
+                        if ((appInfo.hps.size() == 1 && errRecord.size() >= 5) || (appInfo.hps.size() > 0 && errRecord.size() >= 2)) {
+                            errRecord.clear(); it.remove(); redeem(appInfo, hp);
+                        }
+                    }
+                    throw ex;
+                }
+                appInfo.chs.add(ch); count.incrementAndGet();
+                ch.attr(AttributeKey.valueOf("app")).set(appInfo); ch.attr(AttributeKey.valueOf("hp")).set(hp);
+                log.info("New TCP Connection to '{}'[{}]", appInfo, hp);
                 if (once) break;
             } catch (Exception ex) { log.error(ex); }
         }
-        if (once && arr.length > chs.size()) {
-            exec.execute(() -> adaptChannel(appName, false));
+        if (once && (appInfo.hps.size() * maxConnectionPerHp) > appInfo.chs.size()) {
+            exec.execute(() -> adaptChannel(appInfo, false));
         }
     }
 
@@ -141,8 +196,6 @@ class TCPClient extends ServerTpl {
      * 创建客户端
      */
     protected void create() {
-        if (appNameChannelMap == null) appNameChannelMap = new ConcurrentHashMap<>();
-        if (hostChannelMap == null) hostChannelMap = new ConcurrentHashMap<>();
         String loopType = getStr("loopType", (remoter.isLinux() ? "epoll" : "nio"));
         Class ch = null;
         if ("epoll".equalsIgnoreCase(loopType)) {
@@ -210,21 +263,38 @@ class TCPClient extends ServerTpl {
      * @param ch
      */
     protected void removeChannel(Channel ch) {
-        String appName = "";
-        String hp = "";
-        loop: for (Iterator<Map.Entry<String, List<Channel>>> it = appNameChannelMap.entrySet().iterator(); it.hasNext(); ) {
-            Map.Entry<String, List<Channel>> e = it.next();
-            for (Iterator<Channel> it1 = e.getValue().iterator(); it1.hasNext(); ) {
-                if (it1.next() == ch) {it1.remove(); appName = e.getKey(); break loop;}
-            }
+        AppInfo app = (AppInfo) ch.attr(AttributeKey.valueOf("app")).get();
+        String hp = (String) ch.attr(AttributeKey.valueOf("hp")).get();
+        for (Iterator<Channel> it = app.chs.iterator(); it.hasNext(); ) {
+            if (it.next().equals(ch)) {it.remove(); break;}
         }
-        loop: for (Iterator<Map.Entry<String, List<Channel>>> it = hostChannelMap.entrySet().iterator(); it.hasNext(); ) {
-            Map.Entry<String, List<Channel>> e = it.next();
-            for (Iterator<Channel> it1 = e.getValue().iterator(); it1.hasNext(); ) {
-                if (it1.next() == ch) { it1.remove(); hp = e.getKey(); break loop; }
+        app.hpChannelCount.get(hp).decrementAndGet();
+        log.info("Remove TCP Connection to '{}'[{}]", app.name, hp);
+    }
+
+
+    /**
+     * 尝试挽回 被删除 连接配置
+     * @param appInfo
+     * @param hp
+     */
+    protected void redeem(AppInfo appInfo, String hp) {
+        LinkedList<Integer> pass = new LinkedList<>(Arrays.asList(5, 5, 10, 10, 20, 35, 40, 45, 50, 60, 90, 90, 120, 120, 90, 60, 60, 45, 30, 20));
+        Runnable fn = new Runnable() {
+            @Override
+            public void run() {
+                String[] arr = hp.split(":");
+                try {
+                    boot.connect(arr[0], Integer.valueOf(arr[1])).sync().channel().disconnect();
+                    appInfo.hps.add(hp);
+                    log.info("'{}' redeem success", hp);
+                } catch (Exception e) {
+                    if (pass.isEmpty()) { log.warn("'{}' can't redeem", hp); }
+                    else { ep.fire("sched.after", pass.removeFirst(), TimeUnit.SECONDS, this); }
+                }
             }
-        }
-        log.info("Remove TCP Connection to '{}'[{}]", appName, hp);
+        };
+        ep.fire("sched.after", pass.removeFirst(), TimeUnit.SECONDS, fn);
     }
 
 
@@ -237,5 +307,31 @@ class TCPClient extends ServerTpl {
         if (msg instanceof String) return Unpooled.copiedBuffer((String) msg, Charset.forName("utf-8"));
         else if (msg instanceof JSONObject) return Unpooled.copiedBuffer(((JSONObject) msg).toJSONString(), Charset.forName("utf-8"));
         else throw new IllegalArgumentException("Not support '" + getName() + "' send data type '" + (msg == null ? null : msg.getClass().getName()) + "'");
+    }
+
+
+    protected class AppInfo {
+        protected String                        name;
+        /**
+         * app 连接配置信息
+         * app -> ip:port
+         */
+        protected Set<String>                   hps            = ConcurrentHashMap.newKeySet();
+        /**
+         * list Channel
+         */
+        protected List<Channel>                 chs            = new ArrayList(7);
+        /**
+         * host:port -> list Channel
+         */
+        protected Map<String, AtomicInteger>    hpChannelCount = new ConcurrentHashMap<>();
+        /**
+         * host:port -> 连接异常时间
+         */
+        protected Map<String, LinkedList<Long>> hpErrorRecord  = new ConcurrentHashMap<>();
+
+        public AppInfo(String name) {
+            this.name = name;
+        }
     }
 }

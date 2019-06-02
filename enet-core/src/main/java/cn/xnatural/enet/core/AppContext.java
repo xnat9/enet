@@ -362,6 +362,8 @@ public class AppContext {
             @Override
             public EP addListenerSource(Object source) { ep.addListenerSource(source); return this; }
             @Override
+            public boolean exist(String... eNames) { return ep.exist(eNames); }
+            @Override
             public Object fire(String eName, EC ec) {
                 if (ec.source() == null) ec.source(source);
                 return ep.fire(eName, ec);

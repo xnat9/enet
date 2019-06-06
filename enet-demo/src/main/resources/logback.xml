@@ -9,6 +9,7 @@ custom logback configuration
     <property name="CONSOLE_LOG_PATTERN" value="%d{HH:mm:ss.SSS} [%-7thread] [%-5level] [%-50.50C :%-3L] => %m%n"/>
     <property name="FILE_LOG_PATTERN" value="%d{yyyy-MM-dd HH:mm:ss.SSS} [%-7thread] [${PID:- }] [%-5level] [%-50C :%-3L] => %m%n"/>
     <property name="LOG_PATH" value="${LOG_PATH:-${LOG_TEMP:-${java.io.tmpdir:-/tmp}}}"/>
+    <property name="FILE_NAME" value="sys"/>
 
 
     <!-- appender area -->
@@ -22,9 +23,9 @@ custom logback configuration
         <encoder>
             <pattern>${FILE_LOG_PATTERN}</pattern>
         </encoder>
-        <file>${LOG_PATH}/sys.log</file>
+        <file>${LOG_PATH}/${FILE_NAME}.log</file>
         <rollingPolicy class="ch.qos.logback.core.rolling.SizeAndTimeBasedRollingPolicy">
-            <fileNamePattern>${LOG_PATH}/sys.%d{yyyy-MM-dd}.log.%i</fileNamePattern>
+            <fileNamePattern>${LOG_PATH}/${FILE_NAME}.%d{yyyy-MM-dd}.log.%i</fileNamePattern>
             <maxFileSize>7MB</maxFileSize>
             <maxHistory>20</maxHistory>
             <totalSizeCap>5GB</totalSizeCap>

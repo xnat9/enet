@@ -8,7 +8,6 @@ import java.util.Map;
 import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.atomic.AtomicBoolean;
-import java.util.concurrent.atomic.AtomicInteger;
 import java.util.function.Consumer;
 
 /**
@@ -61,25 +60,29 @@ public class EC {
      */
     protected Throwable           ex;
     /**
+     * 错误消息
+     */
+    protected String              errMsg;
+    /**
      * 要执行的事件链
      */
     protected List<Listener>      willPass;
     /**
-     * 执行过的事件链
+     * 成功执行过的事件监听
      */
-    protected List<Listener>      passed  = new LinkedList<>();
+    protected List<Listener>      successPassed = new LinkedList<>();
     /**
-     * 执行完一个计数减一
+     * 执行失败的事件监听
      */
-    protected AtomicInteger       count   = new AtomicInteger(0);
+    protected List<Listener>      failPassed = new LinkedList<>();
     /**
      * 是否结束
      */
-    protected AtomicBoolean       stopped = new AtomicBoolean(false);
+    protected AtomicBoolean       stopped       = new AtomicBoolean(false);
     /**
      * 属性集
      */
-    protected Map<Object, Object> attrs   = new ConcurrentHashMap<>(7);
+    protected Map<Object, Object> attrs         = new ConcurrentHashMap<>(7);
 
 
     public static EC of(Object source) {
@@ -104,7 +107,6 @@ public class EC {
      */
     void start(String eName, List<Listener> ls, EP ep) {
         this.eName = eName; willPass = ls; this.ep = ep;
-        if (ls != null) count.set(ls.size());
         if (track) { // 是否要追踪此条事件链的执行
             id = UUID.randomUUID().toString();
             ep.log.info("Starting listener chain for event '{}'. id: {}, event source: {}", eName, id, source());
@@ -117,10 +119,12 @@ public class EC {
      */
     public void tryFinish() {
         if (stopped.get() || pause) return;
-        if (isNoListener())  ep.log.trace("Not found listener for event '{}'. id: {}", eName, id);
-        else count.decrementAndGet();
-        if (count.get() == 0 && stopped.compareAndSet(false, true)) { // 防止并发时被执行多遍
-            if (track) ep.log.info("End listener chain for event '{}'. id: {}, result: {}", eName, id, result);
+        boolean noL = isNoListener();
+        if (noL && track) ep.log.trace("Not found listener for event '{}'. id: {}", eName, id);
+        if ((noL || successPassed.size() + failPassed.size() == willPass.size()) && stopped.compareAndSet(false, true)) { // 防止并发时被执行多遍
+            boolean f = isSuccess();
+            if (f && track) ep.log.info("End listener chain for event '{}'. id: {}, result: {}", eName, id, result);
+            else if (!f) ep.log.warn("End listener chain for event '{}'. id: {}, result: {}, failDesc: {}", eName, id, result, failDesc());
             Consumer<EC> fn = completeFn();
             if (fn != null) fn.accept(this);
         }
@@ -129,12 +133,14 @@ public class EC {
 
 
     /**
-     * passed一个Listener 代表执行成功一个Listener. 即: 执行成功后调用
-     * @param l
+     * passed一个Listener 代表执行完成一个Listener.
+     * @param l {@link Listener}
+     * @param success 成功执行
      * @return
      */
-    EC passed(Listener l) {
-        passed.add(l);
+    EC passed(Listener l, boolean success) {
+        if (success) successPassed.add(l);
+        else failPassed.add(l);
         return this;
     }
 
@@ -144,7 +150,7 @@ public class EC {
      * @return
      */
     public boolean isSuccess() {
-        return isNoListener() || willPass.size() == passed.size();
+        return isNoListener() || (willPass.size() == successPassed.size() && ex == null && errMsg == null);
     }
 
 
@@ -222,6 +228,28 @@ public class EC {
 
 
     public EC ex(Throwable t) {this.ex = t; return this;}
+
+
+    public Throwable ex() { return ex; }
+
+
+    public EC errMsg(String msg) {this.errMsg = msg; return this;}
+
+
+    /**
+     * 错误消息
+     * @return
+     */
+    public String errMsg() { return errMsg; }
+
+
+    /**
+     * 失败描述
+     * @return
+     */
+    public String failDesc() {
+        return (ex() == null ? (errMsg()) : (ex().getMessage() == null ? ex().getClass().getName() : ex().getMessage()));
+    }
 
 
     public Object source() { return source; }

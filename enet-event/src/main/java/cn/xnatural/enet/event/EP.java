@@ -308,12 +308,13 @@ public class EP {
                     }
                     if (!void.class.isAssignableFrom(m.getReturnType())) ec.result = r;
                 }
-                ec.passed(this);
+                ec.passed(this, true);
                 if (ec.track) log.info("Passed listener of event '{}'. method: {}, id: {}, result: {}",
                     name, (m == null ? "" : source.getClass().getSimpleName() + "." + m.getName()),
                     ec.id, ec.result
                 );
             } catch (Throwable e) {
+                ec.passed(this, false);
                 ec.ex(e.getCause() == null ? e : e.getCause());
                 log.error(ec.ex, "Listener invoke error! name: {}, id: {}, method: {}, event source: {}",
                     name, ec.id,

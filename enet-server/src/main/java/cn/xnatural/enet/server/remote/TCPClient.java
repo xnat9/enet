@@ -22,11 +22,15 @@ import java.nio.charset.Charset;
 import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.Executor;
-import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
+import java.util.concurrent.locks.ReadWriteLock;
+import java.util.concurrent.locks.ReentrantReadWriteLock;
+import java.util.function.Consumer;
 
 import static cn.xnatural.enet.common.Utils.isBlank;
 import static cn.xnatural.enet.common.Utils.isEmpty;
+import static java.util.concurrent.TimeUnit.SECONDS;
 
 /**
  * tcp client
@@ -66,34 +70,31 @@ class TCPClient extends ServerTpl {
 
     /**
      * 发送数据 到 app
-     * @param appName
-     * @param data
+     * @param appName 向哪个应用发数据
+     * @param data 要发送的数据
+     * @param completeFn 发送完成后回调函数
      */
-    public void send(String appName, Object data) {
+    public void send(String appName, Object data, Consumer<Throwable> completeFn) {
         ByteBuf msg = toByteBuf(data);
-        Channel ch = channel(appName, null);
+        Channel ch = channel(appName);
         LinkedList<Long> record = appInfoMap.get(appName).hpErrorRecord.get(ch.attr(AttributeKey.valueOf("hp")).get());
-        try {
-            ch.writeAndFlush(msg, ch.newPromise().addListener(f -> {
-                // 如果成功 则清除之前的错误记录
+        ch.writeAndFlush(msg).addListener(f -> {
+            exec.execute(() -> {
                 if (f.isSuccess() && !record.isEmpty()) record.clear();
-            }));
-        } catch (Exception ex) {
-            log.error("send tcp data error: {}. try again", ex.getMessage());
-            record.addFirst(System.currentTimeMillis());
-            ch = channel(appName, ch);
-            ch.writeAndFlush(msg);
-        }
+                else if (f.cause() != null) record.addFirst(System.currentTimeMillis());
+                completeFn.accept(f.cause());
+            });
+        });
     }
 
 
+    protected ReadWriteLock rwlock = new ReentrantReadWriteLock();
     /**
      * 得到一个指向 appName 的Channel
      * @param appName
      * @return
-     * @throws Exception
      */
-    protected Channel channel(String appName, Channel unexpected) {
+    protected Channel channel(String appName) {
         if (boot == null) {
             synchronized (this) {
                 if (boot == null) create();
@@ -112,18 +113,17 @@ class TCPClient extends ServerTpl {
             }
         } else if (chs.isEmpty()) adaptChannel(info, true);
 
+        // 获取一个连接Channel
         Channel ch = null;
-        if (chs.isEmpty()) throw new IllegalArgumentException("Not found available channel for '" + appName +"'");
-        else if (chs.size() == 1) ch = chs.get(0);
-        else if (chs.size() == 2 && unexpected != null) {
-            ch = chs.get(0);
-            if (ch == unexpected) ch = chs.get(1);
-        } else {
-            while (true) {
+        try {
+            rwlock.readLock().lock();
+            if (chs.isEmpty()) throw new IllegalArgumentException("Not found available channel for '" + appName +"'");
+            else if (chs.size() == 1) ch = chs.get(0);
+            else {
                 ch = chs.get(new Random().nextInt(chs.size()));
-                if (unexpected == null) break;
-                if (unexpected != ch) break;
             }
+        } finally {
+            rwlock.readLock().unlock();
         }
         return ch;
     }
@@ -136,7 +136,7 @@ class TCPClient extends ServerTpl {
      */
     protected void adaptChannel(AppInfo appInfo, boolean once) {
         if (isEmpty(appInfo.hps)) {
-            log.warn("Not found connection config for '{}'", appInfo.name); return;
+            throw new IllegalArgumentException("Not found connection config for '"+ appInfo.name +"'");
         }
         Integer maxConnectionPerHp = getInteger("maxConnectionPerHp", 1); // 每个host:port最多可以建立多少个连接
         for (Iterator<String> it = appInfo.hps.iterator(); it.hasNext(); ) {
@@ -169,12 +169,14 @@ class TCPClient extends ServerTpl {
                 String[] arr = hp.split(":");
                 Channel ch;
                 try {
-                    ch = boot.connect(arr[0], Integer.valueOf(arr[1])).sync().channel();
+                    ChannelFuture f = boot.connect(arr[0], Integer.valueOf(arr[1]));
+                    f.await(getInteger("connectTimeout", 3), SECONDS);
+                    ch = f.channel();
                 } catch (Exception ex) {
                     errRecord.addFirst(System.currentTimeMillis());
                     synchronized (this) {
                         // 连接(hp(host:port))多次发生错误, 则移除此条连接配置
-                        if ((appInfo.hps.size() == 1 && errRecord.size() >= 5) || (appInfo.hps.size() > 0 && errRecord.size() >= 2)) {
+                        if ((appInfo.hps.size() == 1 && errRecord.size() >= 2) || (appInfo.hps.size() > 1)) {
                             errRecord.clear(); it.remove(); redeem(appInfo, hp);
                         }
                     }
@@ -265,8 +267,13 @@ class TCPClient extends ServerTpl {
     protected void removeChannel(Channel ch) {
         AppInfo app = (AppInfo) ch.attr(AttributeKey.valueOf("app")).get();
         String hp = (String) ch.attr(AttributeKey.valueOf("hp")).get();
-        for (Iterator<Channel> it = app.chs.iterator(); it.hasNext(); ) {
-            if (it.next().equals(ch)) {it.remove(); break;}
+        try {
+            rwlock.writeLock().lock();
+            for (Iterator<Channel> it = app.chs.iterator(); it.hasNext(); ) {
+                if (it.next().equals(ch)) {it.remove(); break;}
+            }
+        } finally {
+            rwlock.writeLock().unlock();
         }
         app.hpChannelCount.get(hp).decrementAndGet();
         log.info("Remove TCP Connection to '{}'[{}]", app.name, hp);
@@ -290,11 +297,11 @@ class TCPClient extends ServerTpl {
                     log.info("'{}' redeem success", hp);
                 } catch (Exception e) {
                     if (pass.isEmpty()) { log.warn("'{}' can't redeem", hp); }
-                    else { ep.fire("sched.after", pass.removeFirst(), TimeUnit.SECONDS, this); }
+                    else { ep.fire("sched.after", pass.removeFirst(), SECONDS, this); }
                 }
             }
         };
-        ep.fire("sched.after", pass.removeFirst(), TimeUnit.SECONDS, fn);
+        ep.fire("sched.after", pass.removeFirst(), SECONDS, fn);
     }
 
 
@@ -312,6 +319,10 @@ class TCPClient extends ServerTpl {
 
     protected class AppInfo {
         protected String                        name;
+        /**
+         * chs 读写 锁
+         */
+        protected AtomicBoolean                 chLock         = new AtomicBoolean(false);
         /**
          * app 连接配置信息
          * app -> ip:port

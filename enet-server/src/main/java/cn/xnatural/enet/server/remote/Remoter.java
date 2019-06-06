@@ -90,12 +90,13 @@ public class Remoter extends ServerTpl {
     @EL(name = "remote")
     protected void sendEvent(EC ec, String appName, String eName, Object[] remoteMethodArgs) {
         if (tcpClient == null) throw new RuntimeException(getName() + " not is running");
+        ec.suspend();
         try {
             if (isEmpty(ec.id())) ec.id(UUID.randomUUID().toString());
             JSONObject params = new JSONObject(5);
             params.put("eId", ec.id());
             // 是否需要远程响应执行结果(有完成回调函数就需要远程响应调用结果)
-            boolean reply = ec.completeFn() != null; if (reply) ec.suspend(); // NOTE: 重要
+            boolean reply = ec.completeFn() != null;
             params.put("reply", reply);
             params.put("async", ec.isForceAsync());
             params.put("eName", eName);
@@ -107,16 +108,19 @@ public class Remoter extends ServerTpl {
                     else args.add(new JSONObject(2).fluentPut("type", arg.getClass().getName()).fluentPut("value", arg));
                 }
             }
-            ecMap.put(ec.id(), ec);
+            if (reply) ecMap.put(ec.id(), ec);
             log.debug("Fire remote event. params: {}", params);
+
             // 发送请求给远程应用appName执行
-            tcpClient.send(appName, new JSONObject(3).fluentPut("type", "event").fluentPut("source", sysName).fluentPut("data", params));
+            JSONObject data = new JSONObject(3).fluentPut("type", "event").fluentPut("source", sysName).fluentPut("data", params);
+            tcpClient.send(appName, data, ex -> ec.ex(ex).resume().tryFinish());
+
             // 超时处理
-            ep.fire("sched.after", getInteger("eventTimeout", 10), SECONDS, (Runnable) () -> {
+            if (reply) ep.fire("sched.after", getInteger("eventTimeout", 10), SECONDS, (Runnable) () -> {
                 EC e = ecMap.remove(ec.id());
                 if (e != null) {
                     log.warn("Finish timeout event '{}'", e.id());
-                    e.resume().tryFinish();
+                    e.errMsg("Timeout").resume().tryFinish();
                 }
             });
         } catch (Throwable ex) { ec.resume(); throw ex; }
@@ -129,7 +133,7 @@ public class Remoter extends ServerTpl {
      */
     protected void receiveEventResp(JSONObject data) {
         EC ec = ecMap.remove(data.getString("eId"));
-        if (ec != null) ec.result(data.get("result")).resume().tryFinish();
+        if (ec != null) ec.errMsg(data.getString("exMsg")).result(data.get("result")).resume().tryFinish();
     }
 
 
@@ -166,7 +170,7 @@ public class Remoter extends ServerTpl {
                 ec.completeFn(ec1 -> {
                     JSONObject r = new JSONObject(3);
                     r.put("eId", ec.id());
-                    r.put("success", ec.isSuccess());
+                    if (!ec.isSuccess()) { r.put("exMsg", ec.failDesc()); }
                     r.put("result", ec.result);
                     reply.accept(new JSONObject(3).fluentPut("type", "event").fluentPut("source", sysName).fluentPut("data", r));
                 });

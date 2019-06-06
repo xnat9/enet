@@ -93,6 +93,11 @@ public class Environment {
                 if (s != null && !s.trim().isEmpty()) cfgFileNames.add(s.trim());
             }
         }
+
+        // -Denet.profile.active=pro
+        if (Utils.isNotEmpty(System.getProperty(PROP_ACTIVE))) {
+            allProfiles.addAll(Arrays.asList(System.getProperty(PROP_ACTIVE).split(",")));
+        }
     }
 
 

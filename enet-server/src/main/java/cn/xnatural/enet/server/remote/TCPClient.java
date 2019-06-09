@@ -75,11 +75,10 @@ class TCPClient extends ServerTpl {
      * @param completeFn 发送完成后回调函数
      */
     public void send(String appName, Object data, Consumer<Throwable> completeFn) {
-        ByteBuf msg = toByteBuf(data);
         Channel ch = channel(appName);
-        LinkedList<Long> record = appInfoMap.get(appName).hpErrorRecord.get(ch.attr(AttributeKey.valueOf("hp")).get());
-        ch.writeAndFlush(msg).addListener(f -> {
+        ch.writeAndFlush(toByteBuf(data)).addListener(f -> {
             exec.execute(() -> {
+                LinkedList<Long> record = appInfoMap.get(appName).hpErrorRecord.get(ch.attr(AttributeKey.valueOf("hp")).get());
                 if (f.isSuccess() && !record.isEmpty()) record.clear();
                 else if (f.cause() != null) record.addFirst(System.currentTimeMillis());
                 completeFn.accept(f.cause());
@@ -119,9 +118,7 @@ class TCPClient extends ServerTpl {
             rwlock.readLock().lock();
             if (chs.isEmpty()) throw new IllegalArgumentException("Not found available channel for '" + appName +"'");
             else if (chs.size() == 1) ch = chs.get(0);
-            else {
-                ch = chs.get(new Random().nextInt(chs.size()));
-            }
+            else { ch = chs.get(new Random().nextInt(chs.size())); }
         } finally {
             rwlock.readLock().unlock();
         }

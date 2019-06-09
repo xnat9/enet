@@ -41,7 +41,8 @@ public class Test {
         for (int i = 0; i < threadCnt; i++) {
             String url = urlPrefix;
             if (i % 2 == 0) url += "/dao";
-            else if (i % 3 == 0) url += "/session";
+            else if (i % 5 == 0) url += "/session";
+            else if (i % 3 == 0) url += "/remote";
             else url += "/cache";
             String u = url;
             exec.execute(() -> {

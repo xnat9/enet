@@ -48,7 +48,10 @@ public class TestService extends ServerTpl {
 
     public void remote(String app, String eName, String ret, Consumer fn) {
         // 远程调用
-        ep.fire("remote", EC.of(this).args(app, eName, new Object[]{ret}).completeFn(ec -> fn.accept(ec.result)));
+        ep.fire("remote", EC.of(this).args(app, eName, new Object[]{ret}).completeFn(ec -> {
+            if (ec.isSuccess()) fn.accept(ec.result);
+            else fn.accept(ec.ex() == null ? new Exception(ec.failDesc()) : ec.ex());
+        }));
     }
 
 

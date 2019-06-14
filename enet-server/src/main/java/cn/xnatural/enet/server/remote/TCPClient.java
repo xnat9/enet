@@ -7,13 +7,13 @@ import com.alibaba.fastjson.JSONException;
 import com.alibaba.fastjson.JSONObject;
 import io.netty.bootstrap.Bootstrap;
 import io.netty.buffer.ByteBuf;
-import io.netty.buffer.Unpooled;
 import io.netty.channel.*;
 import io.netty.channel.epoll.EpollEventLoopGroup;
 import io.netty.channel.epoll.EpollSocketChannel;
 import io.netty.channel.nio.NioEventLoopGroup;
 import io.netty.channel.socket.SocketChannel;
 import io.netty.channel.socket.nio.NioSocketChannel;
+import io.netty.handler.codec.DelimiterBasedFrameDecoder;
 import io.netty.util.AttributeKey;
 import io.netty.util.ReferenceCountUtil;
 
@@ -22,7 +22,6 @@ import java.nio.charset.Charset;
 import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.Executor;
-import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.locks.ReadWriteLock;
 import java.util.concurrent.locks.ReentrantReadWriteLock;
@@ -76,7 +75,7 @@ class TCPClient extends ServerTpl {
      */
     public void send(String appName, Object data, Consumer<Throwable> completeFn) {
         Channel ch = channel(appName);
-        ch.writeAndFlush(toByteBuf(data)).addListener(f -> {
+        ch.writeAndFlush(remoter.toByteBuf(data)).addListener(f -> {
             exec.execute(() -> {
                 LinkedList<Long> record = appInfoMap.get(appName).hpErrorRecord.get(ch.attr(AttributeKey.valueOf("hp")).get());
                 if (f.isSuccess() && !record.isEmpty()) record.clear();
@@ -87,7 +86,6 @@ class TCPClient extends ServerTpl {
     }
 
 
-    protected ReadWriteLock rwlock = new ReentrantReadWriteLock();
     /**
      * 得到一个指向 appName 的Channel
      * @param appName
@@ -102,25 +100,25 @@ class TCPClient extends ServerTpl {
 
         // 一个 app 可能被部署多个实例, 每个实例可以创建多个连接
         AppInfo info = appInfoMap.get(appName);
-        List<Channel> chs = info == null ? null : info.chs;
-        if (chs == null) {
-            synchronized (this) {
-                if (chs == null) {
-                    chs = info.chs = new ArrayList<>(7);
-                    adaptChannel(info, true);
-                }
+        if (info == null) throw new IllegalArgumentException("Not found available server for '" + appName + "'");
+        if (info.chs.isEmpty()) {
+            try {
+                info.rwlock.writeLock().lock();
+                adaptChannel(info, false);
+            } finally {
+                info.rwlock.writeLock().unlock();
             }
-        } else if (chs.isEmpty()) adaptChannel(info, true);
+        }
 
         // 获取一个连接Channel
         Channel ch = null;
         try {
-            rwlock.readLock().lock();
-            if (chs.isEmpty()) throw new IllegalArgumentException("Not found available channel for '" + appName +"'");
-            else if (chs.size() == 1) ch = chs.get(0);
-            else { ch = chs.get(new Random().nextInt(chs.size())); }
+            info.rwlock.readLock().lock();
+            if (info.chs.isEmpty()) throw new IllegalArgumentException("Not found available channel for '" + appName +"'");
+            else if (info.chs.size() == 1) ch = info.chs.get(0);
+            else { ch = info.chs.get(new Random().nextInt(info.chs.size())); }
         } finally {
-            rwlock.readLock().unlock();
+            info.rwlock.readLock().unlock();
         }
         return ch;
     }
@@ -135,7 +133,8 @@ class TCPClient extends ServerTpl {
         if (isEmpty(appInfo.hps)) {
             throw new IllegalArgumentException("Not found connection config for '"+ appInfo.name +"'");
         }
-        Integer maxConnectionPerHp = getInteger("maxConnectionPerHp", 1); // 每个host:port最多可以建立多少个连接
+        if (once && appInfo.chs.size() > 0) return;
+        Integer maxConnectionPerHp = getInteger("maxConnectionPerHp", 2); // 每个host:port最多可以建立多少个连接
         for (Iterator<String> it = appInfo.hps.iterator(); it.hasNext(); ) {
             String hp = it.next();
             try {
@@ -144,20 +143,12 @@ class TCPClient extends ServerTpl {
                 }
                 AtomicInteger count = appInfo.hpChannelCount.get(hp);
                 if (count == null) {
-                    synchronized (this) {
-                        if (count == null) {
-                            count = new AtomicInteger(0); appInfo.hpChannelCount.put(hp, count);
-                        }
-                    }
+                    count = new AtomicInteger(0); appInfo.hpChannelCount.put(hp, count);
                 }
                 if (count.get() >= maxConnectionPerHp) continue;
                 LinkedList<Long> errRecord = appInfo.hpErrorRecord.get(hp);
                 if (errRecord == null) {
-                    synchronized (this) {
-                        if (errRecord == null) {
-                            errRecord = new LinkedList<>(); appInfo.hpErrorRecord.put(hp, errRecord);
-                        }
-                    }
+                    errRecord = new LinkedList<>(); appInfo.hpErrorRecord.put(hp, errRecord);
                 }
                 Long lastRefuse = errRecord.peekFirst(); // 上次被连接被拒时间
                 if (lastRefuse != null && (System.currentTimeMillis() - lastRefuse < 2000)) { // 距上次连接被拒还没超过2秒, 则不必再连接
@@ -171,22 +162,27 @@ class TCPClient extends ServerTpl {
                     ch = f.channel();
                 } catch (Exception ex) {
                     errRecord.addFirst(System.currentTimeMillis());
-                    synchronized (this) {
-                        // 连接(hp(host:port))多次发生错误, 则移除此条连接配置
-                        if ((appInfo.hps.size() == 1 && errRecord.size() >= 2) || (appInfo.hps.size() > 1)) {
-                            errRecord.clear(); it.remove(); redeem(appInfo, hp);
-                        }
+                    // 连接(hp(host:port))多次发生错误, 则移除此条连接配置
+                    if ((appInfo.hps.size() == 1 && errRecord.size() >= 2) || (appInfo.hps.size() > 1)) {
+                        errRecord.clear(); it.remove(); redeem(appInfo, hp);
                     }
                     throw ex;
                 }
-                appInfo.chs.add(ch); count.incrementAndGet();
                 ch.attr(AttributeKey.valueOf("app")).set(appInfo); ch.attr(AttributeKey.valueOf("hp")).set(hp);
-                log.info("New TCP Connection to '{}'[{}]", appInfo, hp);
+                appInfo.chs.add(ch); count.incrementAndGet();
+                log.info("New TCP Connection to '{}'[{}]. total count: {}", appInfo.name, hp, count);
                 if (once) break;
             } catch (Exception ex) { log.error(ex); }
         }
         if (once && (appInfo.hps.size() * maxConnectionPerHp) > appInfo.chs.size()) {
-            exec.execute(() -> adaptChannel(appInfo, false));
+            exec.execute(() -> {
+                try {
+                    appInfo.rwlock.writeLock().lock();
+                    adaptChannel(appInfo, false);
+                } finally {
+                    appInfo.rwlock.writeLock().unlock();
+                }
+            });
         }
     }
 
@@ -210,6 +206,7 @@ class TCPClient extends ServerTpl {
             .handler(new ChannelInitializer<SocketChannel>() {
                 @Override
                 protected void initChannel(SocketChannel ch) throws Exception {
+                    ch.pipeline().addLast(new DelimiterBasedFrameDecoder(remoter.getInteger("maxFrameLength", 1024 * 1024), remoter.delimiter));
                     ch.pipeline().addLast(new ChannelInboundHandlerAdapter() {
                         @Override
                         public void channelUnregistered(ChannelHandlerContext ctx) throws Exception {
@@ -224,9 +221,7 @@ class TCPClient extends ServerTpl {
                             ByteBuf buf = (ByteBuf) msg;
                             String str = null;
                             try {
-                                if (buf.readableBytes() <= 0) return;
-                                byte[] bs = new byte[buf.readableBytes()];
-                                buf.readBytes(bs); str = new String(bs, "utf-8");
+                                str = buf.toString(Charset.forName("utf-8"));
                                 receiveReply(ctx, str);
                             } catch (JSONException ex) {
                                 log.error("Received Error Data from '{}'. data: {}, errMsg: {}", ctx.channel().remoteAddress(), str, ex.getMessage());
@@ -247,7 +242,7 @@ class TCPClient extends ServerTpl {
      * @param data
      */
     protected void receiveReply(ChannelHandlerContext ctx, String data) {
-        log.debug("Receive server '{}' reply: {}", ctx.channel().remoteAddress(), data);
+        log.debug("Receive reply from '{}': {}", ctx.channel().remoteAddress(), data);
 
         JSONObject jo = JSON.parseObject(data);
         String type = jo.getString("type");
@@ -265,15 +260,15 @@ class TCPClient extends ServerTpl {
         AppInfo app = (AppInfo) ch.attr(AttributeKey.valueOf("app")).get();
         String hp = (String) ch.attr(AttributeKey.valueOf("hp")).get();
         try {
-            rwlock.writeLock().lock();
+            app.rwlock.writeLock().lock();
             for (Iterator<Channel> it = app.chs.iterator(); it.hasNext(); ) {
                 if (it.next().equals(ch)) {it.remove(); break;}
             }
         } finally {
-            rwlock.writeLock().unlock();
+            app.rwlock.writeLock().unlock();
         }
-        app.hpChannelCount.get(hp).decrementAndGet();
-        log.info("Remove TCP Connection to '{}'[{}]", app.name, hp);
+        AtomicInteger count = app.hpChannelCount.get(hp); count.decrementAndGet();
+        log.info("Remove TCP Connection to '{}'[{}]. left count: {}", app.name, hp, count);
     }
 
 
@@ -302,29 +297,17 @@ class TCPClient extends ServerTpl {
     }
 
 
-    /**
-     * 消息转换成 {@link ByteBuf}
-     * @param msg
-     * @return
-     */
-    protected ByteBuf toByteBuf(Object msg) {
-        if (msg instanceof String) return Unpooled.copiedBuffer((String) msg, Charset.forName("utf-8"));
-        else if (msg instanceof JSONObject) return Unpooled.copiedBuffer(((JSONObject) msg).toJSONString(), Charset.forName("utf-8"));
-        else throw new IllegalArgumentException("Not support '" + getName() + "' send data type '" + (msg == null ? null : msg.getClass().getName()) + "'");
-    }
-
-
     protected class AppInfo {
         protected String                        name;
-        /**
-         * chs 读写 锁
-         */
-        protected AtomicBoolean                 chLock         = new AtomicBoolean(false);
         /**
          * app 连接配置信息
          * app -> ip:port
          */
         protected Set<String>                   hps            = ConcurrentHashMap.newKeySet();
+        /**
+         * {@link #chs} 读写锁
+         */
+        protected ReadWriteLock                 rwlock         = new ReentrantReadWriteLock();
         /**
          * list Channel
          */

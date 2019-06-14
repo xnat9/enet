@@ -120,7 +120,7 @@ public class EC {
     public void tryFinish() {
         if (stopped.get() || pause) return;
         boolean noL = isNoListener();
-        if (noL && track) ep.log.trace("Not found listener for event '{}'. id: {}", eName, id);
+        if (noL && track) ep.log.info("Not found listener for event '{}'. id: {}", eName, id);
         if ((noL || successPassed.size() + failPassed.size() == willPass.size()) && stopped.compareAndSet(false, true)) { // 防止并发时被执行多遍
             boolean f = isSuccess();
             if (f && track) ep.log.info("End listener chain for event '{}'. id: {}, result: {}", eName, id, result);
@@ -248,7 +248,7 @@ public class EC {
      * @return
      */
     public String failDesc() {
-        return (ex() == null ? (errMsg()) : (ex().getMessage() == null ? ex().getClass().getName() : ex().getMessage()));
+        return (ex() == null ? errMsg() : (ex().getMessage() == null ? ex().getClass().getName() : ex().getMessage()));
     }
 
 

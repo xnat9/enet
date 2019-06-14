@@ -58,11 +58,12 @@ public class EhcacheServer extends ServerTpl {
 
     @EL(name = {"${name}.create"}, async = false)
     protected Cache<Object, Object> createCache(String cName, Duration expire, Integer heapOfEntries, Integer heapOfMB) {
-        log.info("{}.create. cName: {}, expire: {}, heapOfEntries: {}, heapOfMB: {}", getName(), cName, expire, heapOfEntries, heapOfMB);
         Cache<Object, Object> cache = cm.getCache(cName, Object.class, Object.class);
         if (cache == null) {
             synchronized (this) {
+                cache = cm.getCache(cName, Object.class, Object.class); // 不同线程同时进来, cache为null
                 if (cache == null) {
+                    log.info("{}.create. cName: {}, expire: {}, heapOfEntries: {}, heapOfMB: {}", getName(), cName, expire, heapOfEntries, heapOfMB);
                     ResourcePoolsBuilder b = newResourcePoolsBuilder();
                     if (heapOfEntries != null && heapOfMB != null) throw new IllegalArgumentException("heapOfEntries 和 heapOfMB 不能同时设置");
                     else if (heapOfEntries == null && heapOfMB == null) throw new IllegalArgumentException("heapOfEntries 和 heapOfMB 必须指定一个");

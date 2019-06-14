@@ -1,18 +1,18 @@
 package cn.xnatural.enet.server.sched;
 
-import org.quartz.*;
-import org.quartz.impl.StdSchedulerFactory;
-import org.quartz.spi.ThreadPool;
-import cn.xnatural.enet.common.Utils;
 import cn.xnatural.enet.event.EL;
 import cn.xnatural.enet.event.EP;
 import cn.xnatural.enet.server.ServerTpl;
+import org.quartz.*;
+import org.quartz.impl.StdSchedulerFactory;
+import org.quartz.spi.ThreadPool;
 
 import javax.annotation.Resource;
 import java.text.SimpleDateFormat;
 import java.util.Date;
 import java.util.Map;
 import java.util.Properties;
+import java.util.UUID;
 import java.util.concurrent.Executor;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.TimeUnit;
@@ -75,15 +75,16 @@ public class SchedServer extends ServerTpl {
     /**
      * cron 时间表达式
      * @param cron
+     * @param keySuffix
      * @param fn
      */
     @EL(name = "sched.cron")
-    public void sched(String cron, Runnable fn) {
+    public void sched(String cron, Runnable fn, String keySuffix) {
         if (scheduler == null) throw new RuntimeException(getName() + " is not running");
         if (isEmpty(cron) || fn == null) throw new IllegalArgumentException("'cron' and 'fn' must not be empty");
         JobDataMap data = new JobDataMap();
         data.put("fn", fn);
-        String id = cron + "_" + System.currentTimeMillis();
+        String id = cron + "_" + (keySuffix == null ? System.currentTimeMillis() : keySuffix);
         try {
             Date d = scheduler.scheduleJob(
                     JobBuilder.newJob(JopTpl.class).withIdentity(id).setJobData(data).build(),
@@ -103,15 +104,16 @@ public class SchedServer extends ServerTpl {
      * 在多少时间之后执行
      * @param time
      * @param unit
+     * @param keySuffix
      * @param fn
      */
     @EL(name = "sched.after")
-    public void sched(Integer time, TimeUnit unit, Runnable fn) {
+    public void sched(Integer time, TimeUnit unit, Runnable fn, String keySuffix) {
         if (scheduler == null) throw new RuntimeException(getName() + " is not running");
         if (time == null || unit == null || fn == null) throw new NullPointerException("'time', 'unit' and 'fn' must not be null");
         JobDataMap data = new JobDataMap();
         data.put("fn", fn);
-        String id = time + "_" + unit + "_" + System.currentTimeMillis();
+        String id = time + "_" + unit + "_" + (keySuffix == null ? UUID.randomUUID().toString() : keySuffix);
         try {
             SimpleDateFormat sdf = new SimpleDateFormat("ss mm HH dd MM ? yyyy");
             String cron = sdf.format(new Date(new Date().getTime() + unit.toMillis(time)));
@@ -132,15 +134,16 @@ public class SchedServer extends ServerTpl {
     /**
      * 在将来的某个时间点执行
      * @param time
+     * @param keySuffix
      * @param fn
      */
     @EL(name = "sched.time")
-    public void sched(Date time, Runnable fn) {
+    public void sched(Date time, Runnable fn, String keySuffix) {
         if (scheduler == null) throw new RuntimeException(getName() + " is not running");
         if (time == null || fn == null) throw new NullPointerException("'time' and 'fn' must not be null");
         JobDataMap data = new JobDataMap();
         data.put("fn", fn);
-        String id = time + "_" + System.currentTimeMillis();
+        String id = time + "_" + (keySuffix == null ? UUID.randomUUID().toString() : keySuffix);
         try {
             SimpleDateFormat sdf = new SimpleDateFormat("ss mm HH dd MM ? yyyy");
             String cron = sdf.format(time);

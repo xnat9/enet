@@ -314,9 +314,8 @@ public class EP {
                     ec.id, ec.result
                 );
             } catch (Throwable e) {
-                ec.passed(this, false);
-                ec.ex(e.getCause() == null ? e : e.getCause());
-                log.error(ec.ex, "Listener invoke error! name: {}, id: {}, method: {}, event source: {}",
+                ec.passed(this, false).ex(e.getCause() == null ? e : e.getCause());
+                log.error(ec.ex, "Listener invoke error! eName: {}, id: {}, method: {}, event source: {}",
                     name, ec.id,
                     (m == null ? "" : source.getClass().getSimpleName() + "." + m.getName()),
                     (ec.source() == null ? null : ec.source().getClass().getSimpleName())

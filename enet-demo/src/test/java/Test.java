@@ -1,16 +1,14 @@
 import cn.xnatural.enet.common.Log;
+import okhttp3.*;
+import okhttp3.internal.Util;
 
-import java.net.SocketTimeoutException;
-import java.util.Map;
-import java.util.Random;
-import java.util.concurrent.ExecutorService;
-import java.util.concurrent.Executors;
-import java.util.concurrent.TimeUnit;
+import java.io.IOException;
+import java.time.Duration;
+import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.List;
+import java.util.concurrent.*;
 import java.util.concurrent.atomic.AtomicBoolean;
-import java.util.concurrent.atomic.AtomicInteger;
-
-import static cn.xnatural.enet.common.Utils.Http;
-import static cn.xnatural.enet.common.Utils.http;
 
 public class Test {
 
@@ -19,52 +17,67 @@ public class Test {
     }
 
     public static void main(String[] args) throws Throwable {
-        System.out.println(new Random().nextInt(3));
 //        System.out.println(http().get("http://localhost:8080/dao").header("Connection", "keep-alive").execute());
 //        Thread.sleep(TimeUnit.SECONDS.toMillis(15));
-        // 压测();
+        压测();
     }
 
-
     static void 压测() throws Throwable {
-        String urlPrefix = "http://localhost:8080/tpl";
+        OkHttpClient client = new OkHttpClient.Builder()
+            .readTimeout(Duration.ofSeconds(17)).connectTimeout(Duration.ofSeconds(5))
+            .dispatcher(new Dispatcher(new ThreadPoolExecutor(4, 10, 60, TimeUnit.SECONDS, new LinkedBlockingQueue<>(), Util.threadFactory("OkHttp Dispatcher", false))))
+            .cookieJar(new CookieJar() {// 共享cookie
+                final HashMap<String, List<Cookie>> cookieStore = new HashMap<>();
+                @Override
+                public void saveFromResponse(HttpUrl url, List<Cookie> cookies) {
+                    cookieStore.put(url.host(), cookies);
+                }
+                @Override
+                public List<Cookie> loadForRequest(HttpUrl url) {
+                    List<Cookie> cookies = cookieStore.get(url.host());
+                    return cookies != null ? cookies : new ArrayList<>(2);
+                }
+            })
+            .build();
+        String urlPrefix = "http://localhost:8000/tpl";
 
-        Http http = http();
-        System.out.println(http.get(urlPrefix + "/dao").execute());
+        System.out.println(client.newCall(new Request.Builder().get().url(urlPrefix + "/dao").build()).execute().body().string());
         // if (true) return;
-        Map<String, Object> cookies = http.cookies();
 
         int threadCnt = 10;
         ExecutorService exec = Executors.newFixedThreadPool(threadCnt);
         final AtomicBoolean stop = new AtomicBoolean(false);
-        AtomicInteger c = new AtomicInteger(0);
         for (int i = 0; i < threadCnt; i++) {
             String url = urlPrefix;
             if (i % 2 == 0) url += "/dao";
             else if (i % 5 == 0) url += "/session";
-            else if (i % 3 == 0) url += "/remote";
+            else if (i % 3 == 0) url += "/remote?app=app2&eName=eName1&ret=" + i;
             else url += "/cache";
             String u = url;
             exec.execute(() -> {
                 while (!stop.get()) {
+                    Request req = new Request.Builder().get().url(u).build();
+//                    client.newCall(req).enqueue(new Callback() {
+//                        @Override
+//                        public void onFailure(Call call, IOException e) { e.printStackTrace(); }
+//                        @Override
+//                        public void onResponse(Call call, Response resp) throws IOException {
+//                            System.out.println(req.url().toString() +" : " + resp.body().string());
+//                        }
+//                    });
                     try {
-                        c.incrementAndGet();
-                        Http h = http().cookies(cookies).get(u);
-                        String r = h.execute();
-                        if (h.getResponseCode() == 503) System.out.println("server is busy");
-                        else System.out.println(r);
-                    } catch (Exception ex) {
-                        if (ex instanceof SocketTimeoutException) System.out.println(ex.getMessage());
-                        else {
-                            ex.printStackTrace();
-                        }
+                        System.out.println(req.url().toString() +" : " + client.newCall(req).execute().body().string());
+                    } catch (IOException e) {
+                        e.printStackTrace();
                     }
                 }
             });
         }
-        Thread.sleep(TimeUnit.MINUTES.toMillis(1)); // 压测时间
+        Thread.sleep(TimeUnit.SECONDS.toMillis(10)); // 压测时间
+        // client.dispatcher().cancelAll();
+        // client.dispatcher().queuedCalls().forEach(call -> call.cancel());
+        // client.dispatcher().executorService().shutdown();
         stop.set(true);
         exec.shutdown();
-        System.out.println("共执行请求: " + c.get());
     }
 }

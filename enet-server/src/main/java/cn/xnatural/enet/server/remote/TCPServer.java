@@ -7,13 +7,13 @@ import com.alibaba.fastjson.JSONException;
 import com.alibaba.fastjson.JSONObject;
 import io.netty.bootstrap.ServerBootstrap;
 import io.netty.buffer.ByteBuf;
-import io.netty.buffer.Unpooled;
 import io.netty.channel.*;
 import io.netty.channel.epoll.EpollEventLoopGroup;
 import io.netty.channel.epoll.EpollServerSocketChannel;
 import io.netty.channel.nio.NioEventLoopGroup;
 import io.netty.channel.socket.SocketChannel;
 import io.netty.channel.socket.nio.NioServerSocketChannel;
+import io.netty.handler.codec.DelimiterBasedFrameDecoder;
 import io.netty.handler.timeout.IdleStateEvent;
 import io.netty.handler.timeout.IdleStateHandler;
 import io.netty.util.ReferenceCountUtil;
@@ -104,11 +104,12 @@ class TCPServer extends ServerTpl {
                         @Override
                         public void channelUnregistered(ChannelHandlerContext ctx) throws Exception {
                             super.channelUnregistered(ctx); connCount.decrementAndGet();
-                            log.debug("TCP Connection unregistered: {}", connCount);
+                            log.debug("TCP Connection unregistered: {}, addr: '{}'-'{}'", connCount, ch.remoteAddress(), ch.localAddress());
                         }
                     });
                     // 最好是将IdleStateHandler放在入站的开头，并且重写userEventTriggered这个方法的handler必须在其后面。否则无法触发这个事件。
                     ch.pipeline().addLast(new IdleStateHandler(getLong("readerIdleTime", 10 * 60L), getLong("writerIdleTime", 0L), getLong("allIdleTime", 0L), SECONDS));
+                    ch.pipeline().addLast(new DelimiterBasedFrameDecoder(remoter.getInteger("maxFrameLength", 1024 * 1024), remoter.delimiter));
                     ch.pipeline().addLast(new ChannelInboundHandlerAdapter() {
                         @Override
                         public void exceptionCaught(ChannelHandlerContext ctx, Throwable cause) throws Exception {
@@ -124,9 +125,7 @@ class TCPServer extends ServerTpl {
                             ByteBuf buf = (ByteBuf) msg;
                             String str = null;
                             try {
-                                if (buf.readableBytes() <= 0) return;
-                                byte[] bs = new byte[buf.readableBytes()];
-                                buf.readBytes(bs); str = new String(bs, "utf-8");
+                                str = buf.toString(Charset.forName("utf-8"));
                                 handleReceive(ctx, str);
                             } catch (JSONException ex) {
                                 log.error("Received Error Data from '{}'. data: {}, errMsg: {}", ctx.channel().remoteAddress(), str, ex.getMessage());
@@ -168,9 +167,9 @@ class TCPServer extends ServerTpl {
 
         String t = jo.getString("type");
         if ("event".equals(t)) {
-            exec.execute(() -> remoter.receiveEventReq(jo.getJSONObject("data"), o -> ctx.writeAndFlush(toByteBuf(o))));
+            exec.execute(() -> remoter.receiveEventReq(jo.getJSONObject("data"), o -> ctx.writeAndFlush(remoter.toByteBuf(o))));
         } else if ("heartbeat".equals(t)) { // 用来验证此条连接是否还可用
-            remoter.receiveHeartbeat(jo.getJSONObject("data"), o -> ctx.writeAndFlush(toByteBuf(o)));
+            remoter.receiveHeartbeat(jo.getJSONObject("data"), o -> ctx.writeAndFlush(remoter.toByteBuf(o)));
         } else throw new IllegalArgumentException("Not support exchange data type '" + t +"'");
     }
 
@@ -182,22 +181,10 @@ class TCPServer extends ServerTpl {
      */
     protected boolean fusing(ChannelHandlerContext ctx) {
         if (connCount.get() >= getInteger("maxConnection", 100)) { // 最大连接
-            ctx.writeAndFlush(toByteBuf("server is busy"));
+            ctx.writeAndFlush(remoter.toByteBuf("server is busy"));
             ctx.close();
             return true;
         }
         return false;
-    }
-
-
-    /**
-     * 消息转换成 {@link ByteBuf}
-     * @param msg
-     * @return
-     */
-    protected ByteBuf toByteBuf(Object msg) {
-        if (msg instanceof String) return Unpooled.copiedBuffer((String) msg, Charset.forName("utf-8"));
-        else if (msg instanceof JSONObject) return Unpooled.copiedBuffer(((JSONObject) msg).toJSONString(), Charset.forName("utf-8"));
-        else throw new IllegalArgumentException("Not support TCP Server send data type '" + (msg == null ? null : msg.getClass().getName()) + "'");
     }
 }

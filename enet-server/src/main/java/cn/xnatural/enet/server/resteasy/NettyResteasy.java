@@ -32,7 +32,6 @@ import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
-import java.util.concurrent.atomic.AtomicInteger;
 
 import static cn.xnatural.enet.common.Utils.*;
 import static io.netty.handler.codec.http.HttpResponseStatus.SERVICE_UNAVAILABLE;
@@ -60,10 +59,6 @@ public class NettyResteasy extends ServerTpl {
      * 吞噬器.请求执行控制器
      */
     protected       Devourer           devourer;
-    /**
-     * 正在处理的请求个数
-     */
-    protected       AtomicInteger      ing        = new AtomicInteger(0);
     /**
      * 关联的所有
      */
@@ -136,10 +131,7 @@ public class NettyResteasy extends ServerTpl {
                     if (i > 0 && i % 3 == 0) log.warn("There are currently {} requests waiting to be processed.", i);
                     ctx.writeAndFlush(new DefaultHttpResponse(HttpVersion.HTTP_1_1, SERVICE_UNAVAILABLE));
                 } else {
-                    devourer.offer(() -> {
-                        ing.incrementAndGet();
-                        exec.execute(() -> {process(ctx, msg); ing.decrementAndGet();});
-                    });
+                    devourer.offer(() -> exec.execute(() -> process(ctx, msg)));
                 }
             }
         });

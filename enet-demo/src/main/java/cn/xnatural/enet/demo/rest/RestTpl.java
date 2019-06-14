@@ -61,7 +61,10 @@ public class RestTpl extends ServerTpl {
     @Produces("application/json")
     public void remote(@QueryParam("app") String app, @QueryParam("eName") String eName, @QueryParam("ret") String ret, @Suspended final AsyncResponse resp) {
         resp.setTimeout(30, TimeUnit.SECONDS);
-        service.remote(app, eName, ret, o -> resp.resume(ApiResp.ok(o)));
+        service.remote(app, eName, ret, o -> {
+            if (o instanceof Exception) resp.resume(ApiResp.fail(((Exception) o).getMessage()));
+            else resp.resume(ApiResp.ok(o));
+        });
     }
 
 

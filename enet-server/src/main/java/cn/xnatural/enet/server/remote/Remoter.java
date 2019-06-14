@@ -6,10 +6,13 @@ import cn.xnatural.enet.event.EP;
 import cn.xnatural.enet.server.ServerTpl;
 import com.alibaba.fastjson.JSONArray;
 import com.alibaba.fastjson.JSONObject;
+import io.netty.buffer.ByteBuf;
+import io.netty.buffer.Unpooled;
 import io.netty.channel.epoll.Native;
 
 import javax.annotation.Resource;
 import java.math.BigDecimal;
+import java.nio.charset.Charset;
 import java.util.Locale;
 import java.util.Map;
 import java.util.UUID;
@@ -27,19 +30,23 @@ import static java.util.concurrent.TimeUnit.SECONDS;
  * @author xiangxb, 2019-05-18
  */
 public class Remoter extends ServerTpl {
-    protected final AtomicBoolean   running = new AtomicBoolean(false);
+    protected final AtomicBoolean   running   = new AtomicBoolean(false);
     @Resource
     protected       Executor        exec;
     /**
      * ecId -> EC
      */
-    protected       Map<String, EC> ecMap   = new ConcurrentHashMap<>();
+    protected       Map<String, EC> ecMap     = new ConcurrentHashMap<>();
     /**
      * 系统名字(标识)
      */
     protected       String          sysName;
     protected       TCPClient       tcpClient;
     protected       TCPServer       tcpServer;
+    /**
+     * 数据传输分割符.用于tcp粘包/拆包
+     */
+    protected       ByteBuf         delimiter;
 
 
     public Remoter() { super("remote"); }
@@ -58,6 +65,7 @@ public class Remoter extends ServerTpl {
 
         attrs.putAll((Map) ep.fire("env.ns", getName()));
         sysName = (String) ep.fire("sysName");
+        delimiter = Unpooled.copiedBuffer(getStr("delimiter", "$_$").getBytes(Charset.forName("utf-8")));
 
         tcpClient = new TCPClient(this, ep, exec);
         tcpClient.start();
@@ -90,6 +98,7 @@ public class Remoter extends ServerTpl {
     @EL(name = "remote")
     protected void sendEvent(EC ec, String appName, String eName, Object[] remoteMethodArgs) {
         if (tcpClient == null) throw new RuntimeException(getName() + " not is running");
+        if (appName == null) throw new IllegalArgumentException("appName is empty");
         ec.suspend();
         try {
             if (isEmpty(ec.id())) ec.id(UUID.randomUUID().toString());
@@ -113,15 +122,12 @@ public class Remoter extends ServerTpl {
             // 发送请求给远程应用appName执行
             JSONObject data = new JSONObject(3).fluentPut("type", "event").fluentPut("source", sysName).fluentPut("data", params);
             tcpClient.send(appName, data, ex -> {
-                if (ex == null && reply) { // 等待响应超时处理
-                    ep.fire("sched.after", getInteger("eventTimeout", 10), SECONDS, (Runnable) () -> {
+                if (ex == null && reply) { // 数据发送成功. 如果需要响应, 则添加等待响应超时处理
+                    ep.fire("sched.after", getInteger("eventTimeout", 17), SECONDS, (Runnable) () -> {
                         EC e = ecMap.remove(ec.id());
-                        if (e != null) {
-                            log.warn("Finish timeout event '{}'", e.id());
-                            e.errMsg("Timeout").resume().tryFinish();
-                        }
+                        if (e != null) { e.errMsg("Timeout").resume().tryFinish(); }
                     });
-                } else if (ex != null) {
+                } else if (ex != null) { // 数据发送失败
                     if (reply) ecMap.remove(ec.id());
                     ec.ex(ex).resume().tryFinish();
                 }
@@ -210,5 +216,18 @@ public class Remoter extends ServerTpl {
      */
     protected boolean isLinux() {
         return System.getProperty("os.name").toLowerCase(Locale.UK).trim().startsWith("linux");
+    }
+
+
+    /**
+     * 消息转换成 ByteBuf
+     * @param msg
+     * @return {@link ByteBuf}
+     */
+    protected ByteBuf toByteBuf(Object msg) {
+        String end = delimiter.toString(Charset.forName("utf-8")); // 每条消息的结束符.解决tcp粘包/拆包
+        if (msg instanceof String) return Unpooled.copiedBuffer(msg + end, Charset.forName("utf-8"));
+        else if (msg instanceof JSONObject) return Unpooled.copiedBuffer(((JSONObject) msg).toJSONString() + end, Charset.forName("utf-8"));
+        else throw new IllegalArgumentException("Not support send data type '" + (msg == null ? null : msg.getClass().getName()) + "'");
     }
 }

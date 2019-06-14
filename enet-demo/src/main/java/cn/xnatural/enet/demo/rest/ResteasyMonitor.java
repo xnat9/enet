@@ -45,7 +45,7 @@ public class ResteasyMonitor implements ContainerRequestFilter, ContainerRespons
         Object startTime = reqCtx.getProperty("startTime");
         if (startTime != null && !ignore.contains(reqCtx.getUriInfo().getPath())) {
             long spend = System.currentTimeMillis() - (long) startTime;
-            if (spend > 3000) {
+            if (spend > 3500) {
                 log.warn("接口 '{}' 超时. spend: {}", reqCtx.getUriInfo().getPath(), spend);
             }
         }

@@ -117,7 +117,7 @@ public class Remoter extends ServerTpl {
                 }
             }
             if (reply) ecMap.put(ec.id(), ec);
-            log.debug("Fire remote event. params: {}", params);
+            log.debug("Fire remote event to '{}'. params: {}", appName, params);
 
             // 发送请求给远程应用appName执行
             JSONObject data = new JSONObject(3).fluentPut("type", "event").fluentPut("source", sysName).fluentPut("data", params);
@@ -128,11 +128,11 @@ public class Remoter extends ServerTpl {
                         if (e != null) { e.errMsg("Timeout").resume().tryFinish(); }
                     });
                 } else if (ex != null) { // 数据发送失败
-                    if (reply) ecMap.remove(ec.id());
+                    ecMap.remove(ec.id());
                     ec.ex(ex).resume().tryFinish();
                 }
             });
-        } catch (Throwable ex) { ec.resume(); throw ex; }
+        } catch (Throwable ex) { ecMap.remove(ec.id()); ec.resume(); throw ex; }
     }
 
 

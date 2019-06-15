@@ -1,5 +1,6 @@
 package cn.xnatural.enet.server.remote;
 
+import cn.xnatural.enet.common.Log;
 import cn.xnatural.enet.event.EP;
 import cn.xnatural.enet.server.ServerTpl;
 import com.alibaba.fastjson.JSON;
@@ -7,6 +8,7 @@ import com.alibaba.fastjson.JSONException;
 import com.alibaba.fastjson.JSONObject;
 import io.netty.bootstrap.ServerBootstrap;
 import io.netty.buffer.ByteBuf;
+import io.netty.buffer.Unpooled;
 import io.netty.channel.*;
 import io.netty.channel.epoll.EpollEventLoopGroup;
 import io.netty.channel.epoll.EpollServerSocketChannel;
@@ -162,7 +164,7 @@ class TCPServer extends ServerTpl {
 
         JSONObject jo = JSON.parseObject(data);
         String from = jo.getString("source");
-        if (isEmpty(from)) throw new IllegalArgumentException("Unknown source");
+        if (isEmpty(from)) throw new IllegalArgumentException("Unknown source"); // 数据来源必填
         else if (Objects.equals(sysName, from)) log.warn("Invoke self. appName", from);
 
         String t = jo.getString("type");
@@ -170,7 +172,18 @@ class TCPServer extends ServerTpl {
             exec.execute(() -> remoter.receiveEventReq(jo.getJSONObject("data"), o -> ctx.writeAndFlush(remoter.toByteBuf(o))));
         } else if ("heartbeat".equals(t)) { // 用来验证此条连接是否还可用
             remoter.receiveHeartbeat(jo.getJSONObject("data"), o -> ctx.writeAndFlush(remoter.toByteBuf(o)));
-        } else throw new IllegalArgumentException("Not support exchange data type '" + t +"'");
+        } else if ("cmd-log".equals(t)) { // 命令行设置日志等级
+            // telnet localhost 8080
+            // 例: {"type":"cmd-log", "source": "xxx", "data": "cn.xnatural.enet.server.remote: debug"}$_$
+            exec.execute(() -> {
+                String[] arr = jo.getString("data").split(":");
+                Log.setLevel(arr[0].trim(), arr[1].trim());
+                ctx.writeAndFlush(Unpooled.copiedBuffer("set log level success", Charset.forName("utf-8")));
+            });
+        } else {
+            ctx.close();
+            log.error("Not support exchange data type '{}'", t);
+        };
     }
 
 

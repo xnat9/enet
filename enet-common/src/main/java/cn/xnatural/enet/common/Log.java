@@ -1,6 +1,7 @@
 package cn.xnatural.enet.common;
 
 import org.apache.commons.beanutils.BeanUtils;
+import org.slf4j.ILoggerFactory;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.slf4j.event.Level;
@@ -18,6 +19,8 @@ import java.util.concurrent.ConcurrentLinkedQueue;
 import java.util.function.Supplier;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
+
+import static cn.xnatural.enet.common.Utils.findMethod;
 
 /**
  * 通用 Log
@@ -262,14 +265,26 @@ public class Log {
 
 
     public void setLevel(String level) {
-        // 如果是 logback
-        if ("ch.qos.logback.classic.Logger".equals(logger.getName())) {
+        setLevel(logger.getName(), level);
+    }
+
+
+    /**
+     * 运行时改变 日志等级
+     * @param logger
+     * @param level
+     */
+    public static void setLevel(String logger, String level) {
+        ILoggerFactory fa = LoggerFactory.getILoggerFactory();
+        // 配置 logback
+        if ("ch.qos.logback.classic.LoggerContext".equals(fa.getClass().getName())) {
+            // 设置日志级别
             try {
-                Method setLevel = Utils.findMethod(Class.forName("ch.qos.logback.classic.Logger"), "setLevel", Class.forName("ch.qos.logback.classic.Level"));
-                Method toLevel = Utils.findMethod(Class.forName("ch.qos.logback.classic.Level"), "toLevel", String.class);
-                Utils.invoke(setLevel, logger, Utils.invoke(toLevel, level));
-            } catch (ClassNotFoundException e) {
-                e.printStackTrace();
+                Method setLevel = findMethod(Class.forName("ch.qos.logback.classic.Logger"), "setLevel", Class.forName("ch.qos.logback.classic.Level"));
+                Method toLevel = findMethod(Class.forName("ch.qos.logback.classic.Level"), "toLevel", String.class);
+                setLevel.invoke(fa.getLogger(logger), toLevel.invoke(null, level));
+            } catch (Exception e) {
+                throw new RuntimeException(e);
             }
         }
     }

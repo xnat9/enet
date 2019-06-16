@@ -114,7 +114,7 @@ public class NettyHttp extends ServerTpl {
                         ch.pipeline().addLast(new IdleStateHandler(getLong("readerIdleTime", 20L), getLong("writerIdleTime", 0L), getLong("allIdleTime", 0L), TimeUnit.SECONDS));
                         ch.pipeline().addLast(new HttpServerCodec());
                         ch.pipeline().addLast(new HttpServerKeepAliveHandler());
-                        ch.pipeline().addLast(new HttpObjectAggregator(getInteger("maxContentLength", 65536)));
+                        ch.pipeline().addLast(new HttpObjectAggregator(getInteger("maxContentLength", 65536))); // 64kb
                         ch.pipeline().addLast(new ChunkedWriteHandler());
                         ep.fire("http-netty.addHandler", new EC().sync().args(ch.pipeline()).completeFn(ec -> {
                             if (ec.isNoListener()) {

@@ -1,6 +1,7 @@
 package cn.xnatural.enet.server.remote;
 
 import cn.xnatural.enet.common.Log;
+import cn.xnatural.enet.event.EC;
 import cn.xnatural.enet.event.EP;
 import cn.xnatural.enet.server.ServerTpl;
 import com.alibaba.fastjson.JSON;
@@ -19,13 +20,16 @@ import io.netty.handler.codec.DelimiterBasedFrameDecoder;
 import io.netty.handler.timeout.IdleStateEvent;
 import io.netty.handler.timeout.IdleStateHandler;
 import io.netty.util.ReferenceCountUtil;
+import org.apache.commons.lang3.time.DateUtils;
 
 import javax.annotation.Resource;
 import java.nio.charset.Charset;
-import java.util.Map;
-import java.util.Objects;
+import java.text.SimpleDateFormat;
+import java.util.*;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.Executor;
 import java.util.concurrent.atomic.AtomicInteger;
+import java.util.concurrent.atomic.LongAdder;
 
 import static cn.xnatural.enet.common.Utils.isEmpty;
 import static cn.xnatural.enet.common.Utils.isNotEmpty;
@@ -45,12 +49,17 @@ class TCPServer extends ServerTpl {
     /**
      * 当前连接数
      */
-    protected       AtomicInteger  connCount = new AtomicInteger(0);
+    protected       AtomicInteger  connCount  = new AtomicInteger(0);
+    /**
+     * 保存 app info 的属性信息
+     */
+    protected Map<String, List<Map<String, Object>>>    appInfoMap = new ConcurrentHashMap<>();
 
 
     public TCPServer(Remoter remoter, EP ep, Executor exec) {
         super("tcp-server");
         this.ep = ep; this.exec = exec; this.remoter = remoter;
+        ep.addListenerSource(this);
     }
     
     
@@ -157,14 +166,15 @@ class TCPServer extends ServerTpl {
     /**
      * 处理接收来自己客户端的数据
      * @param ctx
-     * @param data
+     * @param dataStr
      */
-    protected void handleReceive(ChannelHandlerContext ctx, String data) {
-        log.debug("Receive client '{}' data: {}", ctx.channel().remoteAddress(), data);
+    protected void handleReceive(ChannelHandlerContext ctx, String dataStr) {
+        log.debug("Receive client '{}' data: {}", ctx.channel().remoteAddress(), dataStr);
+        count(); // 统计
 
-        JSONObject jo = JSON.parseObject(data);
-        String from = jo.getString("source");
-        if (isEmpty(from)) throw new IllegalArgumentException("Unknown source"); // 数据来源必填
+        JSONObject jo = JSON.parseObject(dataStr);
+        String from = jo.getString("source"); // 数据来源
+        if (isEmpty(from)) throw new IllegalArgumentException("Unknown source");
         else if (Objects.equals(sysName, from)) log.warn("Invoke self. appName", from);
 
         String t = jo.getString("type");
@@ -172,6 +182,25 @@ class TCPServer extends ServerTpl {
             exec.execute(() -> remoter.receiveEventReq(jo.getJSONObject("data"), o -> ctx.writeAndFlush(remoter.toByteBuf(o))));
         } else if ("heartbeat".equals(t)) { // 用来验证此条连接是否还可用
             remoter.receiveHeartbeat(jo.getJSONObject("data"), o -> ctx.writeAndFlush(remoter.toByteBuf(o)));
+        } else if ("up".equals(t)) {// 一个远程应用服务启动时到这里注册自己的信息
+            exec.execute(() -> {
+                List<Map<String, Object>> apps = appInfoMap.get(from);
+                if (apps == null) {
+                    synchronized (this) {
+                        apps = appInfoMap.get(from);
+                        if (apps == null) {
+                            apps = new LinkedList<>(); appInfoMap.put(from, apps);
+                        }
+                    }
+                }
+                apps.add(jo.getJSONObject("data"));
+                appInfoMap.forEach((s, ls) -> { // 通知其它系统,有新系统上线
+                    if (!from.equals(s)) {
+                        remoter.sendEvent(new EC(), from, "updateAppInfo", new Object[]{s, JSON.toJSON(appInfoMap.get(s))});
+                        remoter.sendEvent(new EC(), s, "updateAppInfo", new Object[]{from, JSON.toJSON(appInfoMap.get(from))});
+                    }
+                });
+            });
         } else if ("cmd-log".equals(t)) { // 命令行设置日志等级
             // telnet localhost 8080
             // 例: {"type":"cmd-log", "source": "xxx", "data": "cn.xnatural.enet.server.remote: debug"}$_$
@@ -199,5 +228,33 @@ class TCPServer extends ServerTpl {
             return true;
         }
         return false;
+    }
+
+
+    /**
+     * 统计每小时的处理 tcp 数据包个数
+     * MM-dd HH -> 个数
+     */
+    protected Map<String, LongAdder> hourCount = new ConcurrentHashMap<>(3);
+    protected void count() {
+        SimpleDateFormat sdf = new SimpleDateFormat("MM-dd HH");
+        boolean isNew = false;
+        String hStr = sdf.format(new Date());
+        LongAdder count = hourCount.get(hStr);
+        if (count == null) {
+            synchronized (this) {
+                count = hourCount.get(hStr);
+                if (count == null) {
+                    count = new LongAdder(); hourCount.put(hStr, count);
+                    isNew = true;
+                }
+            }
+        }
+        count.increment();
+        if (isNew) {
+            String lastHour = sdf.format(DateUtils.addHours(new Date(), -1));
+            LongAdder c = hourCount.remove(lastHour);
+            if (c != null) log.info("{} 时共处理 tcp 数据包: {} 个", lastHour, c);
+        }
     }
 }

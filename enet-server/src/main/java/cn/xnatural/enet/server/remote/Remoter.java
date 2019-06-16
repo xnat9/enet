@@ -13,6 +13,7 @@ import io.netty.channel.epoll.Native;
 import javax.annotation.Resource;
 import java.math.BigDecimal;
 import java.nio.charset.Charset;
+import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 import java.util.UUID;
@@ -119,7 +120,7 @@ public class Remoter extends ServerTpl {
             if (reply) ecMap.put(ec.id(), ec);
             log.debug("Fire remote event to '{}'. params: {}", appName, params);
 
-            // 发送请求给远程应用appName执行
+            // 发送请求给远程应用appName执行. 消息类型为: 'event'
             JSONObject data = new JSONObject(3).fluentPut("type", "event").fluentPut("source", sysName).fluentPut("data", params);
             tcpClient.send(appName, data, ex -> {
                 if (ex == null && reply) { // 数据发送成功. 如果需要响应, 则添加等待响应超时处理
@@ -171,7 +172,8 @@ public class Remoter extends ServerTpl {
                 else if (Double.class.getName().equals(t)) return jo.getDouble("value");
                 else if (Float.class.getName().equals(t)) return jo.getFloat("value");
                 else if (BigDecimal.class.getName().equals(t)) return jo.getBigDecimal("value");
-                else if (JSONObject.class.getName().equals(t)) return jo.getJSONObject("value");
+                else if (JSONObject.class.getName().equals(t) || Map.class.equals(t)) return jo.getJSONObject("value");
+                else if (JSONArray.class.getName().equals(t) || List.class.equals(t)) return jo.getJSONArray("value");
                 else throw new IllegalArgumentException("Not support parameter type '" + t + "'");
             }).toArray());
 

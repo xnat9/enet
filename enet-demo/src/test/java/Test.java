@@ -73,7 +73,7 @@ public class Test {
                 }
             });
         }
-        Thread.sleep(TimeUnit.SECONDS.toMillis(10)); // 压测时间
+        Thread.sleep(TimeUnit.SECONDS.toMillis(20)); // 压测时间
         // client.dispatcher().cancelAll();
         // client.dispatcher().queuedCalls().forEach(call -> call.cancel());
         // client.dispatcher().executorService().shutdown();

@@ -1,8 +1,11 @@
 package cn.xnatural.enet.server.remote;
 
+import cn.xnatural.enet.event.EC;
+import cn.xnatural.enet.event.EL;
 import cn.xnatural.enet.event.EP;
 import cn.xnatural.enet.server.ServerTpl;
 import com.alibaba.fastjson.JSON;
+import com.alibaba.fastjson.JSONArray;
 import com.alibaba.fastjson.JSONException;
 import com.alibaba.fastjson.JSONObject;
 import io.netty.bootstrap.Bootstrap;
@@ -18,6 +21,9 @@ import io.netty.util.AttributeKey;
 import io.netty.util.ReferenceCountUtil;
 
 import javax.annotation.Resource;
+import java.net.InetAddress;
+import java.net.NetworkInterface;
+import java.net.SocketException;
 import java.nio.charset.Charset;
 import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
@@ -27,8 +33,7 @@ import java.util.concurrent.locks.ReadWriteLock;
 import java.util.concurrent.locks.ReentrantReadWriteLock;
 import java.util.function.Consumer;
 
-import static cn.xnatural.enet.common.Utils.isBlank;
-import static cn.xnatural.enet.common.Utils.isEmpty;
+import static cn.xnatural.enet.common.Utils.*;
 import static java.util.concurrent.TimeUnit.SECONDS;
 
 /**
@@ -37,24 +42,35 @@ import static java.util.concurrent.TimeUnit.SECONDS;
 class TCPClient extends ServerTpl {
 
     @Resource
-    protected       Executor                   exec;
-    protected final Remoter                    remoter;
-    protected Map<String, AppInfo>             appInfoMap = new ConcurrentHashMap<>();
-    protected       EventLoopGroup             boos;
-    protected       Bootstrap                  boot;
+    protected       Executor       exec;
+    protected final Remoter        remoter;
+    protected Map<String, AppInfo> appInfoMap = new ConcurrentHashMap<>();
+    protected       EventLoopGroup boos;
+    protected       Bootstrap      boot;
+    /**
+     * 服务中心系统名字.
+     * 会把 appName指向的系统 当作自己的服务注册服务. 并向 appName指向的系统注册自己
+     */
+    protected String               rcAppName;
 
 
     public TCPClient(Remoter remoter, EP ep, Executor exec) {
         super("tcp-client");
         this.ep = ep; this.exec = exec; this.remoter = remoter;
+        ep.addListenerSource(this);
     }
 
 
     public void start() {
         attrs.putAll((Map) ep.fire("env.ns", getName()));
+        rcAppName = getStr("registrationCenterAppName", "rc");
         attrs.forEach((k, v) -> {
             if (k.endsWith(".hosts")) { // 例: app1.hosts=ip1:8201,ip2:8202,ip2:8203
-                appInfoMap.computeIfAbsent(k.split("\\.")[0].trim(), (s) -> new AppInfo(s)).hps.add(((String) v).trim());
+                String appName = k.split("\\.")[0].trim();
+                for (String hp : ((String) v).split(",")) {
+                    String[] arr = hp.trim().split(":");
+                    appInfoMap.computeIfAbsent(appName, (s) -> new AppInfo(s)).hps.add(arr[0].trim() + ":" + Integer.valueOf(arr[1]));
+                }
             }
         });
     }
@@ -64,6 +80,67 @@ class TCPClient extends ServerTpl {
         if (boos != null) boos.shutdownGracefully();
         boot = null;
         appInfoMap = null;
+    }
+
+
+    @EL(name = "sys.started")
+    protected void sysStarted() { register(); }
+
+
+    /**
+     * 向注册服务注册自己
+     */
+    protected void register() {
+        AppInfo ai = appInfoMap.get(rcAppName); // 查找自己的注册中心服务
+        if (ai != null) { // 向服务中心注册自己
+            JSONObject data = new JSONObject(2);
+            ep.fire("http.port", EC.of(this).sync().completeFn(ec -> {
+                if (!ec.isNoListener()) {
+                    String ip = (String) ep.fire("http.getHostname");
+                    if (isEmpty(ip) || "localhost".equals(ip) || "127.0.0.1".equals(ip)) {
+                        ip = resolveLocalIp();
+                    }
+                    if (isNotEmpty(ip)) data.put("http", ip + ":" + ec.result);
+                }
+            }));
+            if (remoter.tcpServer.port != null) {
+                String ip = remoter.tcpServer.getStr("hostname", resolveLocalIp());
+                if (isNotEmpty(ip)) data.put("tcp", ip + ":" + remoter.tcpServer.port);
+            }
+            if (!data.isEmpty()) {
+                log.info("'{}' register up info: {} to '{}'", remoter.sysName, data, ai.name);
+                send(ai.name, new JSONObject(3).fluentPut("type", "up").fluentPut("source", remoter.sysName).fluentPut("data", data), ex -> {
+                    if (ex != null) {
+                        log.warn(ex, "register to sc server fail");
+                    }
+                });
+            }
+        }
+    }
+
+
+
+    /**
+     * 更新app 信息
+     * @param appName
+     * @param infos
+     */
+    @EL(name = "updateAppInfo")
+    protected void updateAppInfo(String appName, JSONArray infos) {
+        log.info("update app '{}' info: {}", appName, infos);
+        AppInfo app = appInfoMap.get(appName);
+        if (app == null) {
+            synchronized (this) {
+                app = appInfoMap.get(appName);
+                if (app == null) {
+                    app = new AppInfo(appName); appInfoMap.put(appName, app);
+                }
+            }
+        }
+        for (Object o : infos) {
+            JSONObject jo = (JSONObject) o;
+            app.hps.add(jo.getString("tcp"));
+        }
     }
 
 
@@ -100,25 +177,18 @@ class TCPClient extends ServerTpl {
 
         // 一个 app 可能被部署多个实例, 每个实例可以创建多个连接
         AppInfo info = appInfoMap.get(appName);
-        if (info == null) throw new IllegalArgumentException("Not found available server for '" + appName + "'");
-        if (info.chs.isEmpty()) {
-            try {
-                info.rwlock.writeLock().lock();
-                adaptChannel(info, false);
-            } finally {
-                info.rwlock.writeLock().unlock();
-            }
-        }
+        if (info == null) { throw new IllegalArgumentException("Not found available server for '" + appName + "'"); }
+        if (info.chs.isEmpty()) adaptChannel(info, true);
 
         // 获取一个连接Channel
         Channel ch = null;
         try {
-            info.rwlock.readLock().lock();
+            info.rwLock.readLock().lock();
             if (info.chs.isEmpty()) throw new IllegalArgumentException("Not found available channel for '" + appName +"'");
             else if (info.chs.size() == 1) ch = info.chs.get(0);
             else { ch = info.chs.get(new Random().nextInt(info.chs.size())); }
         } finally {
-            info.rwlock.readLock().unlock();
+            info.rwLock.readLock().unlock();
         }
         return ch;
     }
@@ -135,54 +205,45 @@ class TCPClient extends ServerTpl {
         }
         if (once && appInfo.chs.size() > 0) return;
         Integer maxConnectionPerHp = getInteger("maxConnectionPerHp", 2); // 每个host:port最多可以建立多少个连接
-        for (Iterator<String> it = appInfo.hps.iterator(); it.hasNext(); ) {
-            String hp = it.next();
-            try {
+        try {
+            appInfo.rwLock.writeLock().lock();
+            for (Iterator<String> it = appInfo.hps.iterator(); it.hasNext(); ) {
+                String hp = it.next();
                 if (isBlank(hp) || !hp.contains(":")) {
                     log.warn("Config error {}", appInfo.hps); continue;
                 }
                 AtomicInteger count = appInfo.hpChannelCount.get(hp);
-                if (count == null) {
-                    count = new AtomicInteger(0); appInfo.hpChannelCount.put(hp, count);
-                }
+                if (count == null) { count = new AtomicInteger(0); appInfo.hpChannelCount.put(hp, count); }
                 if (count.get() >= maxConnectionPerHp) continue;
                 LinkedList<Long> errRecord = appInfo.hpErrorRecord.get(hp);
-                if (errRecord == null) {
-                    errRecord = new LinkedList<>(); appInfo.hpErrorRecord.put(hp, errRecord);
-                }
+                if (errRecord == null) { errRecord = new LinkedList<>(); appInfo.hpErrorRecord.put(hp, errRecord); }
                 Long lastRefuse = errRecord.peekFirst(); // 上次被连接被拒时间
-                if (lastRefuse != null && (System.currentTimeMillis() - lastRefuse < 2000)) { // 距上次连接被拒还没超过2秒, 则不必再连接
+                if (!once && lastRefuse != null && (System.currentTimeMillis() - lastRefuse < 2000)) { // 距上次连接被拒还没超过2秒, 则不必再连接
                     continue;
                 }
                 String[] arr = hp.split(":");
-                Channel ch;
                 try {
                     ChannelFuture f = boot.connect(arr[0], Integer.valueOf(arr[1]));
-                    f.await(getInteger("connectTimeout", 3), SECONDS);
-                    ch = f.channel();
+                    f.sync().await(getInteger("connectTimeout", 3), SECONDS);
+                    Channel ch = f.channel();
+                    ch.attr(AttributeKey.valueOf("app")).set(appInfo); ch.attr(AttributeKey.valueOf("hp")).set(hp);
+                    appInfo.chs.add(ch); count.incrementAndGet();
+                    log.info("New TCP Connection to '{}'[{}]. total count: {}", appInfo.name, hp, count);
+                    if (once) break;
                 } catch (Exception ex) {
                     errRecord.addFirst(System.currentTimeMillis());
-                    // 连接(hp(host:port))多次发生错误, 则移除此条连接配置
-                    if ((appInfo.hps.size() == 1 && errRecord.size() >= 2) || (appInfo.hps.size() > 1)) {
-                        errRecord.clear(); it.remove(); redeem(appInfo, hp);
-                    }
-                    throw ex;
+                    // 多个连接配置, 当某个连接(hp(host:port))多次发生错误, 则移除此条连接配置
+                    if (appInfo.hps.size() > 1) { errRecord.clear(); it.remove(); redeem(appInfo, hp); }
+                    log.warn(ex, "Connect Error to '{}'[{}]", appInfo.name, hp);
                 }
-                ch.attr(AttributeKey.valueOf("app")).set(appInfo); ch.attr(AttributeKey.valueOf("hp")).set(hp);
-                appInfo.chs.add(ch); count.incrementAndGet();
-                log.info("New TCP Connection to '{}'[{}]. total count: {}", appInfo.name, hp, count);
-                if (once) break;
-            } catch (Exception ex) { log.error(ex); }
+            }
+        } finally {
+            appInfo.rwLock.writeLock().unlock();
         }
-        if (once && (appInfo.hps.size() * maxConnectionPerHp) > appInfo.chs.size()) {
-            exec.execute(() -> {
-                try {
-                    appInfo.rwlock.writeLock().lock();
-                    adaptChannel(appInfo, false);
-                } finally {
-                    appInfo.rwlock.writeLock().unlock();
-                }
-            });
+
+        // 立即返回, 已有成功的连接, 少于最多连接
+        if (once && appInfo.chs.size() > 0 && (appInfo.hps.size() * maxConnectionPerHp) > appInfo.chs.size()) {
+            exec.execute(() -> adaptChannel(appInfo, false));
         }
     }
 
@@ -239,12 +300,12 @@ class TCPClient extends ServerTpl {
     /**
      * 客户端接收到服务端的响应数据
      * @param ctx
-     * @param data
+     * @param dataStr
      */
-    protected void receiveReply(ChannelHandlerContext ctx, String data) {
-        log.debug("Receive reply from '{}': {}", ctx.channel().remoteAddress(), data);
+    protected void receiveReply(ChannelHandlerContext ctx, String dataStr) {
+        log.debug("Receive reply from '{}': {}", ctx.channel().remoteAddress(), dataStr);
 
-        JSONObject jo = JSON.parseObject(data);
+        JSONObject jo = JSON.parseObject(dataStr);
         String type = jo.getString("type");
         if ("event".equals(type)) {
             exec.execute(() -> remoter.receiveEventResp(jo.getJSONObject("data")));
@@ -258,14 +319,15 @@ class TCPClient extends ServerTpl {
      */
     protected void removeChannel(Channel ch) {
         AppInfo app = (AppInfo) ch.attr(AttributeKey.valueOf("app")).get();
+        if (app == null) return;
         String hp = (String) ch.attr(AttributeKey.valueOf("hp")).get();
         try {
-            app.rwlock.writeLock().lock();
+            app.rwLock.writeLock().lock();
             for (Iterator<Channel> it = app.chs.iterator(); it.hasNext(); ) {
                 if (it.next().equals(ch)) {it.remove(); break;}
             }
         } finally {
-            app.rwlock.writeLock().unlock();
+            app.rwLock.writeLock().unlock();
         }
         AtomicInteger count = app.hpChannelCount.get(hp); count.decrementAndGet();
         log.info("Remove TCP Connection to '{}'[{}]. left count: {}", app.name, hp, count);
@@ -278,22 +340,55 @@ class TCPClient extends ServerTpl {
      * @param hp
      */
     protected void redeem(AppInfo appInfo, String hp) {
-        LinkedList<Integer> pass = new LinkedList<>(Arrays.asList(5, 5, 10, 10, 20, 35, 40, 45, 50, 60, 90, 90, 120, 120, 90, 60, 60, 45, 30, 20));
+        LinkedList<Integer> pass = new LinkedList<>();
+        for (String s : getStr("redeemFrequency", "5, 10, 5, 10, 20, 35, 40, 45, 50, 60, 90, 120, 90, 120, 90, 60, 90, 60, 90, 60, 90, 120, 300, 120, 600, 300").split(",")) {
+            try {
+                pass.add(Integer.valueOf(s.trim()));
+            } catch (Exception ex) {
+                log.warn("Config error property '{}'. {}", getName() + ".redeemFrequency", ex.getMessage());
+            }
+        }
         Runnable fn = new Runnable() {
             @Override
             public void run() {
                 String[] arr = hp.split(":");
                 try {
-                    boot.connect(arr[0], Integer.valueOf(arr[1])).sync().channel().disconnect();
+                    ChannelFuture f = boot.connect(arr[0], Integer.valueOf(arr[1]));
+                    f.sync().await(getInteger("connectTimeout", 3), SECONDS);
+                    f.channel().disconnect();
                     appInfo.hps.add(hp);
                     log.info("'{}' redeem success", hp);
                 } catch (Exception e) {
                     if (pass.isEmpty()) { log.warn("'{}' can't redeem", hp); }
-                    else { ep.fire("sched.after", pass.removeFirst(), SECONDS, this); }
+                    else {
+                        log.warn("'{}' try redeem fail", hp);
+                        ep.fire("sched.after", pass.removeFirst(), SECONDS, this);
+                    }
                 }
             }
         };
         ep.fire("sched.after", pass.removeFirst(), SECONDS, fn);
+    }
+
+
+    /**
+     * 解析出本地ip
+     * @return
+     */
+    protected String resolveLocalIp() {
+        try {
+            for (Enumeration<NetworkInterface> en = NetworkInterface.getNetworkInterfaces(); en.hasMoreElements(); ) {
+                NetworkInterface current = en.nextElement();
+                if (!current.isUp() || current.isLoopback() || current.isVirtual()) continue;
+                Enumeration<InetAddress> addresses = current.getInetAddresses();
+                while (addresses.hasMoreElements()) {
+                    InetAddress addr = addresses.nextElement();
+                    if (addr.isLoopbackAddress()) continue;
+                    return addr.getHostAddress();
+                }
+            }
+        } catch (SocketException e) { log.error(e); }
+        return null;
     }
 
 
@@ -307,7 +402,7 @@ class TCPClient extends ServerTpl {
         /**
          * {@link #chs} 读写锁
          */
-        protected ReadWriteLock                 rwlock         = new ReentrantReadWriteLock();
+        protected ReadWriteLock                 rwLock         = new ReentrantReadWriteLock();
         /**
          * list Channel
          */

@@ -9,13 +9,13 @@ import org.quartz.spi.ThreadPool;
 
 import javax.annotation.Resource;
 import java.text.SimpleDateFormat;
+import java.time.Duration;
 import java.util.Date;
 import java.util.Map;
 import java.util.Properties;
 import java.util.UUID;
 import java.util.concurrent.Executor;
 import java.util.concurrent.ExecutorService;
-import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
 
 import static cn.xnatural.enet.common.Utils.isEmpty;
@@ -32,7 +32,6 @@ public class SchedServer extends ServerTpl {
 
 
     public SchedServer() { super("sched"); }
-    public SchedServer(String name) { super(name); }
 
 
     @EL(name = "sys.starting")
@@ -79,7 +78,7 @@ public class SchedServer extends ServerTpl {
      * @param fn
      */
     @EL(name = "sched.cron")
-    public void sched(String cron, Runnable fn, String keySuffix) {
+    public void cron(String cron, Runnable fn, String keySuffix) {
         if (scheduler == null) throw new RuntimeException(getName() + " is not running");
         if (isEmpty(cron) || fn == null) throw new IllegalArgumentException("'cron' and 'fn' must not be empty");
         JobDataMap data = new JobDataMap();
@@ -103,20 +102,19 @@ public class SchedServer extends ServerTpl {
     /**
      * 在多少时间之后执行
      * @param time
-     * @param unit
      * @param keySuffix
      * @param fn
      */
     @EL(name = "sched.after")
-    public void sched(Integer time, TimeUnit unit, Runnable fn, String keySuffix) {
+    public void after(Duration time, Runnable fn, String keySuffix) {
         if (scheduler == null) throw new RuntimeException(getName() + " is not running");
-        if (time == null || unit == null || fn == null) throw new NullPointerException("'time', 'unit' and 'fn' must not be null");
+        if (time == null || fn == null) throw new NullPointerException("'time', 'unit' and 'fn' must not be null");
         JobDataMap data = new JobDataMap();
         data.put("fn", fn);
-        String id = time + "_" + unit + "_" + (keySuffix == null ? UUID.randomUUID().toString() : keySuffix);
+        String id = time.toMillis() + "_" + (keySuffix == null ? UUID.randomUUID().toString() : keySuffix);
         try {
             SimpleDateFormat sdf = new SimpleDateFormat("ss mm HH dd MM ? yyyy");
-            String cron = sdf.format(new Date(new Date().getTime() + unit.toMillis(time)));
+            String cron = sdf.format(new Date(new Date().getTime() + time.toMillis()));
             Date d = scheduler.scheduleJob(
                     JobBuilder.newJob(JopTpl.class).withIdentity(id).setJobData(data).build(),
                     TriggerBuilder.newTrigger()
@@ -126,7 +124,7 @@ public class SchedServer extends ServerTpl {
             );
             log.debug("add after '{}' job will execute at '{}'", id, new SimpleDateFormat("yyyy-MM-dd HH:mm:ss SSS").format(d));
         } catch (SchedulerException e) {
-            log.error(e, "add after job error! time: {}, unit: {}", time, unit);
+            log.error(e, "add after job error! time: {}", time.toMillis());
         }
     }
 
@@ -138,7 +136,7 @@ public class SchedServer extends ServerTpl {
      * @param fn
      */
     @EL(name = "sched.time")
-    public void sched(Date time, Runnable fn, String keySuffix) {
+    public void time(Date time, Runnable fn, String keySuffix) {
         if (scheduler == null) throw new RuntimeException(getName() + " is not running");
         if (time == null || fn == null) throw new NullPointerException("'time' and 'fn' must not be null");
         JobDataMap data = new JobDataMap();

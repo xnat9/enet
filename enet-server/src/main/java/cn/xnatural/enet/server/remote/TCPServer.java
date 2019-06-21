@@ -182,24 +182,41 @@ class TCPServer extends ServerTpl {
             exec.execute(() -> remoter.receiveEventReq(jo.getJSONObject("data"), o -> ctx.writeAndFlush(remoter.toByteBuf(o))));
         } else if ("heartbeat".equals(t)) { // 用来验证此条连接是否还可用
             remoter.receiveHeartbeat(jo.getJSONObject("data"), o -> ctx.writeAndFlush(remoter.toByteBuf(o)));
-        } else if ("up".equals(t)) {// 一个远程应用服务启动时到这里注册自己的信息
+        } else if ("up".equals(t)) {// 应用上线通知
             exec.execute(() -> {
-                List<Map<String, Object>> apps = appInfoMap.get(from);
-                if (apps == null) {
-                    synchronized (this) {
-                        apps = appInfoMap.get(from);
-                        if (apps == null) {
-                            apps = new LinkedList<>(); appInfoMap.put(from, apps);
+                synchronized (appInfoMap) {
+                    List<Map<String, Object>> apps = appInfoMap.get(from);
+                    if (apps == null) {
+                        apps = new LinkedList<>(); appInfoMap.put(from, apps);
+                    }
+                    JSONObject d = jo.getJSONObject("data");
+                    for (Iterator<Map<String, Object>> it = apps.iterator(); it.hasNext(); ) {
+                        if (Objects.equals(it.next().get("id"), d.get("id"))) {it.remove(); break;}
+                    }
+                    apps.add(d);
+                    appInfoMap.forEach((s, ls) -> { // 通知其它系统,有新系统上线
+                        if (!from.equals(s)) {
+                            remoter.sendEvent(new EC(), from, "updateAppInfo", new Object[]{s, JSON.toJSON(appInfoMap.get(s))});
+                            remoter.sendEvent(new EC(), s, "updateAppInfo", new Object[]{from, JSON.toJSON(appInfoMap.get(from))});
                         }
+                    });
+                }
+            });
+        } else if ("down".equals(t)) { // 应用下线通知
+            exec.execute(() -> {
+                synchronized (appInfoMap) {
+                    List<Map<String, Object>> apps = appInfoMap.get(from);
+                    if (apps != null) {
+                        for (Iterator<Map<String, Object>> it = apps.iterator(); it.hasNext(); ) {
+                            if (Objects.equals(it.next().get("id"), jo.getString("id"))) {it.remove(); break;}
+                        }
+                        if (!apps.isEmpty()) appInfoMap.forEach((s, ls) -> { // 通知其它系统
+                            if (!from.equals(s)) {
+                                remoter.sendEvent(new EC(), s, "updateAppInfo", new Object[]{from, JSON.toJSON(appInfoMap.get(from))});
+                            }
+                        });
                     }
                 }
-                apps.add(jo.getJSONObject("data"));
-                appInfoMap.forEach((s, ls) -> { // 通知其它系统,有新系统上线
-                    if (!from.equals(s)) {
-                        remoter.sendEvent(new EC(), from, "updateAppInfo", new Object[]{s, JSON.toJSON(appInfoMap.get(s))});
-                        remoter.sendEvent(new EC(), s, "updateAppInfo", new Object[]{from, JSON.toJSON(appInfoMap.get(from))});
-                    }
-                });
             });
         } else if ("cmd-log".equals(t)) { // 命令行设置日志等级
             // telnet localhost 8080

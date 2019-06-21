@@ -137,8 +137,8 @@ public class Log {
     }
 
 
-    private Log() {}
-    private Log(LocationAwareLogger logger) {
+    protected Log() {}
+    protected Log(LocationAwareLogger logger) {
         this.logger = logger;
     }
 

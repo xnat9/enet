@@ -13,6 +13,7 @@ import io.netty.channel.epoll.Native;
 import javax.annotation.Resource;
 import java.math.BigDecimal;
 import java.nio.charset.Charset;
+import java.time.Duration;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
@@ -51,7 +52,6 @@ public class Remoter extends ServerTpl {
 
 
     public Remoter() { super("remote"); }
-    public Remoter(String name) { super(name); }
 
 
     @EL(name = "sys.starting")
@@ -124,7 +124,7 @@ public class Remoter extends ServerTpl {
             JSONObject data = new JSONObject(3).fluentPut("type", "event").fluentPut("source", sysName).fluentPut("data", params);
             tcpClient.send(appName, data, ex -> {
                 if (ex == null && reply) { // 数据发送成功. 如果需要响应, 则添加等待响应超时处理
-                    ep.fire("sched.after", getInteger("eventTimeout", 17), SECONDS, (Runnable) () -> {
+                    ep.fire("sched.after", Duration.ofSeconds(getInteger("eventTimeout", 17)), (Runnable) () -> {
                         EC e = ecMap.remove(ec.id());
                         if (e != null) { e.errMsg("Timeout").resume().tryFinish(); }
                     });

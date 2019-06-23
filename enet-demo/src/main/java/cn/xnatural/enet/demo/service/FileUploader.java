@@ -51,7 +51,7 @@ public class FileUploader extends ServerTpl {
             File dir = new File(localDir); dir.mkdirs();
             log.info("save upload file local dir: {}", dir.getAbsolutePath());
 
-            urlPrefix = URI.create(getStr("url-prefix", ("http://" + ep.fire("http.getHostname").toString() + ":" + ep.fire("http.getPort") + "/file/")) + "/").normalize();
+            urlPrefix = URI.create(getStr("url-prefix", ("http://" + ep.fire("http.getHp") + "/file/")) + "/").normalize();
             log.info("access upload file url prefix: {}", urlPrefix);
         } catch (MalformedURLException e) {
             log.error(e);

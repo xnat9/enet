@@ -17,6 +17,7 @@ import io.netty.handler.stream.ChunkedWriteHandler;
 import io.netty.handler.timeout.IdleStateHandler;
 
 import javax.annotation.Resource;
+import java.net.BindException;
 import java.util.Locale;
 import java.util.Map;
 import java.util.concurrent.Executor;
@@ -135,7 +136,9 @@ public class NettyHttp extends ServerTpl {
                 (f ? getHostname() : "0.0.0.0"), getPort(), loopType, shareLoop
             );
         } catch (Exception ex) {
-            log.error(ex);
+            if (ex instanceof BindException) {
+                log.error(ex, "'{}' server bind error. port: {}", getName(), getPort());
+            } else log.error(ex);
         }
     }
 
@@ -166,13 +169,11 @@ public class NettyHttp extends ServerTpl {
     }
 
 
-    @EL(name = "http.getHostname", async = false)
     public String getHostname() {
         return getStr("hostname", "localhost");
     }
 
 
-    @EL(name = "http.getPort", async = false)
     public int getPort() {
         return getInteger("port", 8080);
     }
@@ -182,5 +183,11 @@ public class NettyHttp extends ServerTpl {
         if (running.get()) throw new RuntimeException("服务正在运行.不允许更新端口");
         attr("port", port);
         return this;
+    }
+
+
+    @EL(name = "http.getHp", async = false)
+    public String getHp() {
+        return getHostname() + ":" + getPort();
     }
 }

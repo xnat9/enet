@@ -1,6 +1,5 @@
 package cn.xnatural.enet.server.remote;
 
-import cn.xnatural.enet.event.EC;
 import cn.xnatural.enet.event.EL;
 import cn.xnatural.enet.event.EP;
 import cn.xnatural.enet.server.ServerTpl;
@@ -19,11 +18,9 @@ import io.netty.channel.socket.nio.NioSocketChannel;
 import io.netty.handler.codec.DelimiterBasedFrameDecoder;
 import io.netty.util.AttributeKey;
 import io.netty.util.ReferenceCountUtil;
+import org.slf4j.event.Level;
 
 import javax.annotation.Resource;
-import java.net.InetAddress;
-import java.net.NetworkInterface;
-import java.net.SocketException;
 import java.nio.charset.Charset;
 import java.time.Duration;
 import java.util.*;
@@ -33,6 +30,7 @@ import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.locks.ReadWriteLock;
 import java.util.concurrent.locks.ReentrantReadWriteLock;
 import java.util.function.Consumer;
+import java.util.stream.Collectors;
 
 import static cn.xnatural.enet.common.Utils.*;
 import static java.util.concurrent.TimeUnit.SECONDS;
@@ -69,7 +67,8 @@ class TCPClient extends ServerTpl {
     public void start() {
         attrs.putAll((Map) ep.fire("env.ns", getName()));
         rcAppName = getStr("registrationCenterAppName", "rc");
-        id = getStr("id", remoter.sysName + "_" + UUID.randomUUID().toString()); // 在整个集群中唯一
+        if (!attrs.containsKey(rcAppName + ".maxConnectionPerHp")) attr(rcAppName + ".maxConnectionPerHp", 1);
+        id = getStr("id", remoter.sysName + "_" + UUID.randomUUID().toString()); // NOTE: 在整个集群中唯一
         attrs.forEach((k, v) -> {
             if (k.endsWith(".hosts")) { // 例: app1.hosts=ip1:8201,ip2:8202,ip2:8203
                 String appName = k.split("\\.")[0].trim();
@@ -79,6 +78,7 @@ class TCPClient extends ServerTpl {
                 }
             }
         });
+        create();
     }
 
 
@@ -91,7 +91,16 @@ class TCPClient extends ServerTpl {
 
 
     @EL(name = "sys.started")
-    protected void sysStarted() { register(); }
+    protected void sysStarted() {
+        // 注册自己到自己
+        synchronized (remoter.tcpServer.appInfoMap) {
+            JSONObject d = collectData();
+            if (isNotEmpty(d)) {
+                remoter.tcpServer.appInfoMap.computeIfAbsent(remoter.sysName, s -> new LinkedList<>()).add(d);
+            }
+        }
+        register();
+    }
 
 
     /**
@@ -100,21 +109,8 @@ class TCPClient extends ServerTpl {
     protected void register() {
         AppInfo ai = appInfoMap.get(rcAppName); // 查找自己的注册中心服务
         if (ai != null) { // 向服务中心注册自己
-            JSONObject data = new JSONObject(2);
-            ep.fire("http.getPort", EC.of(this).sync().completeFn(ec -> {
-                if (!ec.isNoListener()) {
-                    String ip = (String) ep.fire("http.getHostname");
-                    if (isEmpty(ip) || "localhost".equals(ip) || "127.0.0.1".equals(ip)) {
-                        ip = resolveLocalIp();
-                    }
-                    if (isNotEmpty(ip)) data.put("http", ip + ":" + ec.result);
-                }
-            }));
-            if (remoter.tcpServer.port != null) {
-                String ip = remoter.tcpServer.getStr("hostname", resolveLocalIp());
-                if (isNotEmpty(ip)) data.put("tcp", ip + ":" + remoter.tcpServer.port);
-            }
-            if (!data.isEmpty()) {
+            JSONObject data = collectData();
+            if (isNotEmpty(data)) {
                 data.put("id", id);
                 try {
                     send(ai.name, new JSONObject(3).fluentPut("type", "up").fluentPut("source", remoter.sysName).fluentPut("data", data), ex -> {
@@ -122,12 +118,14 @@ class TCPClient extends ServerTpl {
                             log.warn("Register Fail to sc server '{}'. errMsg: {}", ai.name, ex.getMessage());
                             ep.fire("sched.after", Duration.ofSeconds(30), (Runnable) () -> register());
                         } else {
-                            log.info("Register up info: {} to '{}'", remoter.sysName, data, ai.name);
+                            log.info("Register up to '{}'. info: {}", ai.name, data);
                         }
                     });
-                } catch (Exception ex) {
+                    // 每隔一段时间,都去注册下自己
+                    ep.fire("sched.after", Duration.ofSeconds(getInteger("upInterval", new Random().nextInt(getInteger("upIntervalRange", 100)) + getInteger("upIntervalMin", 60))), (Runnable) () -> register());
+                } catch (Throwable ex) {
                     log.warn("Register Fail to sc server '{}'. errMsg: {}", ai.name, ex.getMessage());
-                    ep.fire("sched.after", Duration.ofSeconds(30), (Runnable) () -> register());
+                    ep.fire("sched.after", Duration.ofSeconds(new Random().nextInt(getInteger("upFailIntervalRange", 30)) + getInteger("upFailIntervalMin", 30)), (Runnable) () -> register());
                 }
             }
         }
@@ -142,20 +140,25 @@ class TCPClient extends ServerTpl {
      */
     @EL(name = "updateAppInfo")
     protected void updateAppInfo(String appName, JSONArray infos) {
-        log.info("update app '{}' info: {}", appName, infos);
-        AppInfo app = appInfoMap.get(appName);
-        if (app == null) {
-            synchronized (this) {
-                app = appInfoMap.get(appName);
-                if (app == null) {
-                    app = new AppInfo(appName); appInfoMap.put(appName, app);
+        log.trace("Update app '{}' info: {}", appName, infos);
+        AppInfo app = Optional.ofNullable(appInfoMap.get(appName)).orElseGet(() -> {
+            AppInfo o;
+            synchronized (appInfoMap) {
+                o = appInfoMap.get(appName);
+                if (o == null) {
+                    o = new AppInfo(appName); appInfoMap.put(appName, o);
                 }
             }
-        }
-        for (Object o : infos) {
-            JSONObject jo = (JSONObject) o;
-            app.hps.add(jo.getString("tcp"));
-        }
+            return o;
+        });
+        Optional.ofNullable(infos).ifPresent(o -> o.stream().flatMap(
+            jo -> Arrays.stream(((JSONObject) jo).getString("tcp").split(","))
+                .filter(hp -> hp != null).map(hp -> hp.trim())
+                .filter(hp -> !hp.isEmpty() && !app.hps.contains(hp))
+        ).forEach(hp -> { // 只增不减
+            app.hps.add(hp);
+            log.info("New TCP config '{}'[{}] added", appName, hp);
+        }));
     }
 
 
@@ -166,6 +169,7 @@ class TCPClient extends ServerTpl {
      * @param completeFn 发送完成后回调函数
      */
     public void send(String appName, Object data, Consumer<Throwable> completeFn) {
+        log.trace("Send data to app '{}'. data: {}", appName, data);
         Channel ch = channel(appName);
         ch.writeAndFlush(remoter.toByteBuf(data)).addListener(f -> {
             exec.execute(() -> {
@@ -184,19 +188,15 @@ class TCPClient extends ServerTpl {
      * @return
      */
     protected Channel channel(String appName) {
-        if (boot == null) {
-            synchronized (this) {
-                if (boot == null) create();
-            }
-        }
-
         // 一个 app 可能被部署多个实例, 每个实例可以创建多个连接
         AppInfo info = appInfoMap.get(appName);
-        if (info == null) { throw new IllegalArgumentException("Not found available server for '" + appName + "'"); }
+        if (info == null) {
+            throw new IllegalArgumentException("Not found available server for '" + appName + "'");
+        }
         if (info.chs.isEmpty()) adaptChannel(info, true);
 
         // 获取一个连接Channel
-        Channel ch = null;
+        Channel ch;
         try {
             info.rwLock.readLock().lock();
             if (info.chs.isEmpty()) throw new IllegalArgumentException("Not found available channel for '" + appName +"'");
@@ -220,6 +220,7 @@ class TCPClient extends ServerTpl {
         }
         if (once && appInfo.chs.size() > 0) return;
         Integer maxConnectionPerHp = getInteger(appInfo.name + ".maxConnectionPerHp", getInteger("maxConnectionPerHp", 2)); // 每个hp(host:port)最多可以建立多少个连接
+        if (appInfo.chs.size() >= (appInfo.hps.size() * maxConnectionPerHp)) return; // 已满
         try {
             appInfo.rwLock.writeLock().lock();
             for (Iterator<String> it = appInfo.hps.iterator(); it.hasNext(); ) {
@@ -249,7 +250,7 @@ class TCPClient extends ServerTpl {
                     errRecord.addFirst(System.currentTimeMillis());
                     // 多个连接配置, 当某个连接(hp(host:port))多次发生错误, 则移除此条连接配置
                     if (appInfo.hps.size() > 1) { errRecord.clear(); it.remove(); redeem(appInfo, hp); }
-                    log.warn("Connect Error to '{}'[{}]. errMsg: {}", appInfo.name, hp, ex.getMessage());
+                    log.doLog(null, (appInfo.hps.size() > 1 ? Level.WARN : Level.ERROR), "Connect Error to '{}'[{}]. errMsg: {}", appInfo.name, hp, (isEmpty(ex.getMessage()) ? ex.getClass().getName() : ex.getMessage()));
                 }
             }
         } finally {
@@ -318,12 +319,14 @@ class TCPClient extends ServerTpl {
      * @param dataStr
      */
     protected void receiveReply(ChannelHandlerContext ctx, String dataStr) {
-        log.debug("Receive reply from '{}': {}", ctx.channel().remoteAddress(), dataStr);
-
+        log.trace("Receive reply from '{}': {}", ctx.channel().remoteAddress(), dataStr);
         JSONObject jo = JSON.parseObject(dataStr);
         String type = jo.getString("type");
         if ("event".equals(type)) {
             exec.execute(() -> remoter.receiveEventResp(jo.getJSONObject("data")));
+        } else if ("updateAppInfo".equals(type)) {
+            JSONObject data = jo.getJSONObject("data");
+            exec.execute(() -> updateAppInfo(data.getString("appName"), data.getJSONArray("infos")));
         }
     }
 
@@ -387,35 +390,28 @@ class TCPClient extends ServerTpl {
 
 
     /**
-     * 解析出本地ip
+     * 收集本系统信息
      * @return
      */
-    protected String resolveLocalIp() {
-        try {
-            for (Enumeration<NetworkInterface> en = NetworkInterface.getNetworkInterfaces(); en.hasMoreElements(); ) {
-                NetworkInterface current = en.nextElement();
-                if (!current.isUp() || current.isLoopback() || current.isVirtual()) continue;
-                Enumeration<InetAddress> addresses = current.getInetAddresses();
-                while (addresses.hasMoreElements()) {
-                    InetAddress addr = addresses.nextElement();
-                    if (addr.isLoopbackAddress()) continue;
-                    return addr.getHostAddress();
-                }
+    protected JSONObject collectData() {
+        JSONObject data = new JSONObject(3);
+        Optional.ofNullable(ep.fire("http.getHp")).filter(o -> isNotEmpty((String) o)).ifPresent(hp -> data.put("http", hp));
+        Optional.ofNullable(remoter.tcpServer.port).ifPresent(port -> {
+            Set<String> addrs = remoter.tcpServer.boundAddrs;
+            if (isNotEmpty(addrs)) {
+                data.put("tcp", addrs.stream().map(s -> s + ":" + port).collect(Collectors.joining(",")));
             }
-        } catch (SocketException e) { log.error(e); }
-        return null;
+        });
+        if (!data.isEmpty()) data.put("id", id);
+        return data;
     }
 
 
     protected class AppInfo {
         protected String                        name;
         /**
-         * app 唯一标识
-         */
-        protected String                        id;
-        /**
          * app 连接配置信息
-         * app -> ip:port
+         * hp(host:port)
          */
         protected Set<String>                   hps            = ConcurrentHashMap.newKeySet();
         /**
@@ -427,11 +423,11 @@ class TCPClient extends ServerTpl {
          */
         protected List<Channel>                 chs            = new ArrayList(7);
         /**
-         * host:port -> list Channel
+         * hp(host:port) -> list Channel
          */
         protected Map<String, AtomicInteger>    hpChannelCount = new ConcurrentHashMap<>();
         /**
-         * host:port -> 连接异常时间
+         * hp(host:port) -> 连接异常时间
          */
         protected Map<String, LinkedList<Long>> hpErrorRecord  = new ConcurrentHashMap<>();
 

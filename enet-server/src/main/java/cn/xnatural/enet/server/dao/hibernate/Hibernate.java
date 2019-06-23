@@ -105,7 +105,7 @@ public class Hibernate extends ServerTpl {
         return new PersistenceUnitInfo() {
             @Override
             public String getPersistenceUnitName() {
-                return getAttr("persistenceUnitName", getName()).toString();
+                return getStr("persistenceUnitName", getName());
             }
 
             @Override

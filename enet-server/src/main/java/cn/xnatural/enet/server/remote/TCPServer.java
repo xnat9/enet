@@ -1,7 +1,6 @@
 package cn.xnatural.enet.server.remote;
 
 import cn.xnatural.enet.common.Log;
-import cn.xnatural.enet.event.EC;
 import cn.xnatural.enet.event.EP;
 import cn.xnatural.enet.server.ServerTpl;
 import com.alibaba.fastjson.JSON;
@@ -30,6 +29,7 @@ import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.Executor;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.LongAdder;
+import java.util.stream.Collectors;
 
 import static cn.xnatural.enet.common.Utils.isEmpty;
 import static cn.xnatural.enet.common.Utils.isNotEmpty;
@@ -54,6 +54,7 @@ class TCPServer extends ServerTpl {
      * 保存 app info 的属性信息
      */
     protected Map<String, List<Map<String, Object>>>    appInfoMap = new ConcurrentHashMap<>();
+    protected Set<String> boundAddrs;
 
 
     public TCPServer(Remoter remoter, EP ep, Executor exec) {
@@ -64,6 +65,8 @@ class TCPServer extends ServerTpl {
     
     
     public void start() {
+        // 绑定多个ip地址.ip2,ip2
+        attr("bindAddrs", "localhost," + remoter.resolveLocalIp());
         attrs.putAll((Map) ep.fire("env.ns", getName()));
         port = getInteger("port", null);
         sysName = (String) ep.fire("sysName");
@@ -88,6 +91,9 @@ class TCPServer extends ServerTpl {
         if (isEmpty(sysName)) {
             log.warn("'{}' need property 'sysName'", getName()); return;
         }
+        String addrs = getStr("bindAddrs", null);
+        if (isEmpty(addrs)) throw new IllegalArgumentException("'bindAddrs' need config");
+
         String loopType = getStr("loopType", (remoter.isLinux() ? "epoll" : "nio"));
         Class ch = null;
         if ("epoll".equalsIgnoreCase(loopType)) {
@@ -152,14 +158,15 @@ class TCPServer extends ServerTpl {
             })
             .option(ChannelOption.SO_BACKLOG, getInteger("backlog", 100))
             .childOption(ChannelOption.SO_KEEPALIVE, true);
-        try {
-            String host = getStr("hostname", null);
-            if (isNotEmpty(host)) sb.bind(host, port).sync(); // 如果没有配置hostname, 默认绑定本地所有地址
-            else sb.bind(port).sync();
-            log.info("Start listen TCP {}:{}, type: {}", (isNotEmpty(host) ? host : "0.0.0.0"), port, loopType);
-        } catch (Exception ex) {
-            log.error(ex);
-        }
+
+        boundAddrs = Arrays.stream(addrs.split(",")).filter(s -> isNotEmpty(s)).map(addr -> {
+            try {
+                sb.bind(addr, port).sync();
+                return addr;
+            } catch (Exception e) { log.error(e); }
+            return null;
+        }).filter(s -> isNotEmpty(s)).collect(Collectors.toSet());
+        log.info("Start listen TCP {}:{}, type: {}", boundAddrs, port, loopType);
     }
 
 
@@ -169,52 +176,50 @@ class TCPServer extends ServerTpl {
      * @param dataStr
      */
     protected void handleReceive(ChannelHandlerContext ctx, String dataStr) {
-        log.debug("Receive client '{}' data: {}", ctx.channel().remoteAddress(), dataStr);
+        log.trace("Receive client '{}' data: {}", ctx.channel().remoteAddress(), dataStr);
         count(); // 统计
 
         JSONObject jo = JSON.parseObject(dataStr);
         String from = jo.getString("source"); // 数据来源
         if (isEmpty(from)) throw new IllegalArgumentException("Unknown source");
-        else if (Objects.equals(sysName, from)) log.warn("Invoke self. appName", from);
 
         String t = jo.getString("type");
         if ("event".equals(t)) {
-            exec.execute(() -> remoter.receiveEventReq(jo.getJSONObject("data"), o -> ctx.writeAndFlush(remoter.toByteBuf(o))));
-        } else if ("heartbeat".equals(t)) { // 用来验证此条连接是否还可用
-            remoter.receiveHeartbeat(jo.getJSONObject("data"), o -> ctx.writeAndFlush(remoter.toByteBuf(o)));
+            exec.execute(() -> {
+                if (Objects.equals(sysName, from)) log.warn("Invoke self. appName '{}'", from);
+                remoter.receiveEventReq(jo.getJSONObject("data"), o -> ctx.writeAndFlush(remoter.toByteBuf(o)));
+            });
         } else if ("up".equals(t)) {// 应用上线通知
             exec.execute(() -> {
+                JSONObject data = jo.getJSONObject("data");
+                data.put("_time", System.currentTimeMillis());
+                log.debug("Receive register up: {}", data);
                 synchronized (appInfoMap) {
                     List<Map<String, Object>> apps = appInfoMap.get(from);
-                    if (apps == null) {
-                        apps = new LinkedList<>(); appInfoMap.put(from, apps);
-                    }
-                    JSONObject d = jo.getJSONObject("data");
+                    if (apps == null) { apps = new LinkedList<>(); appInfoMap.put(from, apps); }
                     for (Iterator<Map<String, Object>> it = apps.iterator(); it.hasNext(); ) {
-                        if (Objects.equals(it.next().get("id"), d.get("id"))) {it.remove(); break;}
+                        Map<String, Object> cur = it.next();
+                        if (isEmpty(cur)) it.remove();
+                        if (Objects.equals(cur.get("id"), data.get("id"))) {it.remove(); break;}
                     }
-                    apps.add(d);
+                    apps.add(data);
+                    ep.fire("updateAppInfo", new Object[]{from, JSON.toJSON(appInfoMap.get(from))});
                     appInfoMap.forEach((s, ls) -> { // 通知其它系统,有新系统上线
                         if (!from.equals(s)) {
-                            remoter.sendEvent(new EC(), from, "updateAppInfo", new Object[]{s, JSON.toJSON(appInfoMap.get(s))});
-                            remoter.sendEvent(new EC(), s, "updateAppInfo", new Object[]{from, JSON.toJSON(appInfoMap.get(from))});
+                            ctx.writeAndFlush(remoter.toByteBuf(new JSONObject(2).fluentPut("type", "updateAppInfo").fluentPut("data", new JSONObject(2).fluentPut("appName", s).fluentPut("infos", appInfoMap.get(s)))));
                         }
                     });
                 }
             });
         } else if ("down".equals(t)) { // 应用下线通知
             exec.execute(() -> {
+                log.info("Receive app down notify. data: {}", jo);
                 synchronized (appInfoMap) {
                     List<Map<String, Object>> apps = appInfoMap.get(from);
-                    if (apps != null) {
+                    if (apps != null && apps.size() > 1) {
                         for (Iterator<Map<String, Object>> it = apps.iterator(); it.hasNext(); ) {
                             if (Objects.equals(it.next().get("id"), jo.getString("id"))) {it.remove(); break;}
                         }
-                        if (!apps.isEmpty()) appInfoMap.forEach((s, ls) -> { // 通知其它系统
-                            if (!from.equals(s)) {
-                                remoter.sendEvent(new EC(), s, "updateAppInfo", new Object[]{from, JSON.toJSON(appInfoMap.get(from))});
-                            }
-                        });
                     }
                 }
             });

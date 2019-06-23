@@ -42,7 +42,7 @@ public class OpenApiDoc extends ServerTpl {
 
         ctl = new Controller(this);
         ep.fire("resteasy.addResource", ctl, getRoot()); // addJaxrsDoc(ctl, getRoot(), getName(), null);
-        log.info("Started {} Server. url: {}", getName(), ("http://" + ep.fire("http.getHostname").toString() + ":" + ep.fire("http.getPort") + ("/" + getRoot() + "/").replace("//", "/")));
+        log.info("Started {} Server. url: {}", getName(), ("http://" + ep.fire("http.getHp") + ("/" + getRoot() + "/").replace("//", "/")));
         ep.fire(getName() + ".started");
     }
 

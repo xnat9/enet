@@ -291,6 +291,10 @@ public class Log {
 
     // ====================log method ==============
 
+    public void doLog(final Throwable th, final Level level, final String msg, final Object... args) {
+        doLog(level, FQCN, msg, args, th);
+    }
+
     public void error(String pMsg, Object... pArgs) {
         doLog(Level.ERROR, FQCN, pMsg, pArgs, null);
     }
@@ -359,7 +363,7 @@ public class Log {
             case DEBUG: return logger == null ? false : logger.isDebugEnabled();
             case TRACE: return logger == null ? false : logger.isTraceEnabled();
         }
-        return true;
+        return false;
     }
 
 

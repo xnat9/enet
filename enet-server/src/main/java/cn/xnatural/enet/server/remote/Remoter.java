@@ -12,12 +12,12 @@ import io.netty.channel.epoll.Native;
 
 import javax.annotation.Resource;
 import java.math.BigDecimal;
+import java.net.InetAddress;
+import java.net.NetworkInterface;
+import java.net.SocketException;
 import java.nio.charset.Charset;
 import java.time.Duration;
-import java.util.List;
-import java.util.Locale;
-import java.util.Map;
-import java.util.UUID;
+import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.Executor;
 import java.util.concurrent.ExecutorService;
@@ -25,7 +25,6 @@ import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.function.Consumer;
 
 import static cn.xnatural.enet.common.Utils.isEmpty;
-import static java.util.concurrent.TimeUnit.SECONDS;
 
 /**
  * 由netty实现的远程交互服务. 远程事件
@@ -142,6 +141,7 @@ public class Remoter extends ServerTpl {
      * @param data
      */
     protected void receiveEventResp(JSONObject data) {
+        log.debug("Receive event response: {}", data);
         EC ec = ecMap.remove(data.getString("eId"));
         if (ec != null) ec.errMsg(data.getString("exMsg")).result(data.get("result")).resume().tryFinish();
     }
@@ -153,6 +153,7 @@ public class Remoter extends ServerTpl {
      * @param reply 响应回调(传参为响应的数据)
      */
     protected void receiveEventReq(JSONObject data, Consumer<Object> reply) {
+        log.debug("Receive event request: {}", data);
         boolean fReply = Boolean.TRUE.equals(data.getBoolean("reply")); // 是否需要响应
         try {
             String eId = data.getString("eId");
@@ -202,14 +203,24 @@ public class Remoter extends ServerTpl {
 
 
     /**
-     * 处理来自己客户端的心跳检测
-     * @param data
-     * @param reply
+     * 解析出本地ip
+     * @return
      */
-    protected void receiveHeartbeat(JSONObject data, Consumer<Object> reply) {
-        reply.accept(new JSONObject(3).fluentPut("type", "heartbeat").fluentPut("source", sysName).fluentPut("status", "yes"));
+    protected String resolveLocalIp() {
+        try {
+            for (Enumeration<NetworkInterface> en = NetworkInterface.getNetworkInterfaces(); en.hasMoreElements(); ) {
+                NetworkInterface current = en.nextElement();
+                if (!current.isUp() || current.isLoopback() || current.isVirtual()) continue;
+                Enumeration<InetAddress> addresses = current.getInetAddresses();
+                while (addresses.hasMoreElements()) {
+                    InetAddress addr = addresses.nextElement();
+                    if (addr.isLoopbackAddress()) continue;
+                    return addr.getHostAddress();
+                }
+            }
+        } catch (SocketException e) { log.error(e); }
+        return null;
     }
-
 
     /**
      * 判断系统是否为 linux 系统

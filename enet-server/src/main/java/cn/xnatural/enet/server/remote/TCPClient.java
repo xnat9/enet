@@ -115,16 +115,16 @@ class TCPClient extends ServerTpl {
                 try {
                     send(ai.name, new JSONObject(3).fluentPut("type", "up").fluentPut("source", remoter.sysName).fluentPut("data", data), ex -> {
                         if (ex != null) {
-                            log.warn("Register Fail to sc server '{}'. errMsg: {}", ai.name, ex.getMessage());
+                            log.warn("Register Fail to rc server '{}'. errMsg: {}", ai.name, ex.getMessage());
                             ep.fire("sched.after", Duration.ofSeconds(30), (Runnable) () -> register());
                         } else {
-                            log.info("Register up to '{}'. info: {}", ai.name, data);
+                            log.info("Register up self '{}' to '{}'. info: {}", remoter.sysName, ai.name, data);
                         }
                     });
                     // 每隔一段时间,都去注册下自己
                     ep.fire("sched.after", Duration.ofSeconds(getInteger("upInterval", new Random().nextInt(getInteger("upIntervalRange", 100)) + getInteger("upIntervalMin", 60))), (Runnable) () -> register());
                 } catch (Throwable ex) {
-                    log.warn("Register Fail to sc server '{}'. errMsg: {}", ai.name, ex.getMessage());
+                    log.warn("Register Fail to rc server '{}'. errMsg: {}", ai.name, ex.getMessage());
                     ep.fire("sched.after", Duration.ofSeconds(new Random().nextInt(getInteger("upFailIntervalRange", 30)) + getInteger("upFailIntervalMin", 30)), (Runnable) () -> register());
                 }
             }
@@ -159,6 +159,55 @@ class TCPClient extends ServerTpl {
             app.hps.add(hp);
             log.info("New TCP config '{}'[{}] added", appName, hp);
         }));
+
+//        log.trace("Update app '{}' info: {}", appName, infos);
+//        AppInfo app = Optional.ofNullable(appInfoMap.get(appName)).orElseGet(() -> {
+//            AppInfo o;
+//            synchronized (appInfoMap) {
+//                o = appInfoMap.get(appName);
+//                if (o == null) {
+//                    o = new AppInfo(appName); appInfoMap.put(appName, o);
+//                }
+//            }
+//            return o;
+//        });
+//
+//        Set<String> oldAllSet;
+//        try {
+//            app.rwLock.readLock().lock();
+//            oldAllSet = new HashSet<>(app.hps);
+//        } finally {
+//            app.rwLock.readLock().unlock();
+//        }
+//
+//        Set<String> newAllSet = new HashSet<>();
+//        Set<String> addSet = new HashSet<>();
+//        if (infos != null) infos.stream().flatMap(
+//            jo -> Arrays.stream(((JSONObject) jo).getString("tcp").split(","))
+//                .filter(hp -> hp != null).map(hp -> hp.trim())
+//                .filter(hp -> !hp.isEmpty())
+//        ).forEach(hp -> {
+//            newAllSet.add(hp);
+//            if (!oldAllSet.contains(hp)) addSet.add(hp); // 新增的
+//        });
+//
+//        Set<String> delSet = oldAllSet.stream().filter(hp -> !newAllSet.contains(hp) && ).collect(Collectors.toSet());;
+//
+//        if (!addSet.isEmpty() || !delSet.isEmpty()) {
+//            try {
+//                app.rwLock.writeLock().lock();
+//                if (!addSet.isEmpty()) {
+//                    app.hps.addAll(addSet);
+//                    log.info("New TCP config '{}'{} added", appName, addSet);
+//                }
+//                if (!delSet.isEmpty()) {
+//                    app.hps.removeAll(delSet);
+//                    log.info("Remove TCP config '{}'{}", appName, delSet);
+//                }
+//            } finally {
+//                app.rwLock.writeLock().unlock();
+//            }
+//        }
     }
 
 

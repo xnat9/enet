@@ -199,8 +199,17 @@ class TCPServer extends ServerTpl {
                     if (apps == null) { apps = new LinkedList<>(); appInfoMap.put(from, apps); }
                     for (Iterator<Map<String, Object>> it = apps.iterator(); it.hasNext(); ) {
                         Map<String, Object> cur = it.next();
-                        if (isEmpty(cur)) it.remove();
-                        if (Objects.equals(cur.get("id"), data.get("id"))) {it.remove(); break;}
+                        if (isEmpty(cur)) {
+                            log.warn("Drop bad(empty) app register up info");
+                            it.remove();
+                        }
+                        // 一段时间未上传则删除
+                        // dropAppTimeout 单位: 分钟
+                        else if (((Long) cur.getOrDefault("_time", System.currentTimeMillis()) - System.currentTimeMillis() > getInteger("dropAppTimeout", 2 * 60) * 60 * 1000) && !Objects.equals(cur.get("id"), remoter.tcpClient.id)) {
+                            log.warn("Drop timeout app register info: {}", cur);
+                            it.remove();
+                        }
+                        else if (Objects.equals(cur.get("id"), data.get("id"))) {it.remove();}
                     }
                     apps.add(data);
                     ep.fire("updateAppInfo", new Object[]{from, JSON.toJSON(appInfoMap.get(from))});

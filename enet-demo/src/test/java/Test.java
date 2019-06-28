@@ -7,6 +7,7 @@ import java.time.Duration;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
+import java.util.UUID;
 import java.util.concurrent.*;
 import java.util.concurrent.atomic.AtomicBoolean;
 
@@ -17,9 +18,8 @@ public class Test {
     }
 
     public static void main(String[] args) throws Throwable {
-//        System.out.println(http().get("http://localhost:8080/dao").header("Connection", "keep-alive").execute());
-//        Thread.sleep(TimeUnit.SECONDS.toMillis(15));
-        压测();
+        System.out.println((UUID.randomUUID().toString().replaceAll("-", "")).length());
+         // 压测();
     }
 
     static void 压测() throws Throwable {

@@ -132,7 +132,6 @@ class TCPClient extends ServerTpl {
     }
 
 
-
     /**
      * 更新app 信息
      * @param appName
@@ -151,14 +150,24 @@ class TCPClient extends ServerTpl {
             }
             return o;
         });
-        Optional.ofNullable(infos).ifPresent(o -> o.stream().flatMap(
-            jo -> Arrays.stream(((JSONObject) jo).getString("tcp").split(","))
-                .filter(hp -> hp != null).map(hp -> hp.trim())
-                .filter(hp -> !hp.isEmpty() && !app.hps.contains(hp))
-        ).forEach(hp -> { // 只增不减
-            app.hps.add(hp);
-            log.info("New TCP config '{}'[{}] added", appName, hp);
-        }));
+        Set<String> add = infos.stream().flatMap(
+            jo -> {
+                String tcpHps = ((JSONObject) jo).getString("tcp");
+                if (isEmpty(tcpHps)) return null;
+                return Arrays.stream(tcpHps.split(","))
+                    .filter(hp -> hp != null).map(hp -> hp.trim())
+                    .filter(hp -> !hp.isEmpty() && !app.hps.contains(hp));
+            }
+        ).filter(o -> o != null).collect(Collectors.toSet());
+        if (!add.isEmpty()) {
+            try {
+                app.rwLock.writeLock().lock();
+                app.hps.addAll(add);
+                log.info("New TCP config '{}'{} added", appName, add);
+            } finally {
+                app.rwLock.writeLock().unlock();
+            }
+        }
 
 //        log.trace("Update app '{}' info: {}", appName, infos);
 //        AppInfo app = Optional.ofNullable(appInfoMap.get(appName)).orElseGet(() -> {
@@ -451,7 +460,9 @@ class TCPClient extends ServerTpl {
                 data.put("tcp", addrs.stream().map(s -> s + ":" + port).collect(Collectors.joining(",")));
             }
         });
-        if (!data.isEmpty()) data.put("id", id);
+        if (!data.isEmpty()) {
+            data.fluentPut("name", remoter.sysName).fluentPut("id", id);
+        }
         return data;
     }
 

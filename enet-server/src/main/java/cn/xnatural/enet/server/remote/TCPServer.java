@@ -66,7 +66,7 @@ class TCPServer extends ServerTpl {
     
     public void start() {
         // 绑定多个ip地址.ip2,ip2
-        attr("bindAddrs", "localhost," + remoter.resolveLocalIp());
+        attr("bindAddrs", remoter.resolveLocalIp());
         attrs.putAll((Map) ep.fire("env.ns", getName()));
         port = getInteger("port", null);
         sysName = (String) ep.fire("sysName");
@@ -190,36 +190,7 @@ class TCPServer extends ServerTpl {
                 remoter.receiveEventReq(jo.getJSONObject("data"), o -> ctx.writeAndFlush(remoter.toByteBuf(o)));
             });
         } else if ("up".equals(t)) {// 应用上线通知
-            exec.execute(() -> {
-                JSONObject data = jo.getJSONObject("data");
-                data.put("_time", System.currentTimeMillis());
-                log.debug("Receive register up: {}", data);
-                synchronized (appInfoMap) {
-                    List<Map<String, Object>> apps = appInfoMap.get(from);
-                    if (apps == null) { apps = new LinkedList<>(); appInfoMap.put(from, apps); }
-                    for (Iterator<Map<String, Object>> it = apps.iterator(); it.hasNext(); ) {
-                        Map<String, Object> cur = it.next();
-                        if (isEmpty(cur)) {
-                            log.warn("Drop bad(empty) app register up info");
-                            it.remove();
-                        }
-                        // 一段时间未上传则删除
-                        // dropAppTimeout 单位: 分钟
-                        else if (((Long) cur.getOrDefault("_time", System.currentTimeMillis()) - System.currentTimeMillis() > getInteger("dropAppTimeout", 2 * 60) * 60 * 1000) && !Objects.equals(cur.get("id"), remoter.tcpClient.id)) {
-                            log.warn("Drop timeout app register info: {}", cur);
-                            it.remove();
-                        }
-                        else if (Objects.equals(cur.get("id"), data.get("id"))) {it.remove();}
-                    }
-                    apps.add(data);
-                    ep.fire("updateAppInfo", new Object[]{from, JSON.toJSON(appInfoMap.get(from))});
-                    appInfoMap.forEach((s, ls) -> { // 通知其它系统,有新系统上线
-                        if (!from.equals(s)) {
-                            ctx.writeAndFlush(remoter.toByteBuf(new JSONObject(2).fluentPut("type", "updateAppInfo").fluentPut("data", new JSONObject(2).fluentPut("appName", s).fluentPut("infos", appInfoMap.get(s)))));
-                        }
-                    });
-                }
-            });
+            exec.execute(() -> appUp(jo.getJSONObject("data"), ctx));
         } else if ("down".equals(t)) { // 应用下线通知
             exec.execute(() -> {
                 log.info("Receive app down notify. data: {}", jo);
@@ -259,6 +230,53 @@ class TCPServer extends ServerTpl {
             return true;
         }
         return false;
+    }
+
+
+    /**
+     * 应用上线通知
+     * @param data
+     * @param ctx
+     */
+    protected void appUp(JSONObject data, ChannelHandlerContext ctx) {
+        if (data.isEmpty()) { log.warn("Register data is empty"); return;}
+        log.debug("Receive register up: {}", data);
+        String appName = data.getString("name");
+        data.put("_time", System.currentTimeMillis());
+        synchronized (appInfoMap) {
+            List<Map<String, Object>> del = new LinkedList<>();
+            List<Map<String, Object>> apps = appInfoMap.get(appName);
+            if (apps == null) { apps = new LinkedList<>(); appInfoMap.put(appName, apps); }
+            for (Iterator<Map<String, Object>> it = apps.iterator(); it.hasNext(); ) {
+                Map<String, Object> cur = it.next();
+                if (isEmpty(cur)) {
+                    log.warn("Drop bad(empty) app register up info");
+                    it.remove();
+                }
+                // 一段时间未上传则删除
+                // dropAppTimeout 单位: 分钟
+                else if (((Long) cur.getOrDefault("_time", System.currentTimeMillis()) - System.currentTimeMillis() > getInteger("dropAppTimeout", 30) * 60 * 1000) && !Objects.equals(cur.get("id"), remoter.tcpClient.id)) {
+                    log.warn("Drop timeout app register info: {}", cur);
+                    it.remove(); del.add(cur);
+                }
+                else if (Objects.equals(cur.get("id"), data.get("id"))) {it.remove();}
+            }
+            apps.add(data);
+
+            // 添加
+            ep.fire("updateAppInfo", new Object[]{appName, JSON.toJSON(appInfoMap.get(appName))});
+            appInfoMap.forEach((s, ls) -> {
+                if (!appName.equals(s)) {
+                    ctx.writeAndFlush(remoter.toByteBuf(new JSONObject(2).fluentPut("type", "updateAppInfo").fluentPut("data", new JSONObject(2).fluentPut("appName", s).fluentPut("infos", appInfoMap.get(s)))));
+                }
+            });
+
+            // 删除
+//            del.forEach(m -> {
+//                ep.fire("delAppInfo", new Object[]{m});
+//                ctx.writeAndFlush(remoter.toByteBuf(new JSONObject(2).fluentPut("type", "delAppInfo").fluentPut("data", m)));
+//            });
+        }
     }
 
 

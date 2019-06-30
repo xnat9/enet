@@ -189,20 +189,8 @@ class TCPServer extends ServerTpl {
                 if (Objects.equals(sysName, from)) log.warn("Invoke self. appName '{}'", from);
                 remoter.receiveEventReq(jo.getJSONObject("data"), o -> ctx.writeAndFlush(remoter.toByteBuf(o)));
             });
-        } else if ("up".equals(t)) {// 应用上线通知
+        } else if ("up".equals(t)) {// 应用注册在线通知
             exec.execute(() -> appUp(jo.getJSONObject("data"), ctx));
-        } else if ("down".equals(t)) { // 应用下线通知
-            exec.execute(() -> {
-                log.info("Receive app down notify. data: {}", jo);
-                synchronized (appInfoMap) {
-                    List<Map<String, Object>> apps = appInfoMap.get(from);
-                    if (apps != null && apps.size() > 1) {
-                        for (Iterator<Map<String, Object>> it = apps.iterator(); it.hasNext(); ) {
-                            if (Objects.equals(it.next().get("id"), jo.getString("id"))) {it.remove(); break;}
-                        }
-                    }
-                }
-            });
         } else if ("cmd-log".equals(t)) { // 命令行设置日志等级
             // telnet localhost 8080
             // 例: {"type":"cmd-log", "source": "xxx", "data": "cn.xnatural.enet.server.remote: debug"}$_$
@@ -244,38 +232,37 @@ class TCPServer extends ServerTpl {
         String appName = data.getString("name");
         data.put("_time", System.currentTimeMillis());
         synchronized (appInfoMap) {
-            List<Map<String, Object>> del = new LinkedList<>();
-            List<Map<String, Object>> apps = appInfoMap.get(appName);
-            if (apps == null) { apps = new LinkedList<>(); appInfoMap.put(appName, apps); }
+            List<Map<String, Object>> apps = appInfoMap.computeIfAbsent(appName, s -> new LinkedList<>());
             for (Iterator<Map<String, Object>> it = apps.iterator(); it.hasNext(); ) {
-                Map<String, Object> cur = it.next();
-                if (isEmpty(cur)) {
-                    log.warn("Drop bad(empty) app register up info");
-                    it.remove();
-                }
-                // 一段时间未上传则删除
-                // dropAppTimeout 单位: 分钟
-                else if (((Long) cur.getOrDefault("_time", System.currentTimeMillis()) - System.currentTimeMillis() > getInteger("dropAppTimeout", 30) * 60 * 1000) && !Objects.equals(cur.get("id"), remoter.tcpClient.id)) {
-                    log.warn("Drop timeout app register info: {}", cur);
-                    it.remove(); del.add(cur);
-                }
-                else if (Objects.equals(cur.get("id"), data.get("id"))) {it.remove();}
+                if (Objects.equals(it.next().get("id"), data.get("id"))) {it.remove(); break;}
             }
             apps.add(data);
+            for (Iterator<Map.Entry<String, List<Map<String, Object>>>> it = appInfoMap.entrySet().iterator(); it.hasNext(); ) {
+                Map.Entry<String, List<Map<String, Object>>> e = it.next();
+                List<Map<String, Object>> v = e.getValue();
+                if (v == null || v.isEmpty()) {it.remove(); continue;}
+                for (Iterator<Map<String, Object>> it2 = v.iterator(); it2.hasNext(); ) {
+                    Map<String, Object> cur = it2.next();
+                    if (isEmpty(cur)) it2.remove();
+                    // 一段时间未上传则删除
+                    // dropAppTimeout 单位: 分钟
+                    else if ((System.currentTimeMillis() - (Long) cur.getOrDefault("_time", System.currentTimeMillis()) > getInteger("dropAppTimeout", 30) * 60 * 1000) && !Objects.equals(cur.get("id"), remoter.tcpClient.id)) {
+                        it2.remove();
+                        log.warn("Drop timeout app register info: {}", cur);
+                    }
+                }
+                if (v == null || v.isEmpty()) it.remove();
+            }
 
             // 添加
-            ep.fire("updateAppInfo", new Object[]{appName, JSON.toJSON(appInfoMap.get(appName))});
+            ep.fire("updateAppInfo", new Object[]{data});
             appInfoMap.forEach((s, ls) -> {
                 if (!appName.equals(s)) {
-                    ctx.writeAndFlush(remoter.toByteBuf(new JSONObject(2).fluentPut("type", "updateAppInfo").fluentPut("data", new JSONObject(2).fluentPut("appName", s).fluentPut("infos", appInfoMap.get(s)))));
+                    for (Map<String, Object> d : ls) {
+                        ctx.writeAndFlush(remoter.toByteBuf(new JSONObject(2).fluentPut("type", "updateAppInfo").fluentPut("data", d)));
+                    }
                 }
             });
-
-            // 删除
-//            del.forEach(m -> {
-//                ep.fire("delAppInfo", new Object[]{m});
-//                ctx.writeAndFlush(remoter.toByteBuf(new JSONObject(2).fluentPut("type", "delAppInfo").fluentPut("data", m)));
-//            });
         }
     }
 

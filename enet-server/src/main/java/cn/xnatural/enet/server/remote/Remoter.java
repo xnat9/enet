@@ -77,7 +77,7 @@ public class Remoter extends ServerTpl {
     }
 
 
-    @EL(name = "sys.stopping")
+    @EL(name = "sys.stopping", async = false)
     public void stop() {
         if (tcpClient != null) tcpClient.stop();
         if (tcpServer != null) tcpServer.stop();

@@ -4,7 +4,6 @@ import cn.xnatural.enet.event.EL;
 import cn.xnatural.enet.event.EP;
 import cn.xnatural.enet.server.ServerTpl;
 import com.alibaba.fastjson.JSON;
-import com.alibaba.fastjson.JSONArray;
 import com.alibaba.fastjson.JSONException;
 import com.alibaba.fastjson.JSONObject;
 import io.netty.bootstrap.Bootstrap;
@@ -83,7 +82,6 @@ class TCPClient extends ServerTpl {
 
 
     protected void stop() {
-        send(rcAppName, new JSONObject(3).fluentPut("type", "down").fluentPut("source", remoter.sysName).fluentPut("id", id), null);
         if (boos != null) boos.shutdownGracefully();
         boot = null;
         appInfoMap = null;
@@ -118,7 +116,7 @@ class TCPClient extends ServerTpl {
                             log.warn("Register Fail to rc server '{}'. errMsg: {}", ai.name, ex.getMessage());
                             ep.fire("sched.after", Duration.ofSeconds(30), (Runnable) () -> register());
                         } else {
-                            log.info("Register up self '{}' to '{}'. info: {}", remoter.sysName, ai.name, data);
+                            log.info("Register up self '{}' to '{}'. info: {}", remoter.sysName, ai.name + ai.hps, data);
                         }
                     });
                     // 每隔一段时间,都去注册下自己
@@ -134,12 +132,13 @@ class TCPClient extends ServerTpl {
 
     /**
      * 更新app 信息
-     * @param appName
-     * @param infos
+     * @param data app信息
      */
     @EL(name = "updateAppInfo")
-    protected void updateAppInfo(String appName, JSONArray infos) {
-        log.trace("Update app '{}' info: {}", appName, infos);
+    protected void updateAppInfo(JSONObject data) {
+        log.trace("Update app info: {}", data);
+        if (Objects.equals(id, data.getString("id"))) return;
+        String appName = data.getString("name");
         AppInfo app = Optional.ofNullable(appInfoMap.get(appName)).orElseGet(() -> {
             AppInfo o;
             synchronized (appInfoMap) {
@@ -150,73 +149,22 @@ class TCPClient extends ServerTpl {
             }
             return o;
         });
-        Set<String> add = infos.stream().flatMap(
-            jo -> {
-                String tcpHps = ((JSONObject) jo).getString("tcp");
-                if (isEmpty(tcpHps)) return null;
-                return Arrays.stream(tcpHps.split(","))
-                    .filter(hp -> hp != null).map(hp -> hp.trim())
-                    .filter(hp -> !hp.isEmpty() && !app.hps.contains(hp));
-            }
-        ).filter(o -> o != null).collect(Collectors.toSet());
-        if (!add.isEmpty()) {
-            try {
-                app.rwLock.writeLock().lock();
-                app.hps.addAll(add);
-                log.info("New TCP config '{}'{} added", appName, add);
-            } finally {
-                app.rwLock.writeLock().unlock();
+        String tcpHps = data.getString("tcp");
+        if (isNotEmpty(tcpHps)) {
+            Set<String> add = Arrays.stream(tcpHps.split(","))
+                .filter(hp -> hp != null).map(hp -> hp.trim())
+                .filter(hp -> !hp.isEmpty() && !app.hps.contains(hp))
+                .collect(Collectors.toSet());
+            if (!add.isEmpty()) {
+                try {
+                    app.rwLock.writeLock().lock();
+                    app.hps.addAll(add);
+                    log.info("New TCP config '{}'{} added", appName, add);
+                } finally {
+                    app.rwLock.writeLock().unlock();
+                }
             }
         }
-
-//        log.trace("Update app '{}' info: {}", appName, infos);
-//        AppInfo app = Optional.ofNullable(appInfoMap.get(appName)).orElseGet(() -> {
-//            AppInfo o;
-//            synchronized (appInfoMap) {
-//                o = appInfoMap.get(appName);
-//                if (o == null) {
-//                    o = new AppInfo(appName); appInfoMap.put(appName, o);
-//                }
-//            }
-//            return o;
-//        });
-//
-//        Set<String> oldAllSet;
-//        try {
-//            app.rwLock.readLock().lock();
-//            oldAllSet = new HashSet<>(app.hps);
-//        } finally {
-//            app.rwLock.readLock().unlock();
-//        }
-//
-//        Set<String> newAllSet = new HashSet<>();
-//        Set<String> addSet = new HashSet<>();
-//        if (infos != null) infos.stream().flatMap(
-//            jo -> Arrays.stream(((JSONObject) jo).getString("tcp").split(","))
-//                .filter(hp -> hp != null).map(hp -> hp.trim())
-//                .filter(hp -> !hp.isEmpty())
-//        ).forEach(hp -> {
-//            newAllSet.add(hp);
-//            if (!oldAllSet.contains(hp)) addSet.add(hp); // 新增的
-//        });
-//
-//        Set<String> delSet = oldAllSet.stream().filter(hp -> !newAllSet.contains(hp) && ).collect(Collectors.toSet());;
-//
-//        if (!addSet.isEmpty() || !delSet.isEmpty()) {
-//            try {
-//                app.rwLock.writeLock().lock();
-//                if (!addSet.isEmpty()) {
-//                    app.hps.addAll(addSet);
-//                    log.info("New TCP config '{}'{} added", appName, addSet);
-//                }
-//                if (!delSet.isEmpty()) {
-//                    app.hps.removeAll(delSet);
-//                    log.info("Remove TCP config '{}'{}", appName, delSet);
-//                }
-//            } finally {
-//                app.rwLock.writeLock().unlock();
-//            }
-//        }
     }
 
 
@@ -383,8 +331,13 @@ class TCPClient extends ServerTpl {
         if ("event".equals(type)) {
             exec.execute(() -> remoter.receiveEventResp(jo.getJSONObject("data")));
         } else if ("updateAppInfo".equals(type)) {
-            JSONObject data = jo.getJSONObject("data");
-            exec.execute(() -> updateAppInfo(data.getString("appName"), data.getJSONArray("infos")));
+            exec.execute(() -> {
+                JSONObject d = jo.getJSONObject("data");
+                try { updateAppInfo(d); }
+                catch (Exception ex) {
+                    log.error(ex, "updateAppInfo error. data: {}", d);
+                }
+            });
         }
     }
 

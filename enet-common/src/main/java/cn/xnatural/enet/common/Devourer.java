@@ -56,7 +56,9 @@ public class Devourer {
         // TODO 会有 cas aba 问题?
         if (!running.compareAndSet(false, true)) return;
         // 1.必须保证这里只有一个线程被执行
-        // 2.必须保证不能出现情况: waiting 对列中有值, 但没有被执行
+        if (waiting.isEmpty() || pause.get()) {running.set(false); return;}
+        // 2.必须保证这里waiting对列中不为空
+        // 3.必须保证不能出现情况: waiting 对列中有值, 但没有被执行
         exec.execute(() -> {
             try {
                 waiting.poll().run();

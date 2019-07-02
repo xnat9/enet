@@ -40,21 +40,21 @@ import static java.util.concurrent.TimeUnit.SECONDS;
  */
 class TCPServer extends ServerTpl {
 
-    protected final Remoter        remoter;
+    protected final Remoter                                remoter;
     @Resource
-    protected       Executor       exec;
-    protected       Integer        port;
-    protected       String         sysName;
-    protected       EventLoopGroup boos;
+    protected       Executor                               exec;
+    protected       Integer                                port;
+    protected       String                                 sysName;
+    protected       EventLoopGroup                         boos;
     /**
      * 当前连接数
      */
-    protected       AtomicInteger  connCount  = new AtomicInteger(0);
+    protected       AtomicInteger                          connCount  = new AtomicInteger(0);
     /**
      * 保存 app info 的属性信息
      */
-    protected Map<String, List<Map<String, Object>>>    appInfoMap = new ConcurrentHashMap<>();
-    protected Set<String> boundAddrs;
+    protected       Map<String, List<Map<String, Object>>> appInfoMap = new ConcurrentHashMap<>();
+    protected       Set<String>                            boundAddrs;
 
 
     public TCPServer(Remoter remoter, EP ep, Executor exec) {
@@ -77,7 +77,6 @@ class TCPServer extends ServerTpl {
     public void stop() {
         log.info("Close '{}'", getName());
         if (boos != null) boos.shutdownGracefully();
-        connCount.set(0);
     }
 
 
@@ -257,8 +256,8 @@ class TCPServer extends ServerTpl {
             // 添加
             ep.fire("updateAppInfo", new Object[]{data});
             appInfoMap.forEach((s, ls) -> {
-                if (!appName.equals(s)) {
-                    for (Map<String, Object> d : ls) {
+                for (Map<String, Object> d : ls) {
+                    if (!Objects.equals(d.get("id"), data.getString("id"))) {
                         ctx.writeAndFlush(remoter.toByteBuf(new JSONObject(2).fluentPut("type", "updateAppInfo").fluentPut("data", d)));
                     }
                 }

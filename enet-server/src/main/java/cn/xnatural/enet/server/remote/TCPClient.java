@@ -91,10 +91,13 @@ class TCPClient extends ServerTpl {
     @EL(name = "sys.started")
     protected void sysStarted() {
         // 注册自己到自己
-        synchronized (remoter.tcpServer.appInfoMap) {
-            JSONObject d = collectData();
-            if (isNotEmpty(d)) {
-                remoter.tcpServer.appInfoMap.computeIfAbsent(remoter.sysName, s -> new LinkedList<>()).add(d);
+        if (getBoolean("registerSelf", true)) {
+            synchronized (remoter.tcpServer.appInfoMap) {
+                JSONObject d = collectData();
+                if (isNotEmpty(d)) {
+                    d.put("_time", System.currentTimeMillis());
+                    remoter.tcpServer.appInfoMap.computeIfAbsent(remoter.sysName, s -> new LinkedList<>()).add(d);
+                }
             }
         }
         register();
@@ -109,7 +112,6 @@ class TCPClient extends ServerTpl {
         if (ai != null) { // 向服务中心注册自己
             JSONObject data = collectData();
             if (isNotEmpty(data)) {
-                data.put("id", id);
                 try {
                     send(ai.name, new JSONObject(3).fluentPut("type", "up").fluentPut("source", remoter.sysName).fluentPut("data", data), ex -> {
                         if (ex != null) {
@@ -255,7 +257,7 @@ class TCPClient extends ServerTpl {
                 } catch (Exception ex) {
                     errRecord.addFirst(System.currentTimeMillis());
                     // 多个连接配置, 当某个连接(hp(host:port))多次发生错误, 则移除此条连接配置
-                    if (appInfo.hps.size() > 1) { errRecord.clear(); it.remove(); redeem(appInfo, hp); }
+                    if (appInfo.hps.size() > 1) { it.remove(); redeem(appInfo, hp); }
                     log.doLog(null, (appInfo.hps.size() > 1 ? Level.WARN : Level.ERROR), "Connect Error to '{}'[{}]. errMsg: {}", appInfo.name, hp, (isEmpty(ex.getMessage()) ? ex.getClass().getName() : ex.getMessage()));
                 }
             }
@@ -385,13 +387,22 @@ class TCPClient extends ServerTpl {
                     ChannelFuture f = boot.connect(arr[0], Integer.valueOf(arr[1]));
                     f.sync().await(getInteger("connectTimeout", 3), SECONDS);
                     f.channel().disconnect();
-                    appInfo.hps.add(hp);
-                    log.info("'{}' redeem success", hp);
+                    try {
+                        appInfo.rwLock.writeLock().lock();
+                        appInfo.hps.add(hp);
+                        log.info("'{}'[{}] redeem success", appInfo.name, hp); appInfo.hpErrorRecord.get(hp).clear();
+                    } finally {
+                        appInfo.rwLock.writeLock().unlock();
+                    }
                 } catch (Exception e) {
-                    if (pass.isEmpty()) { log.warn("'{}' can't redeem", hp); }
+                    if (pass.isEmpty()) { log.warn("'{}'[{}] can't redeem", appInfo.name, hp); appInfo.hpErrorRecord.get(hp).removeLast(); }
                     else {
-                        log.warn("'{}' try redeem fail", hp);
-                        ep.fire("sched.after", Duration.ofSeconds(pass.removeFirst()), this);
+                        if (appInfo.hps.contains(hp)) {// 又被加入到配置里面去了,停止redeem
+                            log.info("Stop redeem '{}'[{}]", appInfo.name, hp); appInfo.hpErrorRecord.get(hp).removeLast();
+                        } else {
+                            log.warn("'{}'[{}] try redeem fail", appInfo.name, hp);
+                            ep.fire("sched.after", Duration.ofSeconds(pass.removeFirst()), this);
+                        }
                     }
                 }
             }

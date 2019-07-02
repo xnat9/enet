@@ -31,13 +31,13 @@ import static cn.xnatural.enet.common.Utils.isEmpty;
  * @author xiangxb, 2019-05-18
  */
 public class Remoter extends ServerTpl {
-    protected final AtomicBoolean   running   = new AtomicBoolean(false);
+    protected final AtomicBoolean   running = new AtomicBoolean(false);
     @Resource
     protected       Executor        exec;
     /**
      * ecId -> EC
      */
-    protected       Map<String, EC> ecMap     = new ConcurrentHashMap<>();
+    protected       Map<String, EC> ecMap   = new ConcurrentHashMap<>();
     /**
      * 系统名字(标识)
      */

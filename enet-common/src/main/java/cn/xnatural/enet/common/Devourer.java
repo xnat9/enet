@@ -5,6 +5,7 @@ import java.util.concurrent.ConcurrentLinkedQueue;
 import java.util.concurrent.Executor;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.function.Consumer;
 import java.util.function.Supplier;
 
 /**
@@ -12,19 +13,23 @@ import java.util.function.Supplier;
  * 核心方法: {@link #trigger()}
  */
 public class Devourer {
-    protected final Log               log     = Log.of(getClass());
-    protected final Executor          exec;
-    protected final AtomicBoolean     running = new AtomicBoolean(false);
-    protected final Queue<Runnable>   waiting = new ConcurrentLinkedQueue<>();
-    protected final Object            key;
+    protected final Log                 log     = Log.of(getClass());
+    protected final Executor            exec;
+    protected final AtomicBoolean       running = new AtomicBoolean(false);
+    protected final Queue<Runnable>     waiting = new ConcurrentLinkedQueue<>();
+    protected final Object              key;
     /**
      * 是否应该熔断: 暂停执行
      */
-    protected       Supplier<Boolean> pause   = () -> Boolean.FALSE;
+    protected       Supplier<Boolean>   pause   = () -> Boolean.FALSE;
     /**
      * 是否应该熔断: 丢弃
      */
-    protected       Supplier<Boolean> fusing   = () -> Boolean.FALSE;
+    protected       Supplier<Boolean>   fusing  = () -> Boolean.FALSE;
+    /**
+     * 异常处理
+     */
+    protected       Consumer<Throwable> exConsumer;
 
 
     public Devourer(Object key, Executor exec) {
@@ -56,7 +61,8 @@ public class Devourer {
             try {
                 waiting.poll().run();
             } catch (Throwable t) {
-                log.error(t, getClass().getSimpleName() + ":" + key);
+                if (exConsumer == null) log.error(t, getClass().getSimpleName() + ":" + key);
+                else exConsumer.accept(t);
             } finally {
                 running.set(false);
                 if (!waiting.isEmpty()) trigger();
@@ -75,6 +81,12 @@ public class Devourer {
     public Devourer fusing(Supplier<Boolean> fusing) {
         if (fusing == null) throw new IllegalArgumentException("fusing Supplier can not be null");
         this.fusing = fusing;
+        return this;
+    }
+
+
+    public Devourer exConsumer(Consumer<Throwable> exConsumer) {
+        this.exConsumer = exConsumer;
         return this;
     }
 

@@ -1,5 +1,6 @@
 package cn.xnatural.enet.server.cache.ehcache;
 
+import cn.xnatural.enet.event.EC;
 import cn.xnatural.enet.event.EL;
 import cn.xnatural.enet.event.EP;
 import cn.xnatural.enet.server.ServerTpl;
@@ -8,10 +9,11 @@ import org.ehcache.CacheManager;
 import org.ehcache.config.builders.CacheManagerBuilder;
 import org.ehcache.config.builders.ExpiryPolicyBuilder;
 import org.ehcache.config.builders.ResourcePoolsBuilder;
+import org.slf4j.event.Level;
 
 import java.time.Duration;
 import java.util.Map;
-import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.Objects;
 
 import static org.ehcache.config.builders.CacheConfigurationBuilder.newCacheConfigurationBuilder;
 import static org.ehcache.config.builders.ResourcePoolsBuilder.newResourcePoolsBuilder;
@@ -22,7 +24,6 @@ import static org.ehcache.config.units.MemoryUnit.MB;
  * 提供 ehcache 服务
  */
 public class EhcacheServer extends ServerTpl {
-    protected final AtomicBoolean running = new AtomicBoolean(false);
     protected       CacheManager  cm;
 
 
@@ -32,11 +33,8 @@ public class EhcacheServer extends ServerTpl {
     public EhcacheServer(String name) { super(name); }
 
 
-    @EL(name = "sys.starting")
+    @EL(name = {"sys.starting", "${name}.start"})
     public void start() {
-        if (!running.compareAndSet(false, true)) {
-            log.warn("{} Server is running", getName()); return;
-        }
         if (ep == null) ep = new EP();
         ep.fire(getName() + ".starting");
         attrs.putAll((Map) ep.fire("env.ns", "cache", getName()));
@@ -49,9 +47,9 @@ public class EhcacheServer extends ServerTpl {
     }
 
 
-    @EL(name = "sys.stopping")
-    public void stop() {
-        log.debug("Shutdown '{}' Server", getName());
+    @EL(name = {"sys.stopping", "${name}.stop"})
+    public void stop(EC ec) {
+        log.doLog(null, (ec != null && Objects.equals(ec.eName(), getName()+ ".stop") ? Level.INFO : Level.DEBUG), "Shutdown '{}' Server", getName());
         if (cm != null) cm.close();
     }
 

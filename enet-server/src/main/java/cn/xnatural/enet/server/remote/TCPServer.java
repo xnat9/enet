@@ -1,6 +1,7 @@
 package cn.xnatural.enet.server.remote;
 
 import cn.xnatural.enet.common.Log;
+import cn.xnatural.enet.event.EC;
 import cn.xnatural.enet.event.EP;
 import cn.xnatural.enet.server.ServerTpl;
 import com.alibaba.fastjson.JSON;
@@ -81,7 +82,7 @@ class TCPServer extends ServerTpl {
 
 
     /**
-     * 创建监听
+     * 创建tcp(netty)服务端
      */
     protected void create() {
         if (port == null) {
@@ -172,32 +173,43 @@ class TCPServer extends ServerTpl {
     /**
      * 处理接收来自己客户端的数据
      * @param ctx
-     * @param dataStr
+     * @param dataStr 客户端发送过来的字符串
      */
     protected void handleReceive(ChannelHandlerContext ctx, String dataStr) {
         log.trace("Receive client '{}' data: {}", ctx.channel().remoteAddress(), dataStr);
         count(); // 统计
 
         JSONObject jo = JSON.parseObject(dataStr);
-        String from = jo.getString("source"); // 数据来源
+        String from = jo.getString("source"); // 数据来源(必须)
         if (isEmpty(from)) throw new IllegalArgumentException("Unknown source");
 
         String t = jo.getString("type");
         if ("event".equals(t)) {
             exec.execute(() -> {
-                if (Objects.equals(sysName, from)) log.warn("Invoke self. appName '{}'", from);
+                if (Objects.equals(sysName, from)) log.warn("Event request from same app. appName '{}'", from);
                 remoter.receiveEventReq(jo.getJSONObject("data"), o -> ctx.writeAndFlush(remoter.toByteBuf(o)));
             });
         } else if ("up".equals(t)) {// 应用注册在线通知
-            exec.execute(() -> appUp(jo.getJSONObject("data"), ctx));
+            exec.execute(() -> {
+                JSONObject d = null;
+                try { d = jo.getJSONObject("data"); appUp(d, ctx); }
+                catch (Exception ex) {
+                    log.error(ex, "Register up error!. data: {}", d);
+                }
+            });
         } else if ("cmd-log".equals(t)) { // 命令行设置日志等级
-            // telnet localhost 8080
+            // telnet localhost 8001
             // 例: {"type":"cmd-log", "source": "xxx", "data": "cn.xnatural.enet.server.remote: debug"}$_$
             exec.execute(() -> {
                 String[] arr = jo.getString("data").split(":");
                 Log.setLevel(arr[0].trim(), arr[1].trim());
                 ctx.writeAndFlush(Unpooled.copiedBuffer("set log level success", Charset.forName("utf-8")));
             });
+        } else if ("cmd-restart-server".equals(t)) {
+            // telnet localhost 8001
+            // 例: {"type":"cmd-restart-server", "source": "xxx", "data": "ehcache"}$_$
+            String sName = jo.getString("data");
+            ep.fire(sName+ ".stop", EC.of(this).completeFn(ec -> ep.fire(sName + ".start")));
         } else {
             ctx.close();
             log.error("Not support exchange data type '{}'", t);
@@ -212,7 +224,7 @@ class TCPServer extends ServerTpl {
      */
     protected boolean fusing(ChannelHandlerContext ctx) {
         if (connCount.get() >= getInteger("maxConnection", 100)) { // 最大连接
-            ctx.writeAndFlush(remoter.toByteBuf("server is busy"));
+            ctx.writeAndFlush(Unpooled.copiedBuffer("server is busy", Charset.forName("utf-8")));
             ctx.close();
             return true;
         }
@@ -229,32 +241,34 @@ class TCPServer extends ServerTpl {
         if (data.isEmpty()) { log.warn("Register data is empty"); return;}
         log.debug("Receive register up: {}", data);
         String appName = data.getString("name");
+        if (isEmpty(appName)) throw new IllegalArgumentException("app register up info bad data: have no property 'appName'");
         data.put("_time", System.currentTimeMillis());
         synchronized (appInfoMap) {
+            // 先删除之前的数据,再添加新的
             List<Map<String, Object>> apps = appInfoMap.computeIfAbsent(appName, s -> new LinkedList<>());
             for (Iterator<Map<String, Object>> it = apps.iterator(); it.hasNext(); ) {
                 if (Objects.equals(it.next().get("id"), data.get("id"))) {it.remove(); break;}
             }
             apps.add(data);
+            // 遍历所有的数据,删除不必要的数据
             for (Iterator<Map.Entry<String, List<Map<String, Object>>>> it = appInfoMap.entrySet().iterator(); it.hasNext(); ) {
                 Map.Entry<String, List<Map<String, Object>>> e = it.next();
                 List<Map<String, Object>> v = e.getValue();
                 if (v == null || v.isEmpty()) {it.remove(); continue;}
                 for (Iterator<Map<String, Object>> it2 = v.iterator(); it2.hasNext(); ) {
                     Map<String, Object> cur = it2.next();
-                    if (isEmpty(cur)) it2.remove();
-                    // 一段时间未上传则删除
-                    // dropAppTimeout 单位: 分钟
+                    if (isEmpty(cur)) it2.remove(); // 删除空的坏数据
+                    // 删除一段时间未上传的注册信息, dropAppTimeout 单位: 分钟
                     else if ((System.currentTimeMillis() - (Long) cur.getOrDefault("_time", System.currentTimeMillis()) > getInteger("dropAppTimeout", 30) * 60 * 1000) && !Objects.equals(cur.get("id"), remoter.tcpClient.id)) {
                         it2.remove();
                         log.warn("Drop timeout app register info: {}", cur);
                     }
                 }
-                if (v == null || v.isEmpty()) it.remove();
+                if (v == null || v.isEmpty()) it.remove(); // 删除没有对应的服务信息的应用
             }
 
-            // 添加
-            ep.fire("updateAppInfo", new Object[]{data});
+            ep.fire("updateAppInfo", data); // 同步信息给本服务器的tcp-client
+            // 返回所有的注册信息给客户端
             appInfoMap.forEach((s, ls) -> {
                 for (Map<String, Object> d : ls) {
                     if (!Objects.equals(d.get("id"), data.getString("id"))) {
@@ -277,7 +291,7 @@ class TCPServer extends ServerTpl {
         String hStr = sdf.format(new Date());
         LongAdder count = hourCount.get(hStr);
         if (count == null) {
-            synchronized (this) {
+            synchronized (hourCount) {
                 count = hourCount.get(hStr);
                 if (count == null) {
                     count = new LongAdder(); hourCount.put(hStr, count);

@@ -227,6 +227,13 @@ public class EC {
     public String id() {return this.id;}
 
 
+    /**
+     * 事件名 {@link #eName}
+     * @return
+     */
+    public String eName() {return this.eName;}
+
+
     public EC ex(Throwable t) {this.ex = t; return this;}
 
 

@@ -21,7 +21,7 @@ import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.Executor;
 import java.util.concurrent.ExecutorService;
-import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.concurrent.Executors;
 import java.util.function.Consumer;
 
 import static cn.xnatural.enet.common.Utils.isEmpty;
@@ -31,7 +31,6 @@ import static cn.xnatural.enet.common.Utils.isEmpty;
  * @author xiangxb, 2019-05-18
  */
 public class Remoter extends ServerTpl {
-    protected final AtomicBoolean   running = new AtomicBoolean(false);
     @Resource
     protected       Executor        exec;
     /**
@@ -55,16 +54,15 @@ public class Remoter extends ServerTpl {
 
     @EL(name = "sys.starting")
     public void start() {
-        if (!running.compareAndSet(false, true)) {
-            log.warn("{} Server is running", getName()); return;
-        }
-        if (ep == null) ep = new EP();
+        if (exec == null) exec = Executors.newFixedThreadPool(2);
+        if (ep == null) ep = new EP(exec);
         ep.fire(getName() + ".starting");
 
         if (!ep.exist("sched.after")) throw new RuntimeException("Need sched Server!");
 
         attrs.putAll((Map) ep.fire("env.ns", getName()));
         sysName = (String) ep.fire("sysName");
+        if (isEmpty(sysName)) throw new IllegalArgumentException("'sys.name' not config");
         delimiter = Unpooled.copiedBuffer(getStr("delimiter", "$_$").getBytes(Charset.forName("utf-8")));
 
         tcpClient = new TCPClient(this, ep, exec);
@@ -219,8 +217,9 @@ public class Remoter extends ServerTpl {
                 }
             }
         } catch (SocketException e) { log.error(e); }
-        return null;
+        return "";
     }
+
 
     /**
      * 判断系统是否为 linux 系统

@@ -66,8 +66,10 @@ class TCPClient extends ServerTpl {
     public void start() {
         attrs.putAll((Map) ep.fire("env.ns", getName()));
         rcAppName = getStr("registrationCenterAppName", "rc");
+        // 连接注册中心的的是大连接数:默认1个
         if (!attrs.containsKey(rcAppName + ".maxConnectionPerHp")) attr(rcAppName + ".maxConnectionPerHp", 1);
         id = getStr("id", remoter.sysName + "_" + UUID.randomUUID().toString()); // NOTE: 在整个集群中唯一
+        if (isEmpty(id)) throw new IllegalArgumentException(getName() + ".id can not must be empty");
         attrs.forEach((k, v) -> {
             if (k.endsWith(".hosts")) { // 例: app1.hosts=ip1:8201,ip2:8202,ip2:8203
                 String appName = k.split("\\.")[0].trim();
@@ -84,7 +86,7 @@ class TCPClient extends ServerTpl {
     protected void stop() {
         if (boos != null) boos.shutdownGracefully();
         boot = null;
-        appInfoMap = null;
+        appInfoMap.clear();
     }
 
 
@@ -108,38 +110,46 @@ class TCPClient extends ServerTpl {
      * 向注册服务注册自己
      */
     protected void register() {
-        AppInfo ai = appInfoMap.get(rcAppName); // 查找自己的注册中心服务
-        if (ai != null) { // 向服务中心注册自己
-            JSONObject data = collectData();
-            if (isNotEmpty(data)) {
+        Runnable loopFn = new Runnable() {
+            boolean printInfo = true; // 是否用 INFO日志等级打印注册成功信息
+            @Override
+            public void run() {
+                AppInfo ai = appInfoMap.get(rcAppName); // 查找自己的注册中心服务
+                if (ai == null) return;
+                JSONObject data = collectData();
+                if (isEmpty(data)) return;
+                // 异常处理
+                Consumer<Throwable> exHandler = ex -> {
+                    log.warn("Register Fail to rc server '{}'. errMsg: {}", ai.name, (isEmpty(ex.getMessage()) ? ex.getClass().getName() : ex.getMessage()));
+                    printInfo = true; // 发送失败后的下一次成功,打印发送成功的日志信息
+                    ep.fire("sched.after", Duration.ofSeconds(new Random().nextInt(getInteger("upFailIntervalRange", 30)) + getInteger("upFailIntervalMin", 30)), this);
+                };
                 try {
+                    // 向注册中心发送注册信息(本系统信息)
                     send(ai.name, new JSONObject(3).fluentPut("type", "up").fluentPut("source", remoter.sysName).fluentPut("data", data), ex -> {
-                        if (ex != null) {
-                            log.warn("Register Fail to rc server '{}'. errMsg: {}", ai.name, ex.getMessage());
-                            ep.fire("sched.after", Duration.ofSeconds(30), (Runnable) () -> register());
-                        } else {
-                            log.info("Register up self '{}' to '{}'. info: {}", remoter.sysName, ai.name + ai.hps, data);
+                        if (ex != null) { exHandler.accept(ex); } // 发送失败
+                        else {
+                            log.doLog(null, (printInfo ? Level.INFO : Level.DEBUG), "Register up self '{}' to '{}'. info: {}", remoter.sysName, ai.name + ai.hps, data);
+                            printInfo = false;
                         }
                     });
                     // 每隔一段时间,都去注册下自己
-                    ep.fire("sched.after", Duration.ofSeconds(getInteger("upInterval", new Random().nextInt(getInteger("upIntervalRange", 100)) + getInteger("upIntervalMin", 60))), (Runnable) () -> register());
-                } catch (Throwable ex) {
-                    log.warn("Register Fail to rc server '{}'. errMsg: {}", ai.name, ex.getMessage());
-                    ep.fire("sched.after", Duration.ofSeconds(new Random().nextInt(getInteger("upFailIntervalRange", 30)) + getInteger("upFailIntervalMin", 30)), (Runnable) () -> register());
-                }
+                    ep.fire("sched.after", (Duration.ofSeconds(getInteger("upInterval", new Random().nextInt(getInteger("upIntervalRange", 100)) + getInteger("upIntervalMin", 60)))), this);
+                } catch (Throwable ex) { exHandler.accept(ex); }
             }
-        }
+        };
+        loopFn.run();
     }
 
 
     /**
-     * 更新app 信息
-     * @param data app信息
+     * 更新 app 信息
+     * @param data app信息.例: {"tcp":"192.168.56.1:8001","name":"rc","http":"localhost:8000","id":"rc_b70d18d5-2269-4512-91ea-6380325e2a84"}
      */
     @EL(name = "updateAppInfo")
     protected void updateAppInfo(JSONObject data) {
         log.trace("Update app info: {}", data);
-        if (Objects.equals(id, data.getString("id"))) return;
+        if (Objects.equals(id, data.getString("id"))) return; // 不把系统本身的信息放进去
         String appName = data.getString("name");
         AppInfo app = Optional.ofNullable(appInfoMap.get(appName)).orElseGet(() -> {
             AppInfo o;
@@ -151,11 +161,14 @@ class TCPClient extends ServerTpl {
             }
             return o;
         });
+
+        // 更新tcp连接配置的信息
         String tcpHps = data.getString("tcp");
         if (isNotEmpty(tcpHps)) {
             Set<String> add = Arrays.stream(tcpHps.split(","))
                 .filter(hp -> hp != null).map(hp -> hp.trim())
                 .filter(hp -> !hp.isEmpty() && !app.hps.contains(hp))
+                .filter(hp -> !collectData().getString("tcp").contains(hp)) // 不要和本系统的tcp相同的配置
                 .collect(Collectors.toSet());
             if (!add.isEmpty()) {
                 try {
@@ -167,6 +180,8 @@ class TCPClient extends ServerTpl {
                 }
             }
         }
+
+        // TODO 更新http连接信息
     }
 
 
@@ -218,7 +233,7 @@ class TCPClient extends ServerTpl {
 
 
     /**
-     * 为每个连接配置 适配 连接
+     * 为每个连接配置(hp:(host:port)) 适配 连接
      * @param appInfo 应用名
      * @param once 是否创建一条连接就立即返回
      */
@@ -236,11 +251,9 @@ class TCPClient extends ServerTpl {
                 if (isBlank(hp) || !hp.contains(":")) {
                     log.warn("Config error {}", appInfo.hps); continue;
                 }
-                AtomicInteger count = appInfo.hpChannelCount.get(hp);
-                if (count == null) { count = new AtomicInteger(0); appInfo.hpChannelCount.put(hp, count); }
-                if (count.get() >= maxConnectionPerHp) continue;
-                LinkedList<Long> errRecord = appInfo.hpErrorRecord.get(hp);
-                if (errRecord == null) { errRecord = new LinkedList<>(); appInfo.hpErrorRecord.put(hp, errRecord); }
+                AtomicInteger count = appInfo.hpChannelCount.computeIfAbsent(hp, s -> new AtomicInteger(0));
+                if (count.get() >= maxConnectionPerHp) continue; // 连接个数据大于等于最大连接数,就不创建新连接了
+                LinkedList<Long> errRecord = appInfo.hpErrorRecord.computeIfAbsent(hp, s -> new LinkedList<>());
                 Long lastRefuse = errRecord.peekFirst(); // 上次被连接被拒时间
                 if (!once && lastRefuse != null && (System.currentTimeMillis() - lastRefuse < 2000)) { // 距上次连接被拒还没超过2秒, 则不必再连接
                     continue;
@@ -273,7 +286,7 @@ class TCPClient extends ServerTpl {
 
 
     /**
-     * 创建客户端
+     * 创建 tcp(netty) 客户端
      */
     protected void create() {
         String loopType = getStr("loopType", (remoter.isLinux() ? "epoll" : "nio"));
@@ -334,8 +347,8 @@ class TCPClient extends ServerTpl {
             exec.execute(() -> remoter.receiveEventResp(jo.getJSONObject("data")));
         } else if ("updateAppInfo".equals(type)) {
             exec.execute(() -> {
-                JSONObject d = jo.getJSONObject("data");
-                try { updateAppInfo(d); }
+                JSONObject d = null;
+                try { d = jo.getJSONObject("data"); updateAppInfo(d); }
                 catch (Exception ex) {
                     log.error(ex, "updateAppInfo error. data: {}", d);
                 }
@@ -413,10 +426,12 @@ class TCPClient extends ServerTpl {
 
     /**
      * 收集本系统信息
+     * 例: {"tcp":"192.168.56.1:8001","name":"rc","http":"localhost:8000","id":"rc_b70d18d5-2269-4512-91ea-6380325e2a84"}
      * @return
      */
     protected JSONObject collectData() {
         JSONObject data = new JSONObject(3);
+        // 例: localhost:8080
         Optional.ofNullable(ep.fire("http.getHp")).filter(o -> isNotEmpty((String) o)).ifPresent(hp -> data.put("http", hp));
         Optional.ofNullable(remoter.tcpServer.port).ifPresent(port -> {
             Set<String> addrs = remoter.tcpServer.boundAddrs;

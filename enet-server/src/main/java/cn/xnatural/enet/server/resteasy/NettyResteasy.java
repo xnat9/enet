@@ -9,6 +9,7 @@ import io.netty.channel.ChannelHandlerContext;
 import io.netty.channel.ChannelPipeline;
 import io.netty.handler.codec.http.DefaultHttpResponse;
 import io.netty.handler.codec.http.HttpVersion;
+import org.apache.commons.lang3.time.DateUtils;
 import org.jboss.resteasy.core.InjectorFactoryImpl;
 import org.jboss.resteasy.core.SynchronousDispatcher;
 import org.jboss.resteasy.core.ValueInjector;
@@ -23,15 +24,11 @@ import javax.ws.rs.core.Cookie;
 import javax.ws.rs.core.NewCookie;
 import javax.ws.rs.ext.Provider;
 import java.io.IOException;
-import java.util.LinkedList;
-import java.util.List;
-import java.util.Map;
-import java.util.UUID;
-import java.util.concurrent.Executor;
-import java.util.concurrent.ExecutorService;
-import java.util.concurrent.Executors;
-import java.util.concurrent.TimeUnit;
+import java.text.SimpleDateFormat;
+import java.util.*;
+import java.util.concurrent.*;
 import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.concurrent.atomic.LongAdder;
 
 import static cn.xnatural.enet.common.Utils.*;
 import static io.netty.handler.codec.http.HttpResponseStatus.SERVICE_UNAVAILABLE;
@@ -93,7 +90,7 @@ public class NettyResteasy extends ServerTpl {
         // 初始化请求执行控制器
         devourer = new Devourer(getClass().getSimpleName(), exec);
         devourer.pause(() -> {
-            // 避免让线程池里面全是请求任务在执行
+            // 判断线程池里面等待执行的任务是否过多(避免让线程池里面全是请求任务在执行)
             if (toInteger(invoke(findMethod(exec.getClass(), "getWaitingCount"), exec), 0) >
                 Math.min(Runtime.getRuntime().availableProcessors(), toInteger(invoke(findMethod(exec.getClass(), "getCorePoolSize"), exec), 4) * 2)
             ) return true;
@@ -126,12 +123,12 @@ public class NettyResteasy extends ServerTpl {
             @Override
             protected void channelRead0(ChannelHandlerContext ctx, Object msg) {
                 int i = devourer.getWaitingCount();
-                // 默认值: 线程池的线程个数的3倍
+                // 当请求对列中等待处理的请求过多就拒绝新的请求(默认值: 线程池的线程个数的3倍)
                 if (i >= getInteger("maxWaitRequest", toInteger(invoke(findMethod(exec.getClass(), "getCorePoolSize"), exec), 10) * 3)) {
                     if (i > 0 && i % 3 == 0) log.warn("There are currently {} requests waiting to be processed.", i);
                     ctx.writeAndFlush(new DefaultHttpResponse(HttpVersion.HTTP_1_1, SERVICE_UNAVAILABLE));
                 } else {
-                    devourer.offer(() -> exec.execute(() -> process(ctx, msg)));
+                    devourer.offer(() -> exec.execute(() -> {count(); process(ctx, msg);}));
                 }
             }
         });
@@ -307,9 +304,37 @@ public class NettyResteasy extends ServerTpl {
     protected Object createAndInitSource(Class clz) throws Exception {
         Object o = clz.newInstance(); ep.fire("inject", o); // 注入@Resource注解的字段
         // 调用 PostConstruct 方法
-        invoke(findMethod(clz, mm -> mm.getAnnotation(PostConstruct.class) != null), o);
+        invoke(findMethod(clz, m -> m.getAnnotation(PostConstruct.class) != null), o);
 
         return o;
+    }
+
+
+    /**
+     * 统计每小时的处理 http 请求个数
+     * MM-dd HH -> 个数
+     */
+    protected Map<String, LongAdder> hourCount = new ConcurrentHashMap<>(3);
+    protected void count() {
+        SimpleDateFormat sdf = new SimpleDateFormat("MM-dd HH");
+        boolean isNew = false;
+        String hStr = sdf.format(new Date());
+        LongAdder count = hourCount.get(hStr);
+        if (count == null) {
+            synchronized (hourCount) {
+                count = hourCount.get(hStr);
+                if (count == null) {
+                    count = new LongAdder(); hourCount.put(hStr, count);
+                    isNew = true;
+                }
+            }
+        }
+        count.increment();
+        if (isNew) {
+            String lastHour = sdf.format(DateUtils.addHours(new Date(), -1));
+            LongAdder c = hourCount.remove(lastHour);
+            if (c != null) log.info("{} 时共处理 http 请求: {} 个", lastHour, c);
+        }
     }
 
 

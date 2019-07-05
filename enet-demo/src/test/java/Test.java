@@ -45,7 +45,8 @@ public class Test {
         ExecutorService exec = Executors.newFixedThreadPool(threadCnt);
         final AtomicBoolean stop = new AtomicBoolean(false);
         for (int i = 0; i < threadCnt; i++) {
-            String url = urlPrefix + "/remote?app=app" + (new Random().nextInt(3) + 2) + "&eName=eName" + (new Random().nextInt(5) + 1) + "&ret=" + i;
+            String url = urlPrefix + "/remote?app=rc&eName=eName" + (new Random().nextInt(5) + 1) + "&ret=" + i;
+//            String url = urlPrefix;
 //            if (i % 2 == 0) url += "/dao";
 //            else if (i % 5 == 0) url += "/session";
 //            else if (i % 3 == 0) url += "/remote?app=app" + new Random().nextInt(3) + "&eName=eName1&ret=" + i;
@@ -70,8 +71,8 @@ public class Test {
                 }
             });
         }
-        Thread.sleep(TimeUnit.MINUTES.toMillis(10)); // 压测时间
-        // client.dispatcher().cancelAll();
+        Thread.sleep(TimeUnit.SECONDS.toMillis(10)); // 压测时间
+        client.dispatcher().cancelAll();
         // client.dispatcher().queuedCalls().forEach(call -> call.cancel());
         // client.dispatcher().executorService().shutdown();
         stop.set(true);

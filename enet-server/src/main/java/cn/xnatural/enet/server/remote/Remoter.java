@@ -98,9 +98,9 @@ public class Remoter extends ServerTpl {
         if (tcpClient == null) throw new RuntimeException(getName() + " not is running");
         if (appName == null) throw new IllegalArgumentException("appName is empty");
         ec.suspend();
+        JSONObject params = new JSONObject(4);
         try {
             if (isEmpty(ec.id())) ec.id(UUID.randomUUID().toString());
-            JSONObject params = new JSONObject(4);
             params.put("eId", ec.id());
             // 是否需要远程响应执行结果(有完成回调函数就需要远程响应调用结果)
             boolean reply = ec.completeFn() != null;
@@ -115,22 +115,28 @@ public class Remoter extends ServerTpl {
                 }
             }
             if (reply) ecMap.put(ec.id(), ec);
-            log.debug("Fire remote event to '{}'. params: {}", appName, params);
 
             // 发送请求给远程应用appName执行. 消息类型为: 'event'
             JSONObject data = new JSONObject(3).fluentPut("type", "event").fluentPut("source", sysName).fluentPut("data", params);
             tcpClient.send(appName, data, ex -> {
-                if (ex == null && reply) { // 数据发送成功. 如果需要响应, 则添加等待响应超时处理
-                    ep.fire("sched.after", Duration.ofSeconds(getInteger("eventTimeout", 17)), (Runnable) () -> {
-                        EC e = ecMap.remove(ec.id());
-                        if (e != null) { e.errMsg("Timeout").resume().tryFinish(); }
-                    });
+                if (ex == null) {
+                    if (reply) { // 数据发送成功. 如果需要响应, 则添加等待响应超时处理
+                        ep.fire("sched.after", Duration.ofSeconds(getInteger("eventTimeout", 17)), (Runnable) () -> {
+                            EC e = ecMap.remove(ec.id());
+                            if (e != null) { e.errMsg("'" + eName + "' Timeout").resume().tryFinish(); }
+                        });
+                    }
+                    log.debug("Fire remote event to '{}'. params: {}", appName, params);
                 } else if (ex != null) { // 数据发送失败
                     ecMap.remove(ec.id());
+                    log.error(ex, "Error fire remote event to '{}'. params: {}", appName, params);
                     ec.ex(ex).resume().tryFinish();
                 }
             });
-        } catch (Throwable ex) { ecMap.remove(ec.id()); ec.resume(); throw ex; }
+        } catch (Throwable ex) {
+            log.error(ex, "Error fire remote event to '{}'. params: {}", appName, params);
+            ecMap.remove(ec.id()); ec.resume(); throw ex;
+        }
     }
 
 

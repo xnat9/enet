@@ -1,5 +1,6 @@
 package cn.xnatural.enet.server.remote;
 
+import cn.xnatural.enet.common.Devourer;
 import cn.xnatural.enet.common.Log;
 import cn.xnatural.enet.event.EC;
 import cn.xnatural.enet.event.EP;
@@ -56,6 +57,8 @@ class TCPServer extends ServerTpl {
      */
     protected       Map<String, List<Map<String, Object>>> appInfoMap = new ConcurrentHashMap<>();
     protected       Set<String>                            boundAddrs;
+    protected       Devourer                               upDevourer;
+
 
 
     public TCPServer(Remoter remoter, EP ep, Executor exec) {
@@ -184,20 +187,27 @@ class TCPServer extends ServerTpl {
         if (isEmpty(from)) throw new IllegalArgumentException("Unknown source");
 
         String t = jo.getString("type");
-        if ("event".equals(t)) {
+        if ("event".equals(t)) { // 远程事件请求
             exec.execute(() -> {
                 if (Objects.equals(sysName, from)) log.warn("Event request from same app. appName '{}'", from);
                 remoter.receiveEventReq(jo.getJSONObject("data"), o -> ctx.writeAndFlush(remoter.toByteBuf(o)));
             });
-        } else if ("up".equals(t)) {// 应用注册在线通知
-            exec.execute(() -> {
+        } else if ("up".equals(t)) { // 应用注册在线通知
+            if (upDevourer == null) {
+                synchronized (this) {
+                    if (upDevourer == null) {
+                        upDevourer = new Devourer("registerUp", exec);
+                    }
+                }
+            }
+            upDevourer.offer(() -> {
                 JSONObject d = null;
                 try { d = jo.getJSONObject("data"); appUp(d, ctx); }
                 catch (Exception ex) {
                     log.error(ex, "Register up error!. data: {}", d);
                 }
             });
-        } else if ("cmd-log".equals(t)) { // 命令行设置日志等级
+        } else if ("cmd-log".equals(t)) { // telnet 命令行设置日志等级
             // telnet localhost 8001
             // 例: {"type":"cmd-log", "source": "xxx", "data": "cn.xnatural.enet.server.remote: debug"}$_$
             exec.execute(() -> {
@@ -205,7 +215,7 @@ class TCPServer extends ServerTpl {
                 Log.setLevel(arr[0].trim(), arr[1].trim());
                 ctx.writeAndFlush(Unpooled.copiedBuffer("set log level success", Charset.forName("utf-8")));
             });
-        } else if ("cmd-restart-server".equals(t)) {
+        } else if ("cmd-restart-server".equals(t)) { // telnet 命令行重启某个服务
             // telnet localhost 8001
             // 例: {"type":"cmd-restart-server", "source": "xxx", "data": "ehcache"}$_$
             String sName = jo.getString("data");
@@ -243,39 +253,45 @@ class TCPServer extends ServerTpl {
         String appName = data.getString("name");
         if (isEmpty(appName)) throw new IllegalArgumentException("app register up info bad data: have no property 'appName'");
         data.put("_time", System.currentTimeMillis());
-        synchronized (appInfoMap) {
-            // 先删除之前的数据,再添加新的
-            List<Map<String, Object>> apps = appInfoMap.computeIfAbsent(appName, s -> new LinkedList<>());
-            for (Iterator<Map<String, Object>> it = apps.iterator(); it.hasNext(); ) {
-                if (Objects.equals(it.next().get("id"), data.get("id"))) {it.remove(); break;}
-            }
-            apps.add(data);
-            // 遍历所有的数据,删除不必要的数据
-            for (Iterator<Map.Entry<String, List<Map<String, Object>>>> it = appInfoMap.entrySet().iterator(); it.hasNext(); ) {
-                Map.Entry<String, List<Map<String, Object>>> e = it.next();
-                List<Map<String, Object>> v = e.getValue();
-                if (v == null || v.isEmpty()) {it.remove(); continue;}
-                for (Iterator<Map<String, Object>> it2 = v.iterator(); it2.hasNext(); ) {
-                    Map<String, Object> cur = it2.next();
-                    if (isEmpty(cur)) it2.remove(); // 删除空的坏数据
-                    // 删除一段时间未上传的注册信息, dropAppTimeout 单位: 分钟
-                    else if ((System.currentTimeMillis() - (Long) cur.getOrDefault("_time", System.currentTimeMillis()) > getInteger("dropAppTimeout", 30) * 60 * 1000) && !Objects.equals(cur.get("id"), remoter.tcpClient.id)) {
-                        it2.remove();
-                        log.warn("Drop timeout app register info: {}", cur);
-                    }
-                }
-                if (v == null || v.isEmpty()) it.remove(); // 删除没有对应的服务信息的应用
-            }
 
-            ep.fire("updateAppInfo", data); // 同步信息给本服务器的tcp-client
-            // 返回所有的注册信息给客户端
-            appInfoMap.forEach((s, ls) -> {
-                for (Map<String, Object> d : ls) {
-                    if (!Objects.equals(d.get("id"), data.getString("id"))) {
-                        ctx.writeAndFlush(remoter.toByteBuf(new JSONObject(2).fluentPut("type", "updateAppInfo").fluentPut("data", d)));
-                    }
+        //1. 先删除之前的数据,再添加新的
+        boolean isNew = true;
+        List<Map<String, Object>> apps = appInfoMap.computeIfAbsent(appName, s -> new LinkedList<>());
+        for (Iterator<Map<String, Object>> it = apps.iterator(); it.hasNext(); ) {
+            if (Objects.equals(it.next().get("id"), data.get("id"))) {it.remove(); isNew = false; break;}
+        }
+        apps.add(data);
+        if (isNew) log.info("New app '{}' online. {}", appName, data);
+
+        //2. 遍历所有的数据,删除不必要的数据
+        for (Iterator<Map.Entry<String, List<Map<String, Object>>>> it = appInfoMap.entrySet().iterator(); it.hasNext(); ) {
+            Map.Entry<String, List<Map<String, Object>>> e = it.next();
+            List<Map<String, Object>> v = e.getValue();
+            if (v == null || v.isEmpty()) {it.remove(); continue;}
+            for (Iterator<Map<String, Object>> it2 = v.iterator(); it2.hasNext(); ) {
+                Map<String, Object> cur = it2.next();
+                if (isEmpty(cur)) it2.remove(); // 删除空的坏数据
+                    // 删除一段时间未上传的注册信息, dropAppTimeout 单位: 分钟
+                else if ((System.currentTimeMillis() - (Long) cur.getOrDefault("_time", System.currentTimeMillis()) > getInteger("dropAppTimeout", 30) * 60 * 1000) && !Objects.equals(cur.get("id"), remoter.tcpClient.id)) {
+                    it2.remove();
+                    log.warn("Drop timeout app register info: {}", cur);
                 }
-            });
+            }
+            if (v == null || v.isEmpty()) it.remove(); // 删除没有对应的服务信息的应用
+        }
+
+        //3. 同步注册信息给客户端
+        ep.fire("updateAppInfo", data); // 同步信息给本服务器的tcp-client
+        for (Map.Entry<String, List<Map<String, Object>>> e : appInfoMap.entrySet()) {
+            if (isNew && !Objects.equals(appName, e.getKey())) {
+                // 如果是新系统上线, 则主动通知其它系统(NOTE:如果有多个相同app时, 只能通知到其中一个)
+                ep.fire("remote", e.getKey(), "updateAppInfo", new Object[]{data});
+            }
+            for (Map<String, Object> d : e.getValue()) { // 返回所有的注册信息给当前来注册的客户端
+                if (!Objects.equals(d.get("id"), data.getString("id"))) {
+                    ctx.writeAndFlush(remoter.toByteBuf(new JSONObject(2).fluentPut("type", "updateAppInfo").fluentPut("data", d)));
+                }
+            }
         }
     }
 

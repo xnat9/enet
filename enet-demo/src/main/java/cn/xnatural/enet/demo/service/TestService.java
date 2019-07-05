@@ -10,7 +10,6 @@ import cn.xnatural.enet.event.EC;
 import cn.xnatural.enet.event.EL;
 import cn.xnatural.enet.server.ServerTpl;
 import cn.xnatural.enet.server.dao.hibernate.Trans;
-import com.alibaba.fastjson.JSON;
 
 import javax.annotation.Resource;
 import java.text.SimpleDateFormat;
@@ -63,33 +62,30 @@ public class TestService extends ServerTpl {
         e.setAge(111);
         TestEntity t = testRepo.saveOrUpdate(e);
         // if (true) throw new IllegalArgumentException("xxx");
-        return "save" + t.getName();
+        return "new entity : " + t.getId();
     }
 
 
     @EL(name = "eName2", async = false)
-    private String testEvent2(String p) {
-        return "get1" + JSON.toJSONString(testRepo.findPage(0, 1, (root, query, cb) -> {query.orderBy(cb.desc(root.get("id"))); return null;}));
+    private Object testEvent2(String p) {
+        return testRepo.findPage(0, 20, (root, query, cb) -> {query.orderBy(cb.desc(root.get("id"))); return null;});
     }
 
 
     @EL(name = "eName3", async = false)
-    private String testEvent3(String p) {
-        long l = testRepo.count((root, query, cb) -> {query.orderBy(cb.desc(root.get("id"))); return null;});
-        return "count_" + l;
+    private long testEvent3(String p) {
+        return testRepo.count((root, query, cb) -> {query.orderBy(cb.desc(root.get("id"))); return null;});
     }
 
 
     @EL(name = "eName4", async = false)
-    private String testEvent4(String p) {
-        Object o = ep.fire("cache.get","java","java");
-        return "getcache_" + o;
+    private Object testEvent4(String p) {
+        return ep.fire("cache.get","java","java");
     }
 
 
     @EL(name = "eName5", async = false)
-    private String testEvent5(String p) {
-        ep.fire("cache.add","java","java", p);
-        return "addcache: " + p;
+    private void testEvent5(String p) {
+        ep.fire("cache.set","java","java", p);
     }
 }

@@ -60,7 +60,7 @@ public class SchedServer extends ServerTpl {
 
     @EL(name = "sys.stopping")
     public void stop() {
-        log.info("Shutdown '{}(Quartz)' Server", getName());
+        log.debug("Shutdown '{}(Quartz)' Server", getName());
         try {
             if (scheduler != null) scheduler.shutdown();
         } catch (SchedulerException e) {

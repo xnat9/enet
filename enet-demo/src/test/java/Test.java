@@ -2,6 +2,8 @@ import cn.xnatural.enet.common.Log;
 import okhttp3.*;
 import okhttp3.internal.Util;
 
+import javax.script.ScriptEngine;
+import javax.script.ScriptEngineManager;
 import java.io.IOException;
 import java.time.Duration;
 import java.util.*;
@@ -15,9 +17,16 @@ public class Test {
     }
 
     public static void main(String[] args) throws Throwable {
-        //System.out.println((UUID.randomUUID().toString().replaceAll("-", "")).length());
-         压测();
+         // 压测();
+        groovyTest();
     }
+
+    static void groovyTest() throws Throwable {
+        ScriptEngineManager sem = new ScriptEngineManager();
+        ScriptEngine engine = sem.getEngineByName("groovy");
+        engine.eval("println 'xxx'");
+    }
+
 
     static void 压测() throws Throwable {
         OkHttpClient client = new OkHttpClient.Builder()

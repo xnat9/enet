@@ -17,14 +17,16 @@
 
     <dependencies>
         <dependency>
-            <groupId>cn.xnatural.enet</groupId>
-            <artifactId>enet-event</artifactId>
-            <version>0.0.9</version>
+            <groupId>cn.xnatural.enet</groupId><artifactId>enet-event</artifactId><version>0.0.9</version>
         </dependency>
         <dependency>
-            <groupId>ch.qos.logback</groupId>
-            <artifactId>logback-classic</artifactId>
-            <version>1.2.3</version>
+            <groupId>ch.qos.logback</groupId><artifactId>logback-classic</artifactId><version>1.2.3</version>
+        </dependency>
+        <dependency>
+            <groupId>org.codehaus.groovy</groupId> <artifactId>groovy</artifactId> <version>2.5.7</version>
+        </dependency>
+        <dependency>
+            <groupId>org.codehaus.groovy</groupId> <artifactId>groovy-jsr223</artifactId> <version>2.5.7</version>
         </dependency>
     </dependencies>
 

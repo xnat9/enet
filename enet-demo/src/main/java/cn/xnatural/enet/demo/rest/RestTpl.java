@@ -1,6 +1,7 @@
 package cn.xnatural.enet.demo.rest;
 
 import cn.xnatural.enet.common.Log;
+import cn.xnatural.enet.core.GroovyEngine;
 import cn.xnatural.enet.demo.rest.request.AddFileDto;
 import cn.xnatural.enet.demo.service.FileUploader;
 import cn.xnatural.enet.demo.service.TestService;
@@ -53,6 +54,26 @@ public class RestTpl extends ServerTpl {
     @EL(name = "sys.started")
     public void init() {
         attrs.putAll((Map<? extends String, ?>) ep.fire("env.ns", "mvc"));
+    }
+
+
+    @Resource
+    GroovyEngine ge;
+
+    @GET
+    @Path("groovy")
+    @Produces("application/json")
+    public ApiResp groovy() {
+        // 执行某个文件脚本
+        ep.fire("groovy.script", "test.groovy");
+        ge.script("test.groovy", script -> script.run());
+        // ge.script("text.groovy", script -> script.invokeMethod("aa", "xx")); // 执行文件脚本中的某个方法
+
+        // 执行一段脚本代码
+        ep.fire("groovy.eval", "log.info('groovy eval')");
+        ge.eval("ep.fire('eName2', 'xx')", script -> script.run());
+        ge.eval("def aa() {println 'aa'}", script -> script.invokeMethod("aa", null)); // 执行脚本代码中的aa方法
+        return ok();
     }
 
 

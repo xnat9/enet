@@ -256,6 +256,9 @@ public class AppContext {
 
         // 3. 添加 ep 跟踪事件
         ep.addTrackEvent(env.getString("ep.track", "").split(","));
+
+        // 4. 初始化groovy执行引擎
+        if (env().getBoolean("groovy.enabled", true)) addSource(new GroovyEngine());
     }
 
 

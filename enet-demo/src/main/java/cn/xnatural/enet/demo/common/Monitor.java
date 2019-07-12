@@ -28,9 +28,7 @@ public @interface Monitor {
      */
     boolean trace() default false;
 
-    boolean printArgs() default true;
-
-    String logPrefix() default "METHOD PROCESS MONITOR: ";
+    String logPrefix() default "[METHOD PROCESS MONITOR]: ";
 
     String logSuffix() default "";
 }

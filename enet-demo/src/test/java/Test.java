@@ -6,7 +6,10 @@ import javax.script.ScriptEngine;
 import javax.script.ScriptEngineManager;
 import java.io.IOException;
 import java.time.Duration;
-import java.util.*;
+import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Random;
 import java.util.concurrent.*;
 import java.util.concurrent.atomic.AtomicBoolean;
 
@@ -18,13 +21,6 @@ public class Test {
 
     public static void main(String[] args) throws Throwable {
          // 压测();
-        groovyTest();
-    }
-
-    static void groovyTest() throws Throwable {
-        ScriptEngineManager sem = new ScriptEngineManager();
-        ScriptEngine engine = sem.getEngineByName("groovy");
-        engine.eval("println 'xxx'");
     }
 
 

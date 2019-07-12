@@ -56,6 +56,12 @@ public class GroovyEngine {
     }
 
 
+    /**
+     * 执行一段脚本代码
+     * @param scriptText 脚本代码
+     * @param fn 消费脚本函数
+     * @return 当fn为空时,默认执行脚本并返回结果
+     */
     @EL(name = {"groovy.eval"}, async = false)
     public Object eval(String scriptText, Consumer<Script> fn) {
         Script script = InvokerHelper.createScript(gcl.parseClass(scriptText, genScriptName()), new Binding(new LinkedHashMap(bindAttr)));
@@ -65,13 +71,19 @@ public class GroovyEngine {
     }
 
 
+    /**
+     * 执行一个脚本文件
+     * @param scriptFile 脚本文件名
+     * @param fn 消费脚本函数
+     * @return 当fn为空时,默认执行脚本并返回结果
+     */
     @EL(name = {"groovy.script"}, async = false)
     public Object script(String scriptFile, Consumer<Script> fn) {
-        Script script = null;
+        Script script;
         try {
             script = InvokerHelper.createScript(gse.loadScriptByName(scriptFile), new Binding(new LinkedHashMap(bindAttr)));
         } catch (Exception e) { throw new RuntimeException(e); }
-        if (fn == null) script.run(); // 默认执行
+        if (fn == null) return script.run(); // 默认执行
         else fn.accept(script);
         return null;
     }

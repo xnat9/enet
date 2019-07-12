@@ -10,7 +10,6 @@ import cn.xnatural.enet.server.ServerTpl;
 import cn.xnatural.enet.server.resteasy.SessionAttr;
 import cn.xnatural.enet.server.resteasy.SessionId;
 import com.alibaba.fastjson.JSON;
-import com.mongodb.MongoClient;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
 import org.apache.commons.lang3.BooleanUtils;
@@ -138,10 +137,11 @@ public class RestTpl extends ServerTpl {
     @GET
     @Path("mongo")
     @Produces("application/json")
-    public Object mongo() {
-        MongoClient c = bean(MongoClient.class);
-        // return c == null ? "" : c.getDatabase("cenarius").getCollection("config_list").find().first().toJson();
-        return c == null ? "" : c.getDatabase("gsis").getCollection("cidtb").find().first().toJson();
+    public ApiResp mongo() {
+//        MongoClient c = bean(MongoClient.class);
+//        // return c == null ? "" : c.getDatabase("cenarius").getCollection("config_list").find().first().toJson();
+//        return c == null ? "" : c.getDatabase("gsis").getCollection("cidtb").find().first().toJson();
+        return ok();
     }
 
 

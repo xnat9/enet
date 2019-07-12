@@ -1,7 +1,6 @@
 package cn.xnatural.enet.demo;
 
 
-import cn.xnatural.enet.common.Utils;
 import cn.xnatural.enet.core.AppContext;
 import cn.xnatural.enet.demo.common.Async;
 import cn.xnatural.enet.demo.common.Monitor;
@@ -14,8 +13,6 @@ import cn.xnatural.enet.event.EL;
 import cn.xnatural.enet.server.ServerTpl;
 import cn.xnatural.enet.server.cache.ehcache.EhcacheServer;
 import cn.xnatural.enet.server.dao.hibernate.Hibernate;
-import cn.xnatural.enet.server.dao.hibernate.Trans;
-import cn.xnatural.enet.server.dao.hibernate.TransWrapper;
 import cn.xnatural.enet.server.http.netty.NettyHttp;
 import cn.xnatural.enet.server.mview.MViewServer;
 import cn.xnatural.enet.server.remote.Remoter;
@@ -26,14 +23,13 @@ import cn.xnatural.enet.server.session.RedisSessionManager;
 import cn.xnatural.enet.server.swagger.OpenApiDoc;
 
 import javax.annotation.Resource;
-import java.lang.annotation.Annotation;
 import java.lang.reflect.Method;
-import java.util.*;
+import java.util.Arrays;
+import java.util.Map;
+import java.util.Objects;
 import java.util.concurrent.Executor;
 import java.util.function.Function;
 import java.util.function.Supplier;
-
-import static cn.xnatural.enet.common.Utils.proxy;
 
 /**
  * @author xiangxb, 2018-12-22
@@ -69,16 +65,16 @@ public class Launcher extends ServerTpl {
      * 环境配置完成后执行
      */
     @EL(name = "env.configured", async = false)
-    private void envConfigured() {
+    void envConfigured() {
         if (ctx.env().getBoolean("session.enabled", false)) {
             String t = ctx.env().getString("session.type", "memory");
             // 根据配置来启动用什么session管理
             if ("memory".equalsIgnoreCase(t)) ctx.addSource(new MemSessionManager());
             else if ("redis".equalsIgnoreCase(t)) ctx.addSource(new RedisSessionManager());
         }
-        Function<Class<?>, ?> wrap = createAopFn();
-        ctx.addSource(wrap.apply(TestService.class));
-        ctx.addSource(wrap.apply(FileUploader.class));
+        createAopFn();
+        ctx.addSource(TestService.class);
+        ctx.addSource(FileUploader.class);
     }
 
 
@@ -86,28 +82,23 @@ public class Launcher extends ServerTpl {
      * 创建aop函数
      * @return
      */
-    private Function<Class<?>, ?> createAopFn() {
-        abstract class AopFnCreator {
-            abstract Supplier<Object> create(Method m, Object[] args, Supplier<Object> fn);
-        }
-        // 注解->注解的逻辑Creator
-        Map<Class, AopFnCreator> aopFnCreator = new HashMap<>();
-        aopFnCreator.put(Trans.class, new AopFnCreator() { // 事务方法拦截
+    void createAopFn() {
+        ep.fire("addAop", Async.class, new Function<Map, Supplier>() {
             @Override
-            Supplier<Object> create(Method m, Object[] args, Supplier<Object> fn) {
-                return () -> bean(TransWrapper.class).trans(fn);
-            }
-        });
-        aopFnCreator.put(Async.class, new AopFnCreator() { // 异步方法拦截
-            @Override
-            Supplier<Object> create(Method m, Object[] args, Supplier<Object> fn) {
-                return () -> { exec.execute(fn::get); return null; };
-            }
-        });
-        aopFnCreator.put(Monitor.class, new AopFnCreator() { // 方法监视执行
-            @Override
-            Supplier<Object> create(Method m, Object[] args, Supplier<Object> fn) {
+            public Supplier apply(Map attr) {
                 return () -> {
+                    exec.execute(() -> ((Supplier) attr.get("fn")).get());
+                    return null;
+                };
+            }
+        });
+        ep.fire("addAop", Monitor.class, new Function<Map, Supplier>() {
+            @Override
+            public Supplier apply(Map attr) {
+                return () -> {
+                    Method m = (Method) attr.get("method");
+                    Supplier fn = (Supplier) attr.get("fn");
+                    Object[] args = (Object[]) attr.get("args");
                     Monitor anno = m.getAnnotation(Monitor.class);
                     long start = System.currentTimeMillis();
                     Object ret = null;
@@ -119,7 +110,7 @@ public class Launcher extends ServerTpl {
                         if (anno.trace() || warn) {
                             StringBuilder sb = new StringBuilder(anno.logPrefix());
                             sb.append(m.getDeclaringClass().getName()).append(".").append(m.getName());
-                            if (anno.printArgs() && args.length > 0) {
+                            if (args.length > 0) {
                                 sb.append("(");
                                 for (int i = 0; i < args.length; i++) {
                                     String s;
@@ -127,11 +118,11 @@ public class Launcher extends ServerTpl {
                                     else s = Objects.toString(args[i], "");
 
                                     if (i == 0) sb.append(s);
-                                    else sb.append(";").append(s);
+                                    else sb.append("; ").append(s);
                                 }
                                 sb.append(")");
                             }
-                            sb.append(", time: ").append(end - start).append("ms");
+                            sb.append(". time: ").append(end - start).append("ms");
                             if (warn) log.warn(sb.append(anno.logSuffix()).toString());
                             else log.info(sb.append(anno.logSuffix()).toString());
                         }
@@ -140,37 +131,6 @@ public class Launcher extends ServerTpl {
                 };
             }
         });
-
-        // 多注解拦截
-        return clz -> {
-            // 查询是否有aop注解的方法
-            Method m = Utils.findMethod(clz, mm -> {
-                for (Iterator<Class> it = aopFnCreator.keySet().iterator(); it.hasNext(); ) {
-                    if (mm.getAnnotation(it.next()) != null) return true;
-                }
-                return false;
-            });
-            if (m == null) { // 如果没有直接new对象
-                try { return clz.newInstance(); } catch (Exception e) { log.error(e); }
-                return null;
-            }
-            // 创建被代理对象函数
-            return proxy(clz, (obj, method, args, proxy) -> {
-                // 被代理的方法执行原始逻辑
-                Supplier fn = () -> {
-                    try { return proxy.invokeSuper(obj, args); }
-                    catch (Throwable t) { throw new RuntimeException(t); }
-                };
-                // 为原始逻辑创建aop执行逻辑
-                Annotation[] arr = method.getAnnotations(); // 最外面包裹最里面执行
-                for (int i = arr.length - 1; i >= 0; i--) {
-                    AopFnCreator creator = aopFnCreator.get(arr[i].annotationType());
-                    if (creator == null) continue;
-                    fn = creator.create(method, args, fn);
-                }
-                return fn.get();
-            });
-        };
     }
 
 
@@ -178,7 +138,7 @@ public class Launcher extends ServerTpl {
      * 系统启动结束后执行
      */
     @EL(name = "sys.started")
-    private void sysStarted() {
+    void sysStarted() {
         // ctx.stop(); // 测试关闭
     }
 }

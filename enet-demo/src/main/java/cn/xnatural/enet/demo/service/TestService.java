@@ -1,5 +1,6 @@
 package cn.xnatural.enet.demo.service;
 
+import cn.xnatural.enet.demo.common.Monitor;
 import cn.xnatural.enet.demo.dao.entity.TestEntity;
 import cn.xnatural.enet.demo.dao.entity.UploadFile;
 import cn.xnatural.enet.demo.dao.repo.TestRepo;
@@ -23,6 +24,7 @@ public class TestService extends ServerTpl {
     UploadFileRepo uploadFileRepo;
 
 
+    @Monitor(trace = true)
     @Trans
     public PageModel findTestData() {
         TestEntity e = new TestEntity();

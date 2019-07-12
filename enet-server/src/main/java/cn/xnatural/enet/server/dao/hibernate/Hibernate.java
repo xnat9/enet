@@ -23,6 +23,8 @@ import java.util.List;
 import java.util.Map;
 import java.util.Properties;
 import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.function.Function;
+import java.util.function.Supplier;
 
 import static cn.xnatural.enet.common.Utils.*;
 import static javax.persistence.SharedCacheMode.UNSPECIFIED;
@@ -50,8 +52,19 @@ public class Hibernate extends ServerTpl {
     protected       List<String>   entities   = new LinkedList<>();
 
 
-    public Hibernate() { super("dao"); }
+    public Hibernate() { this("dao"); }
     public Hibernate(String name) { super(name); }
+
+
+    @EL(name = "env.configured", async = false)
+    protected void envConfigured() {
+        ep.fire("addAop", Trans.class, new Function<Map, Supplier>() {
+            @Override
+            public Supplier apply(Map attr) {
+                return () -> tm.trans(((Supplier) attr.get("fn")));
+            }
+        });
+    }
 
 
     @EL(name = "sys.starting")

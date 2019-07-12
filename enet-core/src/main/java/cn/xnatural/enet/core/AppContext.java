@@ -8,12 +8,15 @@ import cn.xnatural.enet.event.EL;
 import cn.xnatural.enet.event.EP;
 
 import javax.annotation.Resource;
+import java.lang.annotation.Annotation;
 import java.lang.management.ManagementFactory;
 import java.lang.reflect.Method;
 import java.lang.reflect.Modifier;
 import java.util.*;
 import java.util.concurrent.*;
 import java.util.concurrent.atomic.AtomicInteger;
+import java.util.function.Function;
+import java.util.function.Supplier;
 
 import static cn.xnatural.enet.common.Utils.*;
 import static java.util.Collections.emptyList;
@@ -68,7 +71,7 @@ public class AppContext {
         // 4. 通知所有服务启动
         ep.fire("sys.starting", EC.of(this).completeFn((ec) -> {
             if (shutdownHook != null) Runtime.getRuntime().addShutdownHook(shutdownHook);
-            autoInject();
+            sourceMap.forEach((s, o) -> inject(o)); // 自动注入
             log.info("Started Application" + (isBlank(getName()) ? "" : " '" + getName() +"' ") + "in {} seconds (JVM running for {})",
                 (System.currentTimeMillis() - startup.getTime()) / 1000.0,
                 ManagementFactory.getRuntimeMXBean().getUptime() / 1000.0
@@ -93,13 +96,14 @@ public class AppContext {
     /**
      * 添加对象源
      * {@link #ep} 会找出source对象中所有其暴露的功能. 即: 用 @EL 标注的方法
-     * 注: 每个对象源都必须有一个 name 属性标识
+     * 注: 为每个对象源都配一个 name 属性标识
      * @param source 不能是一个 Class
      * @return
      */
     @EL(name = "sys.addSource", async = false)
     public void addSource(Object source) {
-        if (source == null || source instanceof Class) return;
+        if (source == null) return;
+        if (source instanceof Class) source = createObj((Class) source);
         Method m = findMethod(source.getClass(), mm -> Modifier.isPublic(mm.getModifiers()) && "getName".equals(mm.getName()) && mm.getParameterCount() == 0 && String.class.equals(mm.getReturnType()));
         String name;
         if (m == null) {
@@ -119,12 +123,60 @@ public class AppContext {
 
 
     /**
-     * 初始化. 自动为所有对象源注入所需的对象
+     * aop 函数创建器
      */
-    protected void autoInject() {
-        log.debug("Auto inject @Resource field");
-        sourceMap.forEach((s, o) -> inject(o));
+    protected Map<Class, Function<Map, Supplier>> aopFnCreator = new ConcurrentHashMap<>();
+    /**
+     * 添加aop注解,及执行函数创建器
+     * @param anno
+     * @param fnCreator
+     */
+    @EL(name = "addAop", async = false)
+    public void addAopFn(Class<? extends Annotation> anno, Function<Map, Supplier> fnCreator) {
+        if (anno == null || fnCreator == null) return;
+        log.debug("Add aop for annotation: '{}'", anno.getName());
+        aopFnCreator.put(anno, fnCreator);
     }
+
+
+    /**
+     * 实例化一个对象
+     * @param clz 类型
+     * @return
+     */
+    @EL(name = "createObj", async = false)
+    protected Object createObj(Class clz) {
+        // 查询是否有aop注解的方法
+        Method m = Utils.findMethod(clz, mm -> {
+            for (Iterator<Class> it = aopFnCreator.keySet().iterator(); it.hasNext(); ) {
+                if (mm.getAnnotation(it.next()) != null) return true;
+            }
+            return false;
+        });
+        if (m == null) { // 如果没有被aop的方法, 直接new对象
+            try { return clz.newInstance(); } catch (Exception e) { log.error(e); }
+            return null;
+        }
+        // 创建被代理对象函数
+        return proxy(clz, (obj, method, args, proxy) -> {
+            // 被代理的方法执行原始逻辑
+            Supplier fn = () -> {
+                try { return proxy.invokeSuper(obj, args); }
+                catch (Throwable t) { throw new RuntimeException(t); }
+            };
+            // 为原始逻辑创建aop执行逻辑
+            Annotation[] arr = method.getAnnotations(); // 最外面包裹最里面执行
+            for (int i = arr.length - 1; i >= 0; i--) {
+                Function<Map, Supplier> creator = aopFnCreator.get(arr[i].annotationType());
+                if (creator == null) continue;
+                Map attr = new HashMap(3);
+                attr.put("method", method); attr.put("args", args); attr.put("fn", fn);
+                fn = creator.apply(attr);
+            }
+            return fn.get();
+        });
+    }
+
 
 
     /**

@@ -289,7 +289,7 @@ public class AppContext {
     }
 
 
-    @EL(name = "env.configured", async = false)
+    @EL(name = "env.configured", async = false, order = -1)
     protected void envConfigured() {
         // 1. 设置app名字
         String n = env.getAttr("sys.name");

@@ -65,13 +65,13 @@ public class RestTpl extends ServerTpl {
     public ApiResp groovy() {
         // 执行某个文件脚本
         ep.fire("groovy.script", "test.groovy");
-        ge.script("test.groovy", script -> script.run());
+        // ge.script("test.groovy", script -> script.run());
         // ge.script("text.groovy", script -> script.invokeMethod("aa", "xx")); // 执行文件脚本中的某个方法
 
         // 执行一段脚本代码
-        ep.fire("groovy.eval", "log.info('groovy eval')");
-        ge.eval("ep.fire('eName2', 'xx')", script -> script.run());
-        ge.eval("def aa() {println 'aa'}", script -> script.invokeMethod("aa", null)); // 执行脚本代码中的aa方法
+        // ep.fire("groovy.eval", "log.info('groovy eval')");
+        // ge.eval("ep.fire('eName2', 'xx')", script -> script.run());
+        // ge.eval("def aa() {println 'aa'}", script -> script.invokeMethod("aa", null)); // 执行脚本代码中的aa方法
         return ok();
     }
 

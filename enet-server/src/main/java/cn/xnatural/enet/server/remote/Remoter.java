@@ -135,7 +135,7 @@ public class Remoter extends ServerTpl {
             });
         } catch (Throwable ex) {
             log.error(ex, "Error fire remote event to '{}'. params: {}", appName, params);
-            ecMap.remove(ec.id()); ec.resume(); throw ex;
+            ecMap.remove(ec.id()); ec.ex(ex).resume();
         }
     }
 

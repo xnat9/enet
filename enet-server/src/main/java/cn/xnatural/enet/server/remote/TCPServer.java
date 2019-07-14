@@ -283,8 +283,8 @@ class TCPServer extends ServerTpl {
         //3. 同步注册信息给客户端
         ep.fire("updateAppInfo", data); // 同步信息给本服务器的tcp-client
         for (Map.Entry<String, List<Map<String, Object>>> e : appInfoMap.entrySet()) {
-            if (isNew && !Objects.equals(appName, e.getKey())) {
-                // 如果是新系统上线, 则主动通知其它系统(NOTE:如果有多个相同app时, 只能通知到其中一个)
+            // 如果是新系统上线, 则主动通知其它系统(NOTE:如果有多个相同app时, 只能通知到其中一个)
+            if (isNew && !((Objects.equals(appName, e.getKey()) || Objects.equals(remoter.sysName, e.getKey())) && e.getValue().size() < 2)) {
                 ep.fire("remote", e.getKey(), "updateAppInfo", new Object[]{data});
             }
             for (Map<String, Object> d : e.getValue()) { // 返回所有的注册信息给当前来注册的客户端

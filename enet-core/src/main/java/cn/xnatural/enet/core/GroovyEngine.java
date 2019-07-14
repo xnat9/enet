@@ -51,8 +51,9 @@ public class GroovyEngine {
         bindAttr.put("ep", ep);
         bindAttr.put("exec", exec);
 
-        gse = new GroovyScriptEngine(ctx.env().getString("groovy.root-urls", "./script"));
-        log.info("inited");
+        String root_urls = ctx.env().getString("groovy.root-urls", "./script") + "/";
+        gse = new GroovyScriptEngine(root_urls);
+        log.info("inited. root-urls: {}", root_urls);
     }
 
 

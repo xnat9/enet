@@ -139,6 +139,7 @@ public class Launcher extends ServerTpl {
      */
     @EL(name = "sys.started")
     void sysStarted() {
+        // bean(GroovyEngine.class).script("test.groovy", script -> script.run());
         // ctx.stop(); // 测试关闭
     }
 }

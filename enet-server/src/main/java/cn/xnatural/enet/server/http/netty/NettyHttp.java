@@ -20,11 +20,7 @@ import javax.annotation.Resource;
 import java.net.BindException;
 import java.util.Locale;
 import java.util.Map;
-import java.util.concurrent.Executor;
-import java.util.concurrent.ExecutorService;
-import java.util.concurrent.Executors;
-import java.util.concurrent.TimeUnit;
-import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.concurrent.*;
 import java.util.concurrent.atomic.AtomicInteger;
 
 import static cn.xnatural.enet.common.Utils.isEmpty;
@@ -34,24 +30,29 @@ import static io.netty.handler.codec.http.HttpResponseStatus.SERVICE_UNAVAILABLE
  * 用 netty 实现的 http server
  */
 public class NettyHttp extends ServerTpl {
-    protected final AtomicBoolean  running = new AtomicBoolean(false);
     @Resource
     protected       Executor       exec;
     protected       EventLoopGroup boosGroup;
     protected       EventLoopGroup workerGroup;
 
 
-    public NettyHttp() { this("http-netty"); }
-    public NettyHttp(String name) { super(name); setPort(8080); }
+    public NettyHttp() { this("http-netty", 8080); }
+    public NettyHttp(int port) { this("http-netty", port); }
+    public NettyHttp(String name, int port) { super(name); attr("port", port); }
 
 
     @EL(name = "sys.starting")
     public void start() {
-        if (!running.compareAndSet(false, true)) {
-            log.warn("{} Server is running", getName()); return;
+        if (exec == null) {
+            exec = Executors.newFixedThreadPool(2, new ThreadFactory() {
+                final AtomicInteger i = new AtomicInteger(0);
+                @Override
+                public Thread newThread(Runnable r) {
+                    return new Thread(r, getName() + "-" + i);
+                }
+            });
         }
-        if (exec == null) exec = Executors.newFixedThreadPool(2);
-        if (ep == null) ep = new EP(exec);
+        if (ep == null) {ep = new EP(exec); ep.addListenerSource(this);}
         ep.fire(getName() + ".starting");
         attrs.putAll((Map) ep.fire("env.ns", "http", getName()));
         createServer();
@@ -176,13 +177,6 @@ public class NettyHttp extends ServerTpl {
 
     public int getPort() {
         return getInteger("port", 8080);
-    }
-
-
-    public NettyHttp setPort(int port) {
-        if (running.get()) throw new RuntimeException("服务正在运行.不允许更新端口");
-        attr("port", port);
-        return this;
     }
 
 

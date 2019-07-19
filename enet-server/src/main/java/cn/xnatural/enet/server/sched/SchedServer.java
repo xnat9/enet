@@ -39,10 +39,12 @@ public class SchedServer extends ServerTpl {
         if (!running.compareAndSet(false, true)) {
             log.warn("{} Server is running", getName()); return;
         }
-        if (ep == null) ep = new EP(exec);
+        if (ep == null) {ep = new EP(exec); ep.addListenerSource(this);}
         ep.fire(getName() + ".starting");
         // 先从核心取配置, 然后再启动
-        attrs.putAll((Map) ep.fire("env.ns", getName()));
+        Map m = (Map) ep.fire("env.ns", getName());
+        if (m != null) attrs.putAll(m);
+
         try {
             StdSchedulerFactory f = new StdSchedulerFactory();
             Properties p = new Properties(); p.putAll(attrs);

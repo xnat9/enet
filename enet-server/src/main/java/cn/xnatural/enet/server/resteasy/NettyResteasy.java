@@ -28,6 +28,7 @@ import java.text.SimpleDateFormat;
 import java.util.*;
 import java.util.concurrent.*;
 import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.LongAdder;
 
 import static cn.xnatural.enet.common.Utils.*;
@@ -71,8 +72,14 @@ public class NettyResteasy extends ServerTpl {
         if (!running.compareAndSet(false, true)) {
             log.warn("{} Server is running", getName()); return;
         }
-        if (exec == null) exec = Executors.newFixedThreadPool(2);
-        if (ep == null) ep = new EP(exec);
+        if (exec == null) exec = Executors.newFixedThreadPool(2, new ThreadFactory() {
+            final AtomicInteger i = new AtomicInteger(0);
+            @Override
+            public Thread newThread(Runnable r) {
+                return new Thread(r, getName() + "-" + i);
+            }
+        });
+        if (ep == null) {ep = new EP(exec); ep.addListenerSource(this);}
         ep.fire(getName() + ".starting");
         attrs.putAll((Map) ep.fire("env.ns", "mvc", getName()));
         attr("session.enabled", Utils.toBoolean(ep.fire("env.getAttr", "session.enabled"), false));

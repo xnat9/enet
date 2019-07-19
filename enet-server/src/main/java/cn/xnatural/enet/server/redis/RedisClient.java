@@ -28,9 +28,10 @@ public class RedisClient extends ServerTpl {
         if (!running.compareAndSet(false, true)) {
             log.warn("{} Client is running", getName()); return;
         }
-        if (ep == null) ep = new EP();
+        if (ep == null) {ep = new EP(); ep.addListenerSource(this);}
         ep.fire(getName() + ".starting");
-        attrs.putAll((Map) ep.fire("env.ns", "cache", getName()));
+        Map m = (Map) ep.fire("env.ns", "cache", getName());
+        if (m != null) attrs.putAll(m);
 
         JedisPoolConfig poolCfg = new JedisPoolConfig();
         poolCfg.setMinIdle(getInteger("minIdle", 1));
@@ -55,14 +56,14 @@ public class RedisClient extends ServerTpl {
     @EL(name = "sys.stopping")
     public void stop() {
         log.info("Shutdown '{}' Client", getName());
-        pool.close();
+        if (pool != null) pool.close();
     }
 
 
     @EL(name = {"${name}.hset"})
-    protected void hset(String cName, String key, Object value, Integer seconds) {
+    public void hset(String cName, String key, Object value, Integer seconds) {
         log.trace("{}.hset. cName: {}, key: {}, value: {}, seconds: {}", getName(), cName, key, value, seconds);
-        execute(c -> {
+        exec(c -> {
             c.hset(cName, key, value.toString());
             c.expire(cName, seconds == null ? getInteger("expire." + cName, getInteger("defaultExpire", 60 * 30)) : seconds);
             return null;
@@ -71,27 +72,27 @@ public class RedisClient extends ServerTpl {
 
 
     @EL(name = {"${name}.hget"}, async = false)
-    protected Object hget(String cName, String key) {
-        return execute(c -> c.hget(cName, key));
+    public Object hget(String cName, String key) {
+        return exec(c -> c.hget(cName, key));
     }
 
 
     @EL(name = {"${name}.hdel"}, async = false)
-    protected void hdel(String cName, String key) {
+    public void hdel(String cName, String key) {
         log.debug("{}.hdel. cName: {}, key: {}", getName(), cName, key);
-        execute(c -> c.hdel(cName, key));
+        exec(c -> c.hdel(cName, key));
     }
 
 
     @EL(name = {"${name}.del"})
-    protected void del(String cName) {
+    public void del(String cName) {
         log.info("{}.del. cName: {}", getName(), cName);
-        execute(c -> c.del(cName));
+        exec(c -> c.del(cName));
     }
 
 
     @EL(name = "${name}.exec", async = false)
-    protected Object execute(Function<Jedis, Object> fn) {
+    public Object exec(Function<Jedis, Object> fn) {
         try (Jedis c = pool.getResource()) {
             return fn.apply(c);
         } catch (Throwable t) { throw t; }

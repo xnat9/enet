@@ -14,7 +14,6 @@ import cn.xnatural.enet.server.ServerTpl;
 import cn.xnatural.enet.server.cache.ehcache.EhcacheServer;
 import cn.xnatural.enet.server.dao.hibernate.Hibernate;
 import cn.xnatural.enet.server.http.netty.NettyHttp;
-import cn.xnatural.enet.server.mview.MViewServer;
 import cn.xnatural.enet.server.remote.Remoter;
 import cn.xnatural.enet.server.resteasy.NettyResteasy;
 import cn.xnatural.enet.server.sched.SchedServer;
@@ -39,9 +38,8 @@ public class Launcher extends ServerTpl {
 
     public static void main(String[] args) {
         AppContext app = new AppContext();
-        app.addSource(new NettyHttp().setPort(8080));
+        app.addSource(new NettyHttp(8080));
         app.addSource(new NettyResteasy().scan(RestTpl.class));
-        app.addSource(new MViewServer());
         app.addSource(new OpenApiDoc());
         app.addSource(new Hibernate().scanEntity(TestEntity.class).scanRepo(TestRepo.class));
         app.addSource(new SchedServer());

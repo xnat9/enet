@@ -18,11 +18,9 @@ import javax.persistence.spi.PersistenceUnitInfo;
 import javax.persistence.spi.PersistenceUnitTransactionType;
 import javax.sql.DataSource;
 import java.net.URL;
-import java.util.LinkedList;
-import java.util.List;
-import java.util.Map;
-import java.util.Properties;
+import java.util.*;
 import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.function.Consumer;
 import java.util.function.Function;
 import java.util.function.Supplier;
 
@@ -61,7 +59,7 @@ public class Hibernate extends ServerTpl {
         ep.fire("addAop", Trans.class, new Function<Map, Supplier>() {
             @Override
             public Supplier apply(Map attr) {
-                return () -> tm.trans(((Supplier) attr.get("fn")));
+                return () -> tm.trans((Supplier) attr.get("fn"));
             }
         });
     }
@@ -72,12 +70,14 @@ public class Hibernate extends ServerTpl {
         if (!running.compareAndSet(false, true)) {
             log.warn("{} Client is running", getName()); return;
         }
-        if (ep == null) ep = new EP();
+        if (ep == null) {ep = new EP(); ep.addListenerSource(this);}
         ep.fire(getName() + ".starting");
+        attrs.put("hibernate.hbm2ddl.auto", "none");
         attrs.put("hibernate.physical_naming_strategy", SpringPhysicalNamingStrategy.class.getName());
         attrs.put("hibernate.implicit_naming_strategy", SpringImplicitNamingStrategy.class.getName());
         attrs.put("hibernate.current_session_context_class", "thread");
-        attrs.putAll((Map) ep.fire("env.ns", getName()));
+        Map m = (Map) ep.fire("env.ns", getName());
+        if (m != null) attrs.putAll(m);
 
         for (String s : getStr("entity-scan", "").split(",")) { // 扫描entity
             if (s == null || s.trim().isEmpty()) continue;
@@ -98,7 +98,7 @@ public class Hibernate extends ServerTpl {
 
         sf = (SessionFactory) new HibernatePersistenceProvider().createContainerEntityManagerFactory(createPersistenceUnit(), attrs);
         exposeBean(sf);
-        tm = new TransWrapper(); exposeBean(tm); ep.fire("inject", tm);
+        tm = new TransWrapper(sf); exposeBean(tm);
         repoCollect();
         log.info("Started {}(Hibernate) Client", getName());
         ep.fire(getName() + ".started");
@@ -109,6 +109,16 @@ public class Hibernate extends ServerTpl {
     public void stop() {
         log.info("Shutdown '{}(Hibernate)' Client", getName());
         sf.close(); closeDs();
+    }
+
+
+    /**
+     * 自定义执行
+     * @param fn
+     */
+    public Hibernate doWork(Consumer<SessionFactory> fn, Runnable successFn, Consumer<Throwable> failFn) {
+        tm.trans(() -> {fn.accept(sf); return null;}, successFn, failFn);
+        return this;
     }
 
 
@@ -269,10 +279,14 @@ public class Hibernate extends ServerTpl {
             log.warn("New Datasource and close old Datasource");
             closeDs();
         }
-        Map<String, String> attr = (Map) ep.fire("env.ns", getName() + ".ds");
+        Map<String, String> dsAttr = new HashMap<>();
+        attrs.entrySet().stream().filter(e -> e.getKey().startsWith("ds")).forEach(e -> {
+            dsAttr.put(e.getKey().replace("ds.", ""), (String) e.getValue());
+        });
+        log.debug("Create datasource properties: {}", dsAttr);
         // druid 数据源
         try {
-            ds = (DataSource) invoke(findMethod(Class.forName("com.alibaba.druid.pool.DruidDataSourceFactory"), "createDataSource", Map.class), null, attr);
+            ds = (DataSource) invoke(findMethod(Class.forName("com.alibaba.druid.pool.DruidDataSourceFactory"), "createDataSource", Map.class), null, dsAttr);
         } catch (ClassNotFoundException e) {
         } catch (Exception e) {
             throw new RuntimeException(e);
@@ -280,7 +294,7 @@ public class Hibernate extends ServerTpl {
         // dbcp2 数据源
         if (ds == null) {
             try {
-                Properties p = new Properties(); p.putAll(attr);
+                Properties p = new Properties(); p.putAll(dsAttr);
                 ds = (DataSource) invoke(findMethod(Class.forName("org.apache.commons.dbcp2.BasicDataSourceFactory"), "createDataSource", Properties.class), null, p);
             } catch (ClassNotFoundException e) {
             } catch (Exception e) {

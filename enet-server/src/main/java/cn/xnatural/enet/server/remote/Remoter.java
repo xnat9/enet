@@ -55,7 +55,7 @@ public class Remoter extends ServerTpl {
     @EL(name = "sys.starting")
     public void start() {
         if (exec == null) exec = Executors.newFixedThreadPool(2);
-        if (ep == null) ep = new EP(exec);
+        if (ep == null) {ep = new EP(exec); ep.addListenerSource(this);}
         ep.fire(getName() + ".starting");
 
         if (!ep.exist("sched.after")) throw new RuntimeException("Need sched Server!");

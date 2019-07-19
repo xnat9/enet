@@ -35,9 +35,10 @@ public class XMemcached extends ServerTpl {
         if (!running.compareAndSet(false, true)) {
             log.warn("{} Client is running", getName()); return;
         }
-        if (ep == null) ep = new EP();
+        if (ep == null) {ep = new EP(); ep.addListenerSource(this);}
         ep.fire(getName() + ".starting");
-        attrs.putAll((Map) ep.fire("env.ns", "cache", getName()));
+        Map m = (Map) ep.fire("env.ns", "cache", getName());
+        if (m != null) attrs.putAll(m);
 
         try {
             List<InetSocketAddress> as = AddrUtil.getAddresses(getStr("hosts", "localhost:11211"));

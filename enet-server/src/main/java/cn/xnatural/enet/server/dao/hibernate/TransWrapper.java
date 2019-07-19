@@ -15,8 +15,13 @@ import java.util.function.Supplier;
  */
 public class TransWrapper extends ServerTpl {
     protected Log            log = Log.of(getClass());
-    @Resource
     protected SessionFactory sf;
+
+
+    protected TransWrapper(SessionFactory sf) {
+        this.sf = sf;
+    }
+
 
     public void trans(Runnable fn) {
         trans(fn, null);
@@ -47,9 +52,22 @@ public class TransWrapper extends ServerTpl {
         if (txFlag.get()) return fn.get();
         else {
             tx.begin(); txFlag.set(true);
-            try { T r = fn.get(); tx.commit(); if (successFn != null) successFn.run(); return r;}
-            catch (Throwable t) { tx.rollback(); if (failFn != null) failFn.accept(t); throw t; }
-            finally { s.close(); txFlag.set(false); }
+            Throwable ex = null;
+            try {
+                T r = fn.get(); tx.commit();
+                s.close(); txFlag.set(false);
+                return r;
+            } catch (Throwable t) {
+                tx.rollback(); ex = t;
+                txFlag.set(false); s.close();
+                throw t;
+            } finally {
+                if (ex == null) { // 成功
+                    if (successFn != null) successFn.run();
+                } else {
+                    if (failFn != null) failFn.accept(ex);
+                }
+            }
         }
     }
 }

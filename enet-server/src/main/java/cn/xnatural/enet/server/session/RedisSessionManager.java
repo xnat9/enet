@@ -5,24 +5,18 @@ import cn.xnatural.enet.event.EP;
 import cn.xnatural.enet.server.ServerTpl;
 
 import java.util.Map;
-import java.util.concurrent.atomic.AtomicBoolean;
 
 /**
  * redis session 管理
  */
 public class RedisSessionManager extends ServerTpl {
-    protected final AtomicBoolean running = new AtomicBoolean(false);
-
-    public RedisSessionManager() { super("session-redis"); }
+    public RedisSessionManager() { this("session-redis"); }
     public RedisSessionManager(String name) { super(name); }
 
 
     @EL(name = "${redisServerName}.started", async = false)
     public void start() {
-        if (!running.compareAndSet(false, true)) {
-            log.warn("{} Server is running", getName()); return;
-        }
-        if (ep == null) ep = new EP();
+        if (ep == null) {ep = new EP(); ep.addListenerSource(this);}
         // 过期时间(单位: 分钟)
         attr("expire", 30);
         attr("keyPrefix", "session-");

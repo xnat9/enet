@@ -43,6 +43,12 @@
             <version>1.4.197</version>
         </dependency>
 
+        <!--<dependency>
+            <groupId>com.jfinal</groupId>
+            <artifactId>jfinal</artifactId>
+            <version>4.3</version>
+        </dependency>-->
+
         <!--<dependency>-->
             <!--<groupId>com.googlecode.xmemcached</groupId>-->
             <!--<artifactId>xmemcached</artifactId>-->

@@ -13,25 +13,19 @@ import java.util.concurrent.atomic.AtomicBoolean;
  * @author xiangxb, 2019-02-05
  */
 public class MemSessionManager extends ServerTpl {
-    protected final AtomicBoolean            running = new AtomicBoolean(false);
     /**
      * 过期时间(单位: 分钟)
      */
     protected       Integer                  expire;
     protected       Map<String, SessionData> sMap;
 
-    public MemSessionManager() {
-        super("session-mem");
-    }
+    public MemSessionManager() {this("session-mem");}
     public MemSessionManager(String name) { super(name); }
 
 
     @EL(name = "sys.starting")
     public void start() {
-        if (!running.compareAndSet(false, true)) {
-            log.warn("{} Server is running", getName()); return;
-        }
-        if (ep == null) ep = new EP();
+        if (ep == null) {ep = new EP(); ep.addListenerSource(this);}
         ep.fire(getName() + ".starting");
         attrs.putAll((Map) ep.fire("env.ns", "session", getName()));
         expire = getInteger("expire", 30);

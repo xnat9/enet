@@ -35,7 +35,7 @@ public class OpenApiDoc extends ServerTpl {
         if (!running.compareAndSet(false, true)) {
             log.warn("服务正在运行"); return;
         }
-        if (ep == null) ep = new EP();
+        if (ep == null) {ep = new EP(); ep.addListenerSource(this);}
         ep.fire(getName() + ".starting");
         attrs.putAll((Map) ep.fire("env.ns", getName()));
         root = getStr("root", "api-doc");

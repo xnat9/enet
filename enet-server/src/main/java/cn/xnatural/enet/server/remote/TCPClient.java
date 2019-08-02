@@ -129,7 +129,7 @@ class TCPClient extends ServerTpl {
                     send(ai.name, new JSONObject(3).fluentPut("type", "up").fluentPut("source", remoter.sysName).fluentPut("data", data), ex -> {
                         if (ex != null) { exHandler.accept(ex); } // 发送失败
                         else {
-                            log.doLog(null, (printInfo ? Level.INFO : Level.DEBUG), "Register up self '{}' to '{}'. info: {}", remoter.sysName, ai.name + ai.hps, data);
+                            log.doLog((printInfo ? Level.INFO : Level.DEBUG), null, "Register up self '{}' to '{}'. info: {}", remoter.sysName, ai.name + ai.hps, data);
                             printInfo = false;
                         }
                     });
@@ -271,7 +271,7 @@ class TCPClient extends ServerTpl {
                     errRecord.addFirst(System.currentTimeMillis());
                     // 多个连接配置, 当某个连接(hp(host:port))多次发生错误, 则移除此条连接配置
                     if (appInfo.hps.size() > 1) { it.remove(); redeem(appInfo, hp); }
-                    log.doLog(null, (appInfo.hps.size() > 1 ? Level.WARN : Level.ERROR), "Connect Error to '{}'[{}]. errMsg: {}", appInfo.name, hp, (isEmpty(ex.getMessage()) ? ex.getClass().getName() : ex.getMessage()));
+                    log.doLog((appInfo.hps.size() > 1 ? Level.WARN : Level.ERROR), null, "Connect Error to '{}'[{}]. errMsg: {}", appInfo.name, hp, (isEmpty(ex.getMessage()) ? ex.getClass().getName() : ex.getMessage()));
                 }
             }
         } finally {

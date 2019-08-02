@@ -20,6 +20,9 @@
             <groupId>cn.xnatural.enet</groupId><artifactId>enet-event</artifactId><version>0.0.10</version>
         </dependency>
         <dependency>
+            <groupId>cn.xnatural.enet</groupId><artifactId>enet-common</artifactId><version>0.0.10</version>
+        </dependency>
+        <dependency>
             <groupId>ch.qos.logback</groupId><artifactId>logback-classic</artifactId><version>1.2.3</version>
         </dependency>
         <dependency>

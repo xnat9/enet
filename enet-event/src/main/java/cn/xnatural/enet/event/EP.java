@@ -1,8 +1,9 @@
 package cn.xnatural.enet.event;
 
 
-import cn.xnatural.enet.common.Log;
-import cn.xnatural.enet.common.Utils;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+import org.slf4j.helpers.MessageFormatter;
 
 import java.lang.reflect.Array;
 import java.lang.reflect.Method;
@@ -10,17 +11,19 @@ import java.lang.reflect.Modifier;
 import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.Executor;
+import java.util.function.Consumer;
+import java.util.function.Predicate;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
-import static java.util.Collections.*;
+import static java.util.Collections.emptyList;
 
 /**
  * event publisher 事件发布器.事件分发中心
  * TODO 事件死锁. 事件执行链
  */
 public class EP {
-    protected Log                         log;
+    protected Logger                      log;
     protected Executor                    exec;
     /**
      * 事件名 -> 监听器{@link Listener}
@@ -32,17 +35,19 @@ public class EP {
     protected Set<String>                 trackEvents;
 
 
-    public EP() { init(null); }
-    public EP(Executor exec) { init(exec); }
+    public EP() { init(null, null); }
+    public EP(Executor exec) { init(exec, null); }
+    public EP(Executor exec, Logger log) { init(exec, log); }
 
 
     /**
      * 初始化
      * @param exec
      */
-    protected void init(Executor exec) {
+    protected void init(Executor exec, Logger log) {
         this.exec = exec;
-        log = Log.of(EP.class);
+        if (log == null) this.log = LoggerFactory.getLogger(EP.class);
+        else this.log = log;
         lsMap = new ConcurrentHashMap<>(7);
         trackEvents = new HashSet<>(7);
     }
@@ -192,7 +197,7 @@ public class EP {
      */
     protected void resolve(final Object source) {
         if (source == null) return;
-        Utils.iterateMethod(source.getClass(), m -> { // 查找包含@EL注解的方法
+        iterateMethod(source.getClass(), m -> { // 查找包含@EL注解的方法
             EL el = m.getDeclaredAnnotation(EL.class);
             if (el == null) return;
             for (String n : el.name()) {
@@ -231,7 +236,7 @@ public class EP {
         if (!matcher.find()) return name;
         String attr = matcher.group("attr");
         // 查找属性对应的get方法
-        Method m = Utils.findMethod(source.getClass(), mm -> {
+        Method m = findMethod(source.getClass(), mm -> {
             if (Modifier.isPublic(mm.getModifiers()) &&
                 mm.getParameterCount() == 0 && // 参数个数为0
                 String.class.equals(mm.getReturnType()) && // 返回String类型
@@ -240,14 +245,47 @@ public class EP {
             return false;
         });
         if (m != null) {
-            Object v = Utils.invoke(m, source);
-            if (v == null || v.toString().isEmpty()) {
-                log.warn("Parse event name '{}' error. Get property '{}' is empty from '{}'.", name, attr, source);
-                return null;
-            }
-            return matcher.replaceAll(v.toString());
+            try {
+                Object v = m.invoke(source);
+                if (v == null || v.toString().isEmpty()) {
+                    log.warn("Parse event name '{}' error. Get property '{}' is empty from '{}'.", name, attr, source);
+                    return null;
+                }
+                return matcher.replaceAll(v.toString());
+            } catch (Exception e) { log.error("", e); }
         }
         log.warn("Parse event name '{}'. Not found property '{}' from {} ", name, attr, source);
+        return null;
+    }
+
+
+    /**
+     * 遍历一个类的方法
+     * @param clz
+     * @param fns
+     */
+    protected void iterateMethod(final Class clz, Consumer<Method>... fns) {
+        if (fns == null || fns.length < 1) return;
+        Class c = clz;
+        do {
+            for (Method m : c.getDeclaredMethods()) for (Consumer<Method> fn : fns) fn.accept(m);
+            c = c.getSuperclass();
+        } while (c != null);
+    }
+
+
+    /**
+     * 查找类中的方法
+     * @param clz
+     * @param predicate
+     * @return
+     */
+    protected Method findMethod(final Class clz, Predicate<Method> predicate) {
+        Class c = clz;
+        do {
+            for (Method m : c.getDeclaredMethods()) if (predicate.test(m)) return m;
+            c = c.getSuperclass();
+        } while (c != null);
         return null;
     }
 
@@ -309,17 +347,23 @@ public class EP {
                     if (!void.class.isAssignableFrom(m.getReturnType())) ec.result = r;
                 }
                 ec.passed(this, true);
-                if (ec.track) log.info("Passed listener of event '{}'. method: {}, id: {}, result: {}",
-                    name, (m == null ? "" : source.getClass().getSimpleName() + "." + m.getName()),
-                    ec.id, ec.result
-                );
+                if (ec.track) {
+                    log.info("Passed listener of event '{}'. method: {}, id: {}, result: {}",
+                        name, (m == null ? "" : source.getClass().getSimpleName() + "." + m.getName()),
+                        ec.id, ec.result
+                    );
+                }
             } catch (Throwable e) {
                 ec.passed(this, false).ex(e.getCause() == null ? e : e.getCause());
-                log.error(ec.ex, "Listener invoke error! eName: {}, id: {}, method: {}, event source: {}",
-                    name, ec.id,
-                    (m == null ? "" : source.getClass().getSimpleName() + "." + m.getName()),
-                    (ec.source() == null ? null : ec.source().getClass().getSimpleName())
-                );
+                log.error(
+                    MessageFormatter.arrayFormat(
+                        "Listener invoke error! eName: {}, id: {}, method: {}, event source: {}",
+                        new Object[]{
+                            name, ec.id,
+                            (m == null ? "" : source.getClass().getSimpleName() + "." + m.getName()),
+                            (ec.source() == null ? null : ec.source().getClass().getSimpleName())
+                        }).getMessage(),
+                    ec.ex);
             } finally {
                 ec.tryFinish();
             }

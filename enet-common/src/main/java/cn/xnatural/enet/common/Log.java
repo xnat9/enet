@@ -4,6 +4,7 @@ import org.apache.commons.beanutils.BeanUtils;
 import org.slf4j.ILoggerFactory;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.slf4j.Marker;
 import org.slf4j.event.Level;
 import org.slf4j.helpers.MessageFormatter;
 import org.slf4j.spi.LocationAwareLogger;
@@ -21,6 +22,7 @@ import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
 import static cn.xnatural.enet.common.Utils.findMethod;
+import static org.slf4j.event.Level.*;
 
 /**
  * 通用 Log
@@ -32,7 +34,7 @@ import static cn.xnatural.enet.common.Utils.findMethod;
  * 注意: 必须要调有下 {@link #init(Runnable)} 才能正常使用
  * @author hubert
  */
-public class Log {
+public class Log implements Logger {
     private static       boolean early         = true;
     private static final Pattern PATTERN_PARAM = Pattern.compile("\\{(([0-9]+).([\\w]+))\\}");
     private static final Pattern PATTERN_INDEX = Pattern.compile("\\{([0-9]+)\\}");
@@ -180,7 +182,7 @@ public class Log {
                             if (d.log.prefixSupplier != null) sb.append(d.log.prefixSupplier.get()).append(d.msg);
                             else sb.append(d.msg);
                             if (d.log.suffixSupplier != null) sb.append(d.log.suffixSupplier.get());
-                            doLog(d.log.logger, d.loggerClassName, translate(d.level), format(sb.toString(), d.args), d.th);
+                            doLog(d.log.logger, null, FQCN, translate(d.level), format(sb.toString(), d.args), d.th);
                         }
                     }
                     early = false;
@@ -194,18 +196,25 @@ public class Log {
      * 日志数据结构
      */
     protected static class LogData {
-        Log log; Level level; String loggerClassName;
+        Log log; Level level;
         String msg; Object[] args; Throwable th;
     }
 
     // 早期日志
     private static Queue<LogData> earlyLog = new ConcurrentLinkedQueue<>();
-    private void doLog(final Level level, final String loggerClassName, final String msg, final Object[] args, final Throwable th) {
+
+
+    public void doLog(final Level level, final Throwable th, final String msg, final Object... args) {
+        doLog(level, null, th, msg, args);
+    }
+
+
+    private void doLog(final Level level, Marker marker, final Throwable th, final String msg, final Object... args) {
         if (early) {
             synchronized (Log.class) {
                 if (early) { // 早期日志(环境还没初始化完成)
                     LogData d = new LogData();
-                    d.log = this; d.level = level; d.loggerClassName = loggerClassName;
+                    d.log = this; d.level = level;
                     d.msg = msg; d.args = args; d.th = th;
                     earlyLog.offer(d);
                     if (earlyLog.size() > 200) {
@@ -225,17 +234,17 @@ public class Log {
             if (prefixSupplier != null) sb.append(prefixSupplier.get()).append(msg);
             else sb.append(msg);
             if (suffixSupplier != null) sb.append(suffixSupplier.get());
-            doLog(logger, loggerClassName, translate(level), format(sb.toString(), args), th);
+            doLog(logger, marker, FQCN, translate(level), format(sb.toString(), args), th);
         }
     }
 
 
-    private static void doLog(LocationAwareLogger logger, String className, int level, String msg, Throwable thrown) {
+    private static void doLog(LocationAwareLogger logger, Marker marker, String className, int level, String msg, Throwable th) {
         try {
             if (POST_1_6) {
-                LOG_METHOD.invoke(logger, null, className, level, msg, EMPTY, thrown);
+                LOG_METHOD.invoke(logger, marker, className, level, msg, EMPTY, th);
             } else {
-                LOG_METHOD.invoke(logger, null, className, level, msg, thrown);
+                LOG_METHOD.invoke(logger, marker, className, level, msg, th);
             }
         } catch (InvocationTargetException e) {
             try {
@@ -251,6 +260,7 @@ public class Log {
             throw new IllegalAccessError(e.getMessage());
         }
     }
+
 
     private static int translate(Level level) {
         if (level != null) switch (level) {
@@ -291,62 +301,274 @@ public class Log {
 
     // ====================log method ==============
 
-    public void doLog(final Throwable th, final Level level, final String msg, final Object... args) {
-        doLog(level, FQCN, msg, args, th);
+    public void error(String pMsg, Object... pArgs) {
+        doLog(ERROR, null, pMsg, pArgs, null);
     }
 
-    public void error(String pMsg, Object... pArgs) {
-        doLog(Level.ERROR, FQCN, pMsg, pArgs, null);
+
+    @Override
+    public void error(String msg, Throwable t) {
+        doLog(ERROR, null, t, msg);
+    }
+
+
+    @Override
+    public boolean isErrorEnabled(Marker marker) {
+        return logger == null ? true : logger.isErrorEnabled(marker);
+    }
+
+
+    @Override
+    public void error(Marker marker, String msg) {
+        doLog(ERROR, marker, null, msg);
+    }
+
+
+    @Override
+    public void error(Marker marker, String format, Object arg) {
+        doLog(ERROR, marker, null, format, arg);
+    }
+
+
+    @Override
+    public void error(Marker marker, String format, Object arg1, Object arg2) {
+        doLog(ERROR, marker, null, format, arg1, arg2);
+    }
+
+
+    @Override
+    public void error(Marker marker, String format, Object... arguments) {
+        doLog(ERROR, marker, null, format, arguments);
+    }
+
+
+    @Override
+    public void error(Marker marker, String msg, Throwable t) {
+        doLog(ERROR, marker, t, msg);
     }
 
 
     public void error(Throwable t) {
-        doLog(Level.ERROR, FQCN, "", null, t);
+        doLog(ERROR, null, t, null);
     }
 
 
     public void error(Throwable t, String pMsg, Object... pArgs) {
-        doLog(Level.ERROR, FQCN, pMsg, pArgs, t);
+        doLog(ERROR, null, t, pMsg, pArgs);
     }
 
 
     public void warn(Throwable t, String pMsg, Object... pArgs) {
-        doLog(Level.WARN, FQCN, pMsg, pArgs, t);
+        doLog(WARN, null, t, pMsg, pArgs);
     }
 
 
     public void warn(String pMsg, Object... pArgs) {
-        doLog(Level.WARN, FQCN, pMsg, pArgs, null);
+        doLog(WARN, null, null, pMsg, pArgs);
+    }
+
+
+    @Override
+    public void warn(String format, Object arg1, Object arg2) {
+        doLog(WARN, null, (Throwable) null, format, arg1, arg2);
+    }
+
+
+    @Override
+    public void warn(String msg, Throwable t) {
+        doLog(WARN, null, t, msg);
+    }
+
+
+    @Override
+    public boolean isWarnEnabled(Marker marker) {
+        return logger == null ? true : logger.isWarnEnabled(marker);
+    }
+
+
+    @Override
+    public void warn(Marker marker, String msg) {
+        doLog(WARN, marker, null, msg);
+    }
+
+
+    @Override
+    public void warn(Marker marker, String format, Object arg) {
+        doLog(WARN, marker, null, format, arg);
+    }
+
+
+    @Override
+    public void warn(Marker marker, String format, Object arg1, Object arg2) {
+        doLog(WARN, marker, null, format, arg1, arg2);
+    }
+
+
+    @Override
+    public void warn(Marker marker, String format, Object... arguments) {
+        doLog(WARN, marker, null, format, arguments);
+    }
+
+
+    @Override
+    public void warn(Marker marker, String msg, Throwable t) {
+        doLog(WARN, marker, t, msg);
     }
 
 
     public void info(String pMsg, Object... pArgs) {
-        doLog(Level.INFO, FQCN, pMsg, pArgs, null);
+        doLog(INFO, null, null, pMsg, pArgs);
+    }
+
+
+    @Override
+    public void info(String msg, Throwable t) {
+        doLog(INFO, null, t, msg);
+    }
+
+
+    @Override
+    public boolean isInfoEnabled(Marker marker) {
+        return logger == null ? true : logger.isInfoEnabled(marker);
+    }
+
+
+    @Override
+    public void info(Marker marker, String msg) {
+        doLog(INFO, marker, null, msg);
+    }
+
+
+    @Override
+    public void info(Marker marker, String format, Object arg) {
+        doLog(INFO, marker, null, format, arg);
+    }
+
+
+    @Override
+    public void info(Marker marker, String format, Object arg1, Object arg2) {
+        doLog(INFO, marker, null, format, arg1, arg2);
+    }
+
+
+    @Override
+    public void info(Marker marker, String format, Object... arguments) {
+        doLog(INFO, marker, null, format, arguments);
+    }
+
+
+    @Override
+    public void info(Marker marker, String msg, Throwable t) {
+        doLog(INFO, marker, t, msg);
     }
 
 
     public void info(Throwable t, String pMsg, Object... pArgs) {
-        doLog(Level.INFO, FQCN, pMsg, pArgs, t);
+        doLog(INFO, null, t, pMsg, pArgs);
     }
 
 
     public void debug(String pMsg, Object... pArgs) {
-        doLog(Level.DEBUG, FQCN, pMsg, pArgs, null);
+        doLog(DEBUG, null, null, pMsg, pArgs);
+    }
+
+
+    @Override
+    public void debug(String msg, Throwable t) {
+        doLog(DEBUG, null, t, msg);
+    }
+
+
+    @Override
+    public boolean isDebugEnabled(Marker marker) {
+        return logger == null ? false : logger.isDebugEnabled(marker);
+    }
+
+
+    @Override
+    public void debug(Marker marker, String msg) {
+        doLog(DEBUG, marker, null, msg);
+    }
+
+
+    @Override
+    public void debug(Marker marker, String format, Object arg) {
+        doLog(DEBUG, marker, null, format, arg);
+    }
+
+
+    @Override
+    public void debug(Marker marker, String format, Object arg1, Object arg2) {
+        doLog(DEBUG, marker, null, format, arg1, arg2);
+    }
+
+
+    @Override
+    public void debug(Marker marker, String format, Object... arguments) {
+        doLog(DEBUG, marker, null, format, arguments);
+    }
+
+
+    @Override
+    public void debug(Marker marker, String msg, Throwable t) {
+        doLog(DEBUG, marker, t, null);
     }
 
 
     public void debug(Throwable t, String pMsg, Object... pArgs) {
-        doLog(Level.DEBUG, FQCN, pMsg, pArgs, t);
+        doLog(DEBUG, null, t, pMsg, pArgs);
     }
 
 
     public void trace(String pMsg, Object... pArgs) {
-        doLog(Level.TRACE, FQCN, pMsg, pArgs, null);
+        doLog(TRACE, null, null, pMsg, pArgs);
+    }
+
+
+    @Override
+    public void trace(String msg, Throwable t) {
+        doLog(TRACE, null, t, null);
+    }
+
+
+    @Override
+    public boolean isTraceEnabled(Marker marker) {
+        return (logger == null ? false : logger.isTraceEnabled(marker));
+    }
+
+
+    @Override
+    public void trace(Marker marker, String msg) {
+        doLog(TRACE, marker, null, msg);
+    }
+
+
+    @Override
+    public void trace(Marker marker, String format, Object arg) {
+        doLog(TRACE, marker, null, format, arg);
+    }
+
+
+    @Override
+    public void trace(Marker marker, String format, Object arg1, Object arg2) {
+        doLog(TRACE, marker, null, format, arg1, arg2);
+    }
+
+
+    @Override
+    public void trace(Marker marker, String format, Object... argArray) {
+        doLog(TRACE, marker, null, format, argArray);
+    }
+
+
+    @Override
+    public void trace(Marker marker, String msg, Throwable t) {
+        doLog(TRACE, marker, t, msg);
     }
 
 
     public void trace(Throwable t, String pMsg, Object... pArgs) {
-        doLog(Level.TRACE, FQCN, pMsg, pArgs, t);
+        doLog(TRACE, null, t, pMsg, pArgs);
     }
 
 
@@ -368,31 +590,117 @@ public class Log {
 
 
     public boolean isInfoEnabled() {
-        return isEnabled(Level.INFO);
+        return isEnabled(INFO);
     }
 
+
+    @Override
+    public void info(String msg) {
+        doLog(INFO, null, (Throwable) null, msg);
+    }
+
+
+    @Override
+    public void info(String format, Object arg) {
+        doLog(INFO, null, (Throwable) null, format, arg);
+    }
+
+
+    @Override
+    public void info(String format, Object arg1, Object arg2) {
+        doLog(INFO, null, (Throwable) null, format, arg1, arg2);
+    }
 
 
     public boolean isWarnEnabled() {
-        return isEnabled(Level.WARN);
+        return isEnabled(WARN);
     }
 
+
+    @Override
+    public void warn(String msg) {
+        doLog(WARN, null, (Throwable) null, msg);
+    }
+
+
+    @Override
+    public void warn(String format, Object arg) {
+        doLog(WARN, null, (Throwable) null, format, arg);
+    }
 
 
     public boolean isErrorEnabled() {
-        return isEnabled(Level.ERROR);
+        return isEnabled(ERROR);
     }
 
+
+    @Override
+    public void error(String msg) {
+        doLog(ERROR, null, (Throwable) null, msg);
+    }
+
+
+    @Override
+    public void error(String format, Object arg) {
+        doLog(ERROR, null, (Throwable) null, format, arg);
+    }
+
+
+    @Override
+    public void error(String format, Object arg1, Object arg2) {
+        doLog(ERROR, null, (Throwable) null, format, arg1, arg2);
+    }
 
 
     public boolean isDebugEnabled() {
-        return isEnabled(Level.DEBUG);
+        return isEnabled(DEBUG);
     }
 
 
+    @Override
+    public void debug(String msg) {
+        doLog(DEBUG, null, (Throwable) null, msg);
+    }
+
+
+    @Override
+    public void debug(String format, Object arg) {
+        doLog(DEBUG, null, (Throwable) null, format, arg);
+    }
+
+
+    @Override
+    public void debug(String format, Object arg1, Object arg2) {
+        doLog(DEBUG, null, (Throwable) null, format, arg1, arg2);
+    }
+
+
+    @Override
+    public String getName() {
+        return logger == null ? name : logger.getName();
+    }
+
 
     public boolean isTraceEnabled() {
-        return isEnabled(Level.TRACE);
+        return isEnabled(TRACE);
+    }
+
+
+    @Override
+    public void trace(String msg) {
+        doLog(TRACE, null, (Throwable) null, msg);
+    }
+
+
+    @Override
+    public void trace(String format, Object arg) {
+        doLog(TRACE, null, (Throwable) null, format, arg);
+    }
+
+
+    @Override
+    public void trace(String format, Object arg1, Object arg2) {
+        doLog(TRACE, null, (Throwable) null, format, arg1, arg2);
     }
 
 

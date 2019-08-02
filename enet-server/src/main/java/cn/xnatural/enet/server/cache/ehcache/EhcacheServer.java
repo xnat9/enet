@@ -48,7 +48,7 @@ public class EhcacheServer extends ServerTpl {
 
     @EL(name = {"sys.stopping", "${name}.stop"})
     public void stop(EC ec) {
-        log.doLog(null, (ec != null && Objects.equals(ec.eName(), getName()+ ".stop") ? Level.INFO : Level.DEBUG), "Shutdown '{}' Server", getName());
+        log.doLog((ec != null && Objects.equals(ec.eName(), getName()+ ".stop") ? Level.INFO : Level.DEBUG), null, "Shutdown '{}' Server", getName());
         if (cm != null) cm.close();
     }
 

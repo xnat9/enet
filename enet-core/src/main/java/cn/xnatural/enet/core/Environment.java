@@ -119,7 +119,7 @@ public class Environment {
         Set<String> loadedProfiles = new HashSet<>();
         while (allProfiles.size() > loadedProfiles.size()) {
             for (String p : allProfiles) {
-                if (loadedProfiles.contains(p)) continue;
+                if (isEmpty(p) || loadedProfiles.contains(p)) continue;
                 loadedProfiles.add(p); // 放在上面, 以免加载出错, 导致死循环
                 for (String l : cfgFileLocations) {
                     if (l == null || l.isEmpty()) continue;
@@ -183,7 +183,7 @@ public class Environment {
                     InputStream in = getClass().getClassLoader().getResourceAsStream(fName);
                     if (in != null) {
                         log.info("Configure logback file: {}", fName);
-                        m.invoke(o, in);
+                        m.invoke(o, in); f = true;
                     }
                 }
                 // 设置日志级别
@@ -206,7 +206,7 @@ public class Environment {
      * @param cfgFileName
      */
     protected void loadPropertiesFile(String profile, String cfgFileLocation, String cfgFileName) {
-        String f = cfgFileLocation + cfgFileName + (profile == null ? "" : "-" + profile) + ".properties";
+        String f = cfgFileLocation + cfgFileName + (isEmpty(profile) ? "" : "-" + profile) + ".properties";
         Map<String, String> r = null;
         if (cfgFileLocation.startsWith("classpath:")) {
             try (InputStream in = getClass().getClassLoader().getResourceAsStream(f.replace("classpath:/", ""))) {

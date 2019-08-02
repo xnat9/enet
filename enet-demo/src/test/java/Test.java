@@ -20,6 +20,7 @@ public class Test {
     }
 
     public static void main(String[] args) throws Throwable {
+        System.out.println("d3ff5".toUpperCase());
          // 压测();
     }
 

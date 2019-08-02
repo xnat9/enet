@@ -6,6 +6,7 @@ import cn.xnatural.enet.common.Utils;
 import cn.xnatural.enet.event.EC;
 import cn.xnatural.enet.event.EL;
 import cn.xnatural.enet.event.EP;
+import org.slf4j.Logger;
 
 import javax.annotation.Resource;
 import java.lang.annotation.Annotation;
@@ -241,7 +242,7 @@ public class AppContext {
      * @return
      */
     protected EP initEp() {
-        return new EP(exec) {
+        return new EP(exec, Log.of(EP.class)) {
             @Override
             protected Object doPublish(String eName, EC ec) {
                 if ("sys.starting".equals(eName) || "sys.stopping".equals(eName) || "sys.started".equals(eName)) {
@@ -404,7 +405,7 @@ public class AppContext {
     protected EP wrapEpForSource(Object source) {
         return new EP() {
             @Override
-            protected void init(Executor exec) {}
+            protected void init(Executor exec, Logger log) {}
             @Override
             public EP addTrackEvent(String... eNames) { ep.addTrackEvent(eNames); return this; }
             @Override

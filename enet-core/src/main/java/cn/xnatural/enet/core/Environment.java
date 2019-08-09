@@ -163,6 +163,7 @@ public class Environment {
                 System.setProperty("PID", getPid());
                 String logPath = getAttr("log.path");
                 if (isNotEmpty(logPath)) System.setProperty("LOG_PATH", logPath);
+                else System.setProperty("LOG_PATH", "./log/"); // 默认输出到当前目录下的log目录
 
                 Object o = Class.forName("ch.qos.logback.classic.joran.JoranConfigurator").newInstance();
                 Method m = findMethod(o.getClass(), "setContext", Class.forName("ch.qos.logback.core.Context"));
@@ -185,6 +186,9 @@ public class Environment {
                         log.info("Configure logback file: {}", fName);
                         m.invoke(o, in); f = true;
                     }
+                }
+                if (!f) {
+
                 }
                 // 设置日志级别
                 Method setLevel = findMethod(Class.forName("ch.qos.logback.classic.Logger"), "setLevel", Class.forName("ch.qos.logback.classic.Level"));

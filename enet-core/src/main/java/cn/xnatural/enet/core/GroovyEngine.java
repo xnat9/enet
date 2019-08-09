@@ -14,7 +14,6 @@ import java.util.HashMap;
 import java.util.LinkedHashMap;
 import java.util.Map;
 import java.util.concurrent.Executor;
-import java.util.concurrent.atomic.AtomicLong;
 import java.util.function.Consumer;
 
 /**
@@ -31,7 +30,6 @@ public class GroovyEngine {
 
     protected       Map                bindAttr;
     protected       GroovyScriptEngine gse;
-    protected final AtomicLong         counter = new AtomicLong(0);
     protected       GroovyClassLoader  gcl;
 
 
@@ -65,7 +63,7 @@ public class GroovyEngine {
      */
     @EL(name = {"groovy.eval"}, async = false)
     public Object eval(String scriptText, Consumer<Script> fn) {
-        Script script = InvokerHelper.createScript(gcl.parseClass(scriptText, genScriptName()), new Binding(new LinkedHashMap(bindAttr)));
+        Script script = InvokerHelper.createScript(gcl.parseClass(scriptText), new Binding(new LinkedHashMap(bindAttr)));
         if (fn == null) return script.run(); // 默认执行
         else fn.accept(script);
         return null;
@@ -87,10 +85,5 @@ public class GroovyEngine {
         if (fn == null) return script.run(); // 默认执行
         else fn.accept(script);
         return null;
-    }
-
-
-    protected String genScriptName() {
-        return "Script" + counter.getAndIncrement() + ".groovy";
     }
 }

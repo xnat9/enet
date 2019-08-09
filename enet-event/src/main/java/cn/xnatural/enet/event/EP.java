@@ -182,8 +182,7 @@ public class EP {
         if (source == null) lsMap.remove(eName);
         else {
             for (Iterator<Listener> it = lsMap.get(eName).iterator(); it.hasNext(); ) {
-                Listener l = it.next();
-                if (l.source == source) it.remove();
+                if (it.next().source == source) it.remove();
             }
         };
         return this;

@@ -1,9 +1,8 @@
 import cn.xnatural.enet.common.Log;
 import okhttp3.*;
 import okhttp3.internal.Util;
+import okio.ByteString;
 
-import javax.script.ScriptEngine;
-import javax.script.ScriptEngineManager;
 import java.io.IOException;
 import java.time.Duration;
 import java.util.ArrayList;
@@ -12,6 +11,7 @@ import java.util.List;
 import java.util.Random;
 import java.util.concurrent.*;
 import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.concurrent.atomic.AtomicInteger;
 
 public class Test {
 
@@ -20,13 +20,46 @@ public class Test {
     }
 
     public static void main(String[] args) throws Throwable {
-        System.out.println("d3ff5".toUpperCase());
+        // System.out.println("d3ff5".toUpperCase());
          // 压测();
+        // ws();
     }
 
 
-    static void 压测() throws Throwable {
-        OkHttpClient client = new OkHttpClient.Builder()
+    static void ws() throws Exception {
+        okClient().newWebSocket(new Request.Builder().url("ws://rl.cnxnu.com:9659/ppf/ar/6.0").build(), new WebSocketListener() {
+            @Override
+            public void onOpen(WebSocket webSocket, Response response) {
+                super.onOpen(webSocket, response);
+            }
+            AtomicInteger i = new AtomicInteger();
+            @Override
+            public void onMessage(WebSocket webSocket, String text) {
+                System.out.println("消息" + i.getAndIncrement() + ": " + text);
+            }
+            @Override
+            public void onMessage(WebSocket webSocket, ByteString bytes) {
+                super.onMessage(webSocket, bytes);
+            }
+            @Override
+            public void onClosing(WebSocket webSocket, int code, String reason) {
+                super.onClosing(webSocket, code, reason);
+            }
+            @Override
+            public void onClosed(WebSocket webSocket, int code, String reason) {
+                super.onClosed(webSocket, code, reason);
+            }
+            @Override
+            public void onFailure(WebSocket webSocket, Throwable t, Response response) {
+                super.onFailure(webSocket, t, response);
+            }
+        });
+        Thread.sleep(TimeUnit.MINUTES.toMillis(10));
+    }
+
+
+    static OkHttpClient okClient() {
+        return new OkHttpClient.Builder()
             .readTimeout(Duration.ofSeconds(17)).connectTimeout(Duration.ofSeconds(5))
             .dispatcher(new Dispatcher(new ThreadPoolExecutor(4, 10, 60, TimeUnit.SECONDS, new LinkedBlockingQueue<>(), Util.threadFactory("OkHttp Dispatcher", false))))
             .cookieJar(new CookieJar() {// 共享cookie
@@ -42,6 +75,11 @@ public class Test {
                 }
             })
             .build();
+    }
+
+
+    static void 压测() throws Throwable {
+        OkHttpClient client = okClient();
         String urlPrefix = "http://localhost:8000/tpl";
 
         System.out.println(client.newCall(new Request.Builder().get().url(urlPrefix + "/dao").build()).execute().body().string());

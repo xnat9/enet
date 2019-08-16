@@ -8,6 +8,7 @@ import cn.xnatural.enet.event.EP;
 import org.slf4j.ILoggerFactory;
 import org.slf4j.LoggerFactory;
 
+import java.io.File;
 import java.io.FileNotFoundException;
 import java.io.InputStream;
 import java.lang.reflect.Method;
@@ -44,7 +45,7 @@ public class Environment {
     /**
      * 运行时改变的属性, 优先级高于 {@link #finalAttrs} see: {@link #getAttr(String)}
      */
-    protected final     Map<String, String>              runtimeAttrs     = new ConcurrentHashMap<>(7);
+    protected final     Map<String, Object>              runtimeAttrs     = new ConcurrentHashMap<>(7);
     /**
      * location 和 其对应的 所有属性
      */
@@ -161,9 +162,8 @@ public class Environment {
             try {
                 // 设置logback 配置文件中的变量
                 System.setProperty("PID", getPid());
-                String logPath = getAttr("log.path");
-                if (isNotEmpty(logPath)) System.setProperty("LOG_PATH", logPath);
-                else System.setProperty("LOG_PATH", "./log/"); // 默认输出到当前目录下的log目录
+                String logPath = getString("log.path", "./log/"); // 默认输出到当前目录下的log目录
+                System.setProperty("LOG_PATH", logPath); new File(logPath).mkdirs();
 
                 Object o = Class.forName("ch.qos.logback.classic.joran.JoranConfigurator").newInstance();
                 Method m = findMethod(o.getClass(), "setContext", Class.forName("ch.qos.logback.core.Context"));
@@ -188,7 +188,10 @@ public class Environment {
                     }
                 }
                 if (!f) {
-
+                    InputStream in = getClass().getClassLoader().getResourceAsStream(getClass().getPackage().getName().replace(".", "/") + "/logback.xml");
+                    if (in != null) {
+                        m.invoke(o, in); f = true;
+                    }
                 }
                 // 设置日志级别
                 Method setLevel = findMethod(Class.forName("ch.qos.logback.classic.Logger"), "setLevel", Class.forName("ch.qos.logback.classic.Level"));
@@ -274,8 +277,8 @@ public class Environment {
 
 
     public String getString(String key, String defaultValue) {
-        String v = getAttr(key);
-        return (v == null ? defaultValue : v);
+        Object v = getAttr(key);
+        return (v == null ? defaultValue : v.toString());
     }
 
 
@@ -290,9 +293,9 @@ public class Environment {
      * @return
      */
     @EL(name = "env.getAttr", async = false)
-    protected String getAttr(String key) {
-        String v = runtimeAttrs.get(key);
-        if (v == null) v = System.getProperty(key);
+    protected Object getAttr(String key) {
+        Object v = System.getProperty(key);
+        if (v == null) v = runtimeAttrs.get(key);
         if (v == null) v = finalAttrs.get(key);
         return v;
     }
@@ -304,7 +307,7 @@ public class Environment {
      * @param value 属性值
      * @return
      */
-    public Environment setAttr(String key, String value) {
+    public Environment setAttr(String key, Object value) {
         if (PROP_ACTIVE.equals(key)) throw new RuntimeException("not allow change this property '" + PROP_ACTIVE + "'");
         // 即时通知
         ep.fire("env.updateAttr", EC.of(this).args(key, value).completeFn(ec -> { if (ec.isSuccess()) runtimeAttrs.put(key, value); }));
@@ -335,7 +338,7 @@ public class Environment {
 
         finalAttrs.forEach(fn);
         System.getProperties().forEach((k, v) -> fn.accept(k.toString(), Objects.toString(v, null)));
-        runtimeAttrs.forEach(fn);
+        runtimeAttrs.forEach((k, v) -> fn.accept(k, Objects.toString(v, null)));
         return group;
     }
 

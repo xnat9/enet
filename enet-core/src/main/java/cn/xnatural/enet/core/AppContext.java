@@ -293,7 +293,7 @@ public class AppContext {
     @EL(name = "env.configured", async = false, order = -1)
     protected void envConfigured() {
         // 1. 设置app名字
-        String n = env.getAttr("sys.name");
+        String n = (String) env.getAttr("sys.name");
         if (isNotEmpty(n)) name = n.trim();
 
         // 2. 重置 exec 相关属性
@@ -311,12 +311,12 @@ public class AppContext {
         ep.addTrackEvent(env.getString("ep.track", "").split(","));
 
         // 4. 初始化groovy执行引擎
-        if (env().getBoolean("groovy.enabled", true)) addSource(new GroovyEngine());
+        if (env().getBoolean("groovy.enabled", false)) addSource(new GroovyEngine());
     }
 
 
     @EL(name = "env.updateAttr")
-    protected void updateAttr(String k, String v) {
+    protected void updateAttr(String k, Object v) {
         if (k.startsWith("sys.exec.")) { // 更改sys线程池属性
             if ("sys.exec.corePoolSize".equals(k)) {
                 Integer i = toInteger(v, null);

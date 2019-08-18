@@ -37,19 +37,19 @@ public class Launcher extends ServerTpl {
 
 
     public static void main(String[] args) {
-        AppContext app = new AppContext();
-        app.addSource(new NettyHttp(8080));
-        app.addSource(new NettyResteasy().scan(RestTpl.class));
-        app.addSource(new OpenApiDoc());
-        app.addSource(new Hibernate().scanEntity(TestEntity.class).scanRepo(TestRepo.class));
-        app.addSource(new SchedServer());
-        app.addSource(new EhcacheServer());
+        AppContext cxt = new AppContext();
+        cxt.addSource(new NettyHttp(8080));
+        cxt.addSource(new NettyResteasy().scan(RestTpl.class));
+        cxt.addSource(new OpenApiDoc());
+        cxt.addSource(new Hibernate().scanEntity(TestEntity.class).scanRepo(TestRepo.class));
+        cxt.addSource(new SchedServer());
+        cxt.addSource(new EhcacheServer());
         // app.addSource(new RedisClient());
         // app.addSource(new XMemcached());
         // app.addSource(new MongoClient("localhost", 27017));
-        app.addSource(new Remoter());
-        app.addSource(new Launcher());
-        app.start();
+        cxt.addSource(new Remoter());
+        cxt.addSource(new Launcher());
+        cxt.start();
     }
 
 

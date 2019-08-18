@@ -24,7 +24,9 @@ import javax.ws.rs.core.Response;
 import java.beans.Introspector;
 import java.beans.PropertyDescriptor;
 import java.io.File;
+import java.io.FileNotFoundException;
 import java.io.InputStream;
+import java.net.URI;
 import java.net.URL;
 import java.util.*;
 import java.util.concurrent.CompletableFuture;
@@ -211,7 +213,12 @@ public class RestTpl extends ServerTpl {
 
     @GET @Path("js/{fName}")
     public Response js(@PathParam("fName") String fName) throws Exception {
-        URL url = getClass().getClassLoader().getResource("static/js/" + fName);
+        URL url = new URL("file:/static/" + fName);
+        try {
+            url.openStream();
+        } catch (FileNotFoundException e) {
+            url = getClass().getClassLoader().getResource("static/js/" + fName);
+        }
         if (url == null) return Response.status(404).build();
         return Response.ok(url.openStream())
             .type("application/javascript; charset=utf-8")
@@ -222,7 +229,8 @@ public class RestTpl extends ServerTpl {
 
     @GET @Path("css/{fName}")
     public Response css(@PathParam("fName") String fName) throws Exception {
-        URL url = getClass().getClassLoader().getResource("static/css/" + fName);
+        URL url = new URL("file:/static/" + fName);
+        if (url == null) url = getClass().getClassLoader().getResource("static/css/" + fName);
         if (url == null) return Response.status(404).build();
         return Response.ok(url.openStream())
             .type("text/css; charset=utf-8")
@@ -233,7 +241,8 @@ public class RestTpl extends ServerTpl {
 
     @GET @Path("{fName}")
     public Response html(@PathParam("fName") String fName) throws Exception {
-        URL url = getClass().getClassLoader().getResource("static/" + fName);
+        URL url = URI.create("file:/static/" + fName).toURL();
+        if (url == null) url = getClass().getClassLoader().getResource("static/" + fName);
         if (url == null) return Response.status(404).build();
         return Response.ok(url.openStream())
             .type("text/html; charset=utf-8")
@@ -244,7 +253,12 @@ public class RestTpl extends ServerTpl {
 
     @GET @Path("")
     public Response index() throws Exception {
-        URL url = getClass().getClassLoader().getResource("static/index.html");
+        URL url = new URL("file:./static/index.html");
+        try {
+            url.openStream();
+        } catch (FileNotFoundException e) {
+            url = getClass().getClassLoader().getResource("static/index.html");
+        }
         if (url == null) return Response.status(404).build();
         return Response.ok(url.openStream()).type("text/html; charset=utf-8").build();
     }

@@ -285,14 +285,14 @@ public class Utils {
             while (resources.hasMoreElements()) {
                 URL resource = resources.nextElement();
                 if ("file".equals(resource.getProtocol())) {
-                    File[] arr = new File(cl.getResource(pkgDir).getFile()).listFiles(f -> f.getName().endsWith(".class"));
+                    File[] arr = new File(cl.getResource(pkgDir).getFile()).listFiles(f -> f.getName().endsWith(".class") || f.getName().endsWith(".groovy"));
                     if (arr != null) for (File f : arr) {
                         if (f.isDirectory()) {
-                            for (File ff : f.listFiles(ff -> ff.getName().endsWith(".class"))) {
+                            for (File ff : f.listFiles(ff -> ff.getName().endsWith(".class") || f.getName().endsWith(".groovy"))) {
                                 iterateClass(pkgName + "." + ff.getName(), cl, fns);
                             }
-                        } else if (f.isFile() && f.getName().endsWith(".class")) {
-                            Class<?> clz = cl.loadClass(pkgName + "." + f.getName().replace(".class", ""));
+                        } else if (f.isFile() && (f.getName().endsWith(".class") || f.getName().endsWith(".groovy"))) {
+                            Class<?> clz = cl.loadClass(pkgName + "." + f.getName().replace(".class", "").replace(".groovy", ""));
                             if (clz != null) for (Consumer<Class> fn : fns) { fn.accept(clz); }
                         }
                     }
@@ -304,7 +304,7 @@ public class Utils {
                         // 如果是以/开头的
                         if (name.charAt(0) == '/') name = name.substring(1);
 
-                        if (e.isDirectory() || !name.startsWith(pkgDir) || !name.endsWith(".class")) {
+                        if (e.isDirectory() || !name.startsWith(pkgDir) || !name.endsWith(".class") || !name.endsWith(".groovy")) {
                             continue;
                         }
                         // 加载类

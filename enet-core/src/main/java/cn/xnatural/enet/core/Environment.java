@@ -163,7 +163,7 @@ public class Environment {
                 // 设置logback 配置文件中的变量
                 System.setProperty("PID", getPid());
                 String logPath = getString("log.path", "./log/"); // 默认输出到当前目录下的log目录
-                System.setProperty("LOG_PATH", logPath); new File(logPath).mkdirs();
+                System.setProperty("LOG_PATH", logPath);
 
                 Object o = Class.forName("ch.qos.logback.classic.joran.JoranConfigurator").newInstance();
                 Method m = findMethod(o.getClass(), "setContext", Class.forName("ch.qos.logback.core.Context"));
@@ -196,7 +196,7 @@ public class Environment {
                 // 设置日志级别
                 Method setLevel = findMethod(Class.forName("ch.qos.logback.classic.Logger"), "setLevel", Class.forName("ch.qos.logback.classic.Level"));
                 Method toLevel = findMethod(Class.forName("ch.qos.logback.classic.Level"), "toLevel", String.class);
-                for (Map.Entry<String, String> e : groupAttr("log.level").entrySet()) {
+                for (Map.Entry<String, String> e : group("log.level").entrySet()) {
                     setLevel.invoke(fa.getLogger(e.getKey()), toLevel.invoke(null, e.getValue()));
                 }
             } catch (Exception e) {
@@ -325,7 +325,7 @@ public class Environment {
      * @return
      */
     @EL(name = "env.ns", async = false)
-    public Map<String, String> groupAttr(String... keys) {
+    public Map<String, String> group(String... keys) {
         Map<String, String> group = new HashMap<>();
         if (keys == null || keys.length < 1) return group;
         BiConsumer<String, String> fn = (k, v) -> {

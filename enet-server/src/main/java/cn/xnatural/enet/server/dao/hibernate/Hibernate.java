@@ -5,6 +5,7 @@ import cn.xnatural.enet.event.EL;
 import cn.xnatural.enet.event.EP;
 import cn.xnatural.enet.server.ServerTpl;
 import org.hibernate.HibernateException;
+import org.hibernate.Session;
 import org.hibernate.SessionFactory;
 import org.hibernate.jpa.HibernatePersistenceProvider;
 
@@ -116,9 +117,14 @@ public class Hibernate extends ServerTpl {
      * 自定义执行
      * @param fn
      */
-    public Hibernate doWork(Consumer<SessionFactory> fn, Runnable successFn, Consumer<Throwable> failFn) {
-        tm.trans(() -> {fn.accept(sf); return null;}, successFn, failFn);
+    public Hibernate doWork(Consumer<Session> fn, Runnable successFn, Consumer<Throwable> failFn) {
+        tm.trans(() -> {fn.accept(sf.getCurrentSession()); return null;}, successFn, failFn);
         return this;
+    }
+
+
+    public Hibernate doWork(Consumer<Session> fn) {
+        return doWork(fn, null, null);
     }
 
 
@@ -280,6 +286,7 @@ public class Hibernate extends ServerTpl {
             closeDs();
         }
         Map<String, String> dsAttr = new HashMap<>();
+        dsAttr.put("validationQuery", "select 1");
         attrs.entrySet().stream().filter(e -> e.getKey().startsWith("ds")).forEach(e -> {
             dsAttr.put(e.getKey().replace("ds.", ""), (String) e.getValue());
         });

@@ -4,7 +4,7 @@ package cn.xnatural.enet.demo;
 import cn.xnatural.enet.core.AppContext;
 import cn.xnatural.enet.demo.common.Async;
 import cn.xnatural.enet.demo.common.Monitor;
-import cn.xnatural.enet.demo.dao.entity.TestEntity;
+import cn.xnatural.enet.demo.dao.entity.Test;
 import cn.xnatural.enet.demo.dao.repo.TestRepo;
 import cn.xnatural.enet.demo.rest.RestTpl;
 import cn.xnatural.enet.demo.service.FileUploader;
@@ -41,7 +41,7 @@ public class Launcher extends ServerTpl {
         cxt.addSource(new NettyHttp(8080));
         cxt.addSource(new NettyResteasy().scan(RestTpl.class));
         cxt.addSource(new OpenApiDoc());
-        cxt.addSource(new Hibernate().scanEntity(TestEntity.class).scanRepo(TestRepo.class));
+        cxt.addSource(new Hibernate().scanEntity(Test.class).scanRepo(TestRepo.class));
         cxt.addSource(new SchedServer());
         cxt.addSource(new EhcacheServer());
         // app.addSource(new RedisClient());

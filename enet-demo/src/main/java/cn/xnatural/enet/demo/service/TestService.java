@@ -1,7 +1,7 @@
 package cn.xnatural.enet.demo.service;
 
 import cn.xnatural.enet.demo.common.Monitor;
-import cn.xnatural.enet.demo.dao.entity.TestEntity;
+import cn.xnatural.enet.demo.dao.entity.Test;
 import cn.xnatural.enet.demo.dao.entity.UploadFile;
 import cn.xnatural.enet.demo.dao.repo.TestRepo;
 import cn.xnatural.enet.demo.dao.repo.UploadFileRepo;
@@ -27,7 +27,7 @@ public class TestService extends ServerTpl {
     @Monitor(trace = true)
     @Trans
     public PageModel findTestData() {
-        TestEntity e = new TestEntity();
+        Test e = new Test();
         e.setName("aaaa" + new SimpleDateFormat("yyyy-MM-dd HH:mm:ss").format(new Date()));
         e.setAge(111);
         testRepo.saveOrUpdate(e);
@@ -59,10 +59,10 @@ public class TestService extends ServerTpl {
 
     @EL(name = "eName1", async = false)
     private String testEvent1(String p) {
-        TestEntity e = new TestEntity();
+        Test e = new Test();
         e.setName("aaaa" + new SimpleDateFormat("yyyy-MM-dd HH:mm:ss").format(new Date()));
         e.setAge(111);
-        TestEntity t = testRepo.saveOrUpdate(e);
+        Test t = testRepo.saveOrUpdate(e);
         // if (true) throw new IllegalArgumentException("xxx");
         return "new entity : " + t.getId();
     }

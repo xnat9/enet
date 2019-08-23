@@ -5,7 +5,7 @@ import cn.xnatural.enet.server.dao.hibernate.LongIdEntity;
 import javax.persistence.Entity;
 
 @Entity
-public class TestEntity extends LongIdEntity {
+public class Test extends LongIdEntity {
 
     private String name;
     private Integer age;
@@ -16,7 +16,7 @@ public class TestEntity extends LongIdEntity {
     }
 
 
-    public TestEntity setName(String name) {
+    public Test setName(String name) {
         this.name = name;
         return this;
     }
@@ -27,7 +27,7 @@ public class TestEntity extends LongIdEntity {
     }
 
 
-    public TestEntity setAge(Integer age) {
+    public Test setAge(Integer age) {
         this.age = age;
         return this;
     }

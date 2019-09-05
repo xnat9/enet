@@ -11,12 +11,12 @@
 <dependency>
     <groupId>cn.xnatural.enet</groupId>
     <artifactId>enet-core</artifactId>
-    <version>0.0.9</version>
+    <version>0.0.10</version>
 </dependency>
 <dependency>
     <groupId>cn.xnatural.enet</groupId>
     <artifactId>enet-server</artifactId>
-    <version>0.0.9</version>
+    <version>0.0.10</version>
 </dependency>
 ```
 

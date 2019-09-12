@@ -5,7 +5,7 @@
     <parent>
         <artifactId>enet</artifactId>
         <groupId>cn.xnatural.enet</groupId>
-        <version>0.0.10</version>
+        <version>0.0.11</version>
     </parent>
     <modelVersion>4.0.0</modelVersion>
     <artifactId>enet-demo</artifactId>
@@ -17,12 +17,12 @@
         <dependency>
             <groupId>cn.xnatural.enet</groupId>
             <artifactId>enet-core</artifactId>
-            <version>0.0.10</version>
+            <version>0.0.11</version>
         </dependency>
         <dependency>
             <groupId>cn.xnatural.enet</groupId>
             <artifactId>enet-server</artifactId>
-            <version>0.0.10</version>
+            <version>0.0.11</version>
         </dependency>
 
         <dependency>

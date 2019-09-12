@@ -5,13 +5,13 @@
     <parent>
         <artifactId>enet</artifactId>
         <groupId>cn.xnatural.enet</groupId>
-        <version>0.0.10</version>
+        <version>0.0.11</version>
     </parent>
     <modelVersion>4.0.0</modelVersion>
 
     <artifactId>enet-server</artifactId>
     <packaging>jar</packaging>
-    <version>0.0.10</version>
+    <version>0.0.11</version>
 
     <url>https://gitee.com/xnat/enet</url>
 
@@ -23,12 +23,12 @@
         <dependency>
             <groupId>cn.xnatural.enet</groupId>
             <artifactId>enet-event</artifactId>
-            <version>0.0.10</version>
+            <version>0.0.11</version>
         </dependency>
         <dependency>
             <groupId>cn.xnatural.enet</groupId>
             <artifactId>enet-common</artifactId>
-            <version>0.0.10</version>
+            <version>0.0.11</version>
         </dependency>
 
         <!--<dependency>

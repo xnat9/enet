@@ -218,6 +218,37 @@ public class Hibernate extends ServerTpl {
     }
 
 
+    /**
+     * 设置entity
+     * @param es
+     * @return
+     */
+    public Hibernate entities(Object...es) {
+        if (es != null) {
+            for (Object e : es) {
+                if (e instanceof Class) entities.add(((Class) e).getName());
+                else if (e instanceof String) entities.add(e.toString());
+                else throw new IllegalArgumentException("Only accept Class or String parameter");
+            }
+        }
+        return this;
+    }
+
+
+    /**
+     *
+     */
+    protected List<Class<BaseRepo>> repos = new LinkedList<>();
+    public Hibernate repos(Class<BaseRepo>...clzs) {
+        if (clzs != null) {
+            for (Class clz : clzs) {
+                repos.add(clz);
+            }
+        }
+        return this;
+    }
+
+
     public Hibernate scanEntity(Class... clzs) {
         if (running.get()) throw new IllegalArgumentException("Server is running, not allow change");
         if (clzs == null || clzs.length == 0) {
@@ -236,8 +267,6 @@ public class Hibernate extends ServerTpl {
 
 
     protected void entityCollect() {
-        if (entityScan == null || entityScan.isEmpty()) return;
-        log.debug("entityCollect. scan: {}", entityScan);
         for (Class tmpClz : entityScan) {
             iterateClass(tmpClz.getPackage().getName(), getClass().getClassLoader(), clz -> {
                 if (clz.getAnnotation(Entity.class) != null) entities.add(clz.getName());
@@ -248,30 +277,32 @@ public class Hibernate extends ServerTpl {
 
 
     protected void repoCollect() {
-        if (repoScan == null || repoScan.isEmpty()) return;
-        log.debug("collect hibernate repo. scan: {}", repoScan);
-        for (Class tmpClz : repoScan) {
-            iterateClass(tmpClz.getPackage().getName(), getClass().getClassLoader(), clz -> {
-                if (clz.getAnnotation(Repo.class) == null) return;
-                Object originObj;
-                try { originObj = clz.newInstance(); } catch (Exception e) { log.error(e); return; }
+        Consumer<Class> p = clz -> {
+            if (clz.getAnnotation(Repo.class) == null) return;
+            Object originObj;
+            try { originObj = clz.newInstance(); } catch (Exception e) { log.error(e); return; }
 
-                ep.fire("inject", originObj); //注入@Resource注解的字段
+            ep.fire("inject", originObj); //注入@Resource注解的字段
 
-                // invoke init method
-                invoke(findMethod(clz, m -> m.getAnnotation(PostConstruct.class) != null), originObj);
+            // invoke init method
+            invoke(findMethod(clz, m -> m.getAnnotation(PostConstruct.class) != null), originObj);
 
-                // 增强 repo 对象
-                Object inst = Utils.proxy(clz, (obj, method, args, proxy) -> {
-                    if (method.getAnnotation(Trans.class) == null) return proxy.invoke(originObj, args);
-                    else return tm.trans(() -> {
-                        try { return proxy.invoke(originObj, args); } catch (Throwable t) { throw new HibernateException(t); }
-                    });
+            // 增强 repo 对象
+            Object inst = Utils.proxy(clz, (obj, method, args, proxy) -> {
+                if (method.getAnnotation(Trans.class) == null) return proxy.invoke(originObj, args);
+                else return tm.trans(() -> {
+                    try { return proxy.invoke(originObj, args); } catch (Throwable t) { throw new HibernateException(t); }
                 });
-                ep.addListenerSource(inst);
-                exposeBean(inst, clz.getSimpleName()); // 暴露所有Repo出去
-                log.debug("add hibernate repo object: {}", inst);
             });
+            ep.addListenerSource(inst);
+            exposeBean(inst, clz.getSimpleName()); // 暴露所有Repo出去
+            log.debug("add hibernate repo object: {}", inst);
+        };
+        for (Class tmpClz : repoScan) {
+            iterateClass(tmpClz.getPackage().getName(), getClass().getClassLoader(), p);
+        }
+        for (Class<BaseRepo> clz : repos) {
+            p.accept(clz);
         }
     }
 

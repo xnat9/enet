@@ -30,6 +30,7 @@ import java.util.concurrent.*;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.LongAdder;
+import java.util.function.Consumer;
 
 import static cn.xnatural.enet.common.Utils.*;
 import static io.netty.handler.codec.http.HttpResponseStatus.SERVICE_UNAVAILABLE;
@@ -133,9 +134,10 @@ public class NettyResteasy extends ServerTpl {
                 // 当请求对列中等待处理的请求过多就拒绝新的请求(默认值: 线程池的线程个数的3倍)
                 if (i >= getInteger("maxWaitRequest", toInteger(invoke(findMethod(exec.getClass(), "getCorePoolSize"), exec), 10) * 3)) {
                     if (i > 0 && i % 3 == 0) log.warn("There are currently {} requests waiting to be processed.", i);
+                    log.warn("Drop request: {}", ((NettyHttpRequest) msg).getUri().getRequestUri());
                     ctx.writeAndFlush(new DefaultHttpResponse(HttpVersion.HTTP_1_1, SERVICE_UNAVAILABLE));
                 } else {
-                    devourer.offer(() -> exec.execute(() -> {count(); process(ctx, msg);}));
+                    devourer.offer(() -> exec.execute(() -> {count(); process(ctx, (NettyHttpRequest) msg);}));
                 }
             }
         });
@@ -145,48 +147,45 @@ public class NettyResteasy extends ServerTpl {
     /**
      * 处理请求
      * @param ctx
-     * @param msg
+     * @param req
      */
-    protected void process(ChannelHandlerContext ctx, Object msg) {
-        if (msg instanceof NettyHttpRequest) {
-            NettyHttpRequest req = (NettyHttpRequest) msg;
-            NettyHttpResponse resp = req.getResponse();
-            log.trace("Start process new request: {}", req.getUri().getPath());
-            try {
-                if (getBoolean("session.enabled", false)) { // 添加session控制
-                    Cookie c = req.getHttpHeaders().getCookies().get(getSessionCookieName());
-                    String sId;
-                    if (c == null || Utils.isEmpty(c.getValue())) {
-                        sId = UUID.randomUUID().toString().replace("-", "");
-                        ((NettyHttpRequest) msg).getResponse().addNewCookie(
-                            new NewCookie(
-                                getSessionCookieName(), sId, "/", (String) null, 1, (String) null,
-                                (int) TimeUnit.MINUTES.toSeconds((Integer) ep.fire("session.getExpire") + 5)
-                                , null, false, false
-                            )
-                        );
-                    } else sId = c.getValue();
-                    ep.fire("session.access", sId);
-                    ((NettyHttpRequest) msg).setAttribute(getSessionCookieName(), sId);
-                }
-
-                dispatcher.service(ctx, req, resp, true);
-            } catch (Failure ex) {
-                resp.reset(); resp.setStatus(ex.getErrorCode());
-            } catch (UnhandledException e) {
-                resp.reset(); resp.setStatus(500);
-                if (e.getCause() != null) log.error(e.getCause());
-                else log.error(e);
-            } catch (Exception ex) {
-                resp.reset(); resp.setStatus(500);
-                log.error(ex);
-            } finally {
-                if (!req.getAsyncContext().isSuspended()) {
-                    try { resp.finish(); }
-                    catch (IOException e) { log.error(e); }
-                }
-                req.releaseContentBuffer();
+    protected void process(ChannelHandlerContext ctx, NettyHttpRequest req) {
+        log.info("Process request: {}", req.getUri().getRequestUri());
+        NettyHttpResponse resp = req.getResponse();
+        try {
+            if (getBoolean("session.enabled", false)) { // 添加session控制
+                Cookie c = req.getHttpHeaders().getCookies().get(getSessionCookieName());
+                String sId;
+                if (c == null || Utils.isEmpty(c.getValue())) {
+                    sId = UUID.randomUUID().toString().replace("-", "");
+                    req.getResponse().addNewCookie(
+                        new NewCookie(
+                            getSessionCookieName(), sId, "/", (String) null, 1, (String) null,
+                            (int) TimeUnit.MINUTES.toSeconds((Integer) ep.fire("session.getExpire") + 5)
+                            , null, false, false
+                        )
+                    );
+                } else sId = c.getValue();
+                ep.fire("session.access", sId);
+                req.setAttribute(getSessionCookieName(), sId);
             }
+
+            dispatcher.service(ctx, req, resp, true);
+        } catch (Failure ex) {
+            resp.reset(); resp.setStatus(ex.getErrorCode());
+        } catch (UnhandledException e) {
+            resp.reset(); resp.setStatus(500);
+            if (e.getCause() != null) log.error(e.getCause());
+            else log.error(e);
+        } catch (Exception ex) {
+            resp.reset(); resp.setStatus(500);
+            log.error(ex);
+        } finally {
+            if (!req.getAsyncContext().isSuspended()) {
+                try { resp.finish(); }
+                catch (IOException e) { log.error(e); }
+            }
+            req.releaseContentBuffer();
         }
     }
 
@@ -281,23 +280,35 @@ public class NettyResteasy extends ServerTpl {
         return this;
     }
 
+    protected List<Class> sourceClzs = new LinkedList<>();
+    public NettyResteasy sources(Class...clzs) {
+        if (clzs != null) {
+            for (Class clz : clzs) {
+                sourceClzs.add(clz);
+            }
+        }
+        return this;
+    }
+
 
     /**
      * 收集 {@link #scan} 类对的包下边所有的 有注解{@link Path}的类
      */
     protected void collect() {
-        if (scan == null || scan.isEmpty()) return;
-        log.debug("collect resteasy resource. scan: {}", scan);
-        for (Class tmpClz : scan) {
-            iterateClass(tmpClz.getPackage().getName(), getClass().getClassLoader(), clz -> {
-                if (clz.getAnnotation(Path.class) != null || clz.getAnnotation(Provider.class) != null) {
-                    try {
-                        addResource(createAndInitSource(clz), null, true);
-                    } catch (Exception e) {
-                        log.error(e);
-                    }
+        Consumer<Class> p = clz -> {
+            if (clz.getAnnotation(Path.class) != null || clz.getAnnotation(Provider.class) != null) {
+                try {
+                    addResource(createAndInitSource(clz), null, true);
+                } catch (Exception e) {
+                    log.error(e);
                 }
-            });
+            }
+        };
+        for (Class tmpClz : scan) {
+            iterateClass(tmpClz.getPackage().getName(), getClass().getClassLoader(), p);
+        }
+        for (Class clz : sourceClzs) {
+            p.accept(clz);
         }
     }
 

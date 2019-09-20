@@ -41,14 +41,25 @@ public class BaseRepo<T extends IEntity, ID extends Serializable> {
     protected int            defaultPageSize;
 
 
+    public BaseRepo() { }
+
+
+    public BaseRepo(Class<T> entityType, Class<ID> idType) {
+        this.entityType = entityType;
+        this.idType = idType;
+    }
+
+
     @PostConstruct
     protected void init() {
-        Type genType = getClass().getGenericSuperclass();
-        if (genType instanceof ParameterizedType) {
-            Type[] params = ((ParameterizedType) genType).getActualTypeArguments();
-            if (params[0] instanceof Class) {
-                entityType = (Class) params[0];
-                idType = (Class) params[1];
+        if (entityType == null && idType == null) {
+            Type genType = getClass().getGenericSuperclass();
+            if (genType instanceof ParameterizedType) {
+                Type[] params = ((ParameterizedType) genType).getActualTypeArguments();
+                if (params[0] instanceof Class) {
+                    entityType = (Class) params[0];
+                    idType = (Class) params[1];
+                }
             }
         }
         Objects.requireNonNull(entityType, "domainType is null");

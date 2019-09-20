@@ -358,6 +358,21 @@ public class Log implements Logger {
     }
 
 
+    public void error(Throwable t, String pMsg, Object pArgs) {
+        doLog(ERROR, null, t, pMsg, pArgs);
+    }
+
+
+    public void error(Throwable t, String pMsg, Object arg1, Object arg2) {
+        doLog(ERROR, null, t, pMsg, arg1, arg2);
+    }
+
+
+    public void error(Throwable t, String pMsg, Object arg1, Object arg2, Object arg3) {
+        doLog(ERROR, null, t, pMsg, arg1, arg2, arg3);
+    }
+
+
     public void warn(Throwable t, String pMsg, Object... pArgs) {
         doLog(WARN, null, t, pMsg, pArgs);
     }
@@ -371,6 +386,11 @@ public class Log implements Logger {
     @Override
     public void warn(String format, Object arg1, Object arg2) {
         doLog(WARN, null, (Throwable) null, format, arg1, arg2);
+    }
+
+
+    public void warn(String format, Object arg1, Object arg2, Object arg3) {
+        doLog(WARN, null, (Throwable) null, format, arg1, arg2, arg3);
     }
 
 
@@ -612,6 +632,11 @@ public class Log implements Logger {
     }
 
 
+    public void info(String format, Object arg1, Object arg2, Object arg3) {
+        doLog(INFO, null, (Throwable) null, format, arg1, arg2, arg3);
+    }
+
+
     public boolean isWarnEnabled() {
         return isEnabled(WARN);
     }
@@ -652,6 +677,11 @@ public class Log implements Logger {
     }
 
 
+    public void error(String format, Object arg1, Object arg2, Object arg3) {
+        doLog(ERROR, null, (Throwable) null, format, arg1, arg2, arg3);
+    }
+
+
     public boolean isDebugEnabled() {
         return isEnabled(DEBUG);
     }
@@ -672,6 +702,11 @@ public class Log implements Logger {
     @Override
     public void debug(String format, Object arg1, Object arg2) {
         doLog(DEBUG, null, (Throwable) null, format, arg1, arg2);
+    }
+
+
+    public void debug(String format, Object arg1, Object arg2, Object arg3) {
+        doLog(DEBUG, null, (Throwable) null, format, arg1, arg2, arg3);
     }
 
 
@@ -701,6 +736,11 @@ public class Log implements Logger {
     @Override
     public void trace(String format, Object arg1, Object arg2) {
         doLog(TRACE, null, (Throwable) null, format, arg1, arg2);
+    }
+
+
+    public void trace(String format, Object arg1, Object arg2, Object arg3) {
+        doLog(TRACE, null, (Throwable) null, format, arg1, arg2, arg3);
     }
 
 

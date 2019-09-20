@@ -1,5 +1,6 @@
 package cn.xnatural.enet.server.session;
 
+import cn.xnatural.enet.common.Utils;
 import cn.xnatural.enet.event.EL;
 import cn.xnatural.enet.event.EP;
 import cn.xnatural.enet.server.ServerTpl;
@@ -57,7 +58,7 @@ public class MemSessionManager extends ServerTpl {
      * @return {@link SessionData}
      */
     protected SessionData createOrGet(String sId) {
-        if (sMap.containsKey(sId)) {
+        if (Utils.isNotEmpty(sId) && sMap.containsKey(sId)) {
             SessionData d = sMap.get(sId);
             // 判断是否已过期
             if ((System.currentTimeMillis() - d.accessTime) > TimeUnit.MINUTES.toMillis(expire)) sMap.remove(sId);

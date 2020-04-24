@@ -150,7 +150,7 @@ public class EC {
      * @return
      */
     public boolean isSuccess() {
-        return isNoListener() || (willPass.size() == successPassed.size() && ex == null && errMsg == null);
+        return isNoListener() || (willPass.size() == successPassed.size() && ex == null && errMsg == null && pause == false);
     }
 
 

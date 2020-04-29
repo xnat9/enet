@@ -18,10 +18,10 @@ public @interface EL {
     String[] name();
 
     /**
-     * 是否异步. 默认异步
+     * 是否异步. 默认同步
      * @return
      */
-    boolean async() default true;
+    boolean async() default false;
 
     /**
      * 同相事件名的多个监听器的执行顺序.

@@ -184,7 +184,7 @@ public class EP {
             for (Iterator<Listener> it = lsMap.get(eName).iterator(); it.hasNext(); ) {
                 if (it.next().source == source) it.remove();
             }
-        };
+        }
         return this;
     }
 

@@ -30,7 +30,7 @@ public class XMemcached extends ServerTpl {
     }
 
 
-    @EL(name = "sys.starting")
+    @EL(name = "sys.starting", async = true)
     public void start() {
         if (!running.compareAndSet(false, true)) {
             log.warn("{} Client is running", getName()); return;

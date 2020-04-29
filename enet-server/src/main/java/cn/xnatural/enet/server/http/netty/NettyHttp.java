@@ -41,7 +41,7 @@ public class NettyHttp extends ServerTpl {
     public NettyHttp(String name, int port) { super(name); attr("port", port); }
 
 
-    @EL(name = "sys.starting")
+    @EL(name = "sys.starting", async = true)
     public void start() {
         if (exec == null) {
             exec = Executors.newFixedThreadPool(2, new ThreadFactory() {

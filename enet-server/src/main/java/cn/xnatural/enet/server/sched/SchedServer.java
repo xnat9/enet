@@ -34,7 +34,7 @@ public class SchedServer extends ServerTpl {
     public SchedServer() { super("sched"); }
 
 
-    @EL(name = "sys.starting")
+    @EL(name = "sys.starting", async = true)
     public void start() {
         if (!running.compareAndSet(false, true)) {
             log.warn("{} Server is running", getName()); return;

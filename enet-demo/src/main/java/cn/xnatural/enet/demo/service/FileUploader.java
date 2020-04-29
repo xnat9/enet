@@ -43,7 +43,7 @@ public class FileUploader extends ServerTpl {
     public FileUploader() { super("file-uploader"); }
 
 
-    @EL(name = "sys.starting")
+    @EL(name = "sys.starting", async = true)
     protected void init() {
         attrs.putAll((Map<? extends String, ?>) ep.fire("env.ns", getName()));
         try {

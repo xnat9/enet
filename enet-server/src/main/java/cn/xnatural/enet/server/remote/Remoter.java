@@ -52,7 +52,7 @@ public class Remoter extends ServerTpl {
     public Remoter() { super("remote"); }
 
 
-    @EL(name = "sys.starting")
+    @EL(name = "sys.starting", async = true)
     public void start() {
         if (exec == null) exec = Executors.newFixedThreadPool(2);
         if (ep == null) {ep = new EP(exec); ep.addListenerSource(this);}

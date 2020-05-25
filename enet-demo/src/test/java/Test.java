@@ -1,4 +1,6 @@
 import cn.xnatural.enet.common.Log;
+import cn.xnatural.enet.event.EC;
+import cn.xnatural.enet.event.EP;
 import okhttp3.*;
 import okhttp3.internal.Util;
 import okio.ByteString;
@@ -19,10 +21,18 @@ public class Test {
         Log.init(null);
     }
 
-    public static void main(String[] args) throws Throwable {
-        // System.out.println("d3ff5".toUpperCase());
+    public static void main(String[] args) throws Exception {
+        EP ep = new EP();
+        ep.listen("xx", () -> System.out.println("xxx event1"), true);
+        ep.listen("xx1", (s) -> {System.out.println("xxx event2"); return s;});
+        ep.listen("xx2", (p1, p2) -> {System.out.println("xxx event3"); return p2;});
+        EC ec = new EC();
+        ep.fire("xx", ec);
+        System.out.println(ec.isSuccess());
+        System.out.println(ep.fire("xx1", "p1"));
+        System.out.println(ep.fire("xx2", "p1","p2"));
          // 压测();
-        ws();
+        // ws();
     }
 
 

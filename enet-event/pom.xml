@@ -2,16 +2,12 @@
 <project xmlns="http://maven.apache.org/POM/4.0.0"
          xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
          xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
-    <parent>
-        <artifactId>enet</artifactId>
-        <groupId>cn.xnatural.enet</groupId>
-        <version>0.0.11</version>
-    </parent>
     <modelVersion>4.0.0</modelVersion>
 
+    <groupId>cn.xnatural.enet</groupId>
     <artifactId>enet-event</artifactId>
     <packaging>jar</packaging>
-    <version>0.0.12</version>
+    <version>0.0.13</version>
 
     <url>https://gitee.com/xnat/enet</url>
 
@@ -79,6 +75,7 @@
             <plugin>
                 <groupId>org.apache.maven.plugins</groupId>
                 <artifactId>maven-source-plugin</artifactId>
+                <version>3.0.1</version>
                 <executions>
                     <execution>
                         <id>attach-sources</id>
@@ -91,6 +88,7 @@
             <plugin>
                 <groupId>org.apache.maven.plugins</groupId>
                 <artifactId>maven-scm-publish-plugin</artifactId>
+                <version>3.0.0</version>
                 <configuration>
                     <ignorePathsToDelete>
                         <ignorePathToDelete>javadocs</ignorePathToDelete>

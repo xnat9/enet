@@ -70,19 +70,19 @@ public class EC {
     /**
      * 成功执行过的事件监听
      */
-    protected List<Listener>      successPassed = new LinkedList<>();
+    protected final List<Listener>      successPassed = new LinkedList<>();
     /**
      * 执行失败的事件监听
      */
-    protected List<Listener>      failPassed = new LinkedList<>();
+    protected final List<Listener>      failPassed = new LinkedList<>();
     /**
      * 是否结束
      */
-    protected AtomicBoolean       stopped       = new AtomicBoolean(false);
+    protected final AtomicBoolean       stopped       = new AtomicBoolean(false);
     /**
      * 属性集
      */
-    protected Map<Object, Object> attrs         = new ConcurrentHashMap<>(7);
+    protected Map<Object, Object> attrs;
 
 
     public static EC of(Object source) {
@@ -108,7 +108,7 @@ public class EC {
     void start(String eName, List<Listener> ls, EP ep) {
         this.eName = eName; willPass = ls; this.ep = ep;
         if (track) { // 是否要追踪此条事件链的执行
-            id = UUID.randomUUID().toString();
+            id = UUID.randomUUID().toString().replaceAll("-", "");
             ep.log.info("Starting listener chain for event '{}'. id: {}, event source: {}", eName, id, source());
         }
     }
@@ -279,12 +279,16 @@ public class EC {
 
 
     public EC attr(Object key, Object value) {
+        if (attrs == null) {
+            attrs = new ConcurrentHashMap<>(7);
+        }
         attrs.put(key, value);
         return this;
     }
 
 
     public <T> T getAttr(Object key, Class<T> type, T defaultValue) {
+        if (attrs == null) return null;
         return type.cast(attrs.getOrDefault(key, defaultValue));
     }
 
@@ -295,6 +299,6 @@ public class EC {
 
 
     public Object getAttr(Object key) {
-        return attrs.get(key);
+        return attrs == null ? null : attrs.get(key);
     }
 }

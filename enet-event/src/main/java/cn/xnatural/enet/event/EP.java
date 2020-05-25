@@ -11,7 +11,9 @@ import java.lang.reflect.Modifier;
 import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.Executor;
+import java.util.function.BiFunction;
 import java.util.function.Consumer;
+import java.util.function.Function;
 import java.util.function.Predicate;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
@@ -94,8 +96,8 @@ public class EP {
         if (trackEvents.contains(eName) || log.isTraceEnabled()) ec.track = true;
 
         List<Listener> ls = lsMap.get(eName); // 获取需要执行的监听器
-        ls = new ArrayList<>(ls == null ? emptyList() : ls); // 避免在执行的过程中动态增删事件的监听器而导致个数错误
-        ec.start(eName, ls, this); // 开始执行
+        ls = new LinkedList<>(ls == null ? emptyList() : ls); // 避免在执行的过程中动态增删事件的监听器而导致个数错误
+        ec.start(eName, ls, this); // 初始化
 
         if (ec.isNoListener()) { ec.tryFinish(); return ec.result; } // 没有监听器的情况
 
@@ -125,7 +127,7 @@ public class EP {
     /**
      * 是否存在事件监听器
      * @param eNames
-     * @return
+     * @return true if exist
      */
     public boolean exist(String...eNames) {
         if (eNames == null) return false;
@@ -175,7 +177,7 @@ public class EP {
      * 删除指定对象源中的事件监听
      * @param eName 事件名
      * @param source 监听器对象源
-     * @return this
+     * @return this ep
      */
     public EP removeEvent(String eName, Object source) {
         log.debug("remove event '{}' with source: {}", eName, source);
@@ -187,6 +189,140 @@ public class EP {
         }
         return this;
     }
+
+    /**
+     * 移除事件监听器
+     * @param eName 事件名
+     * @return this ep
+     */
+    public EP removeEvent(String eName) {return removeEvent(eName, null);}
+
+
+    /**
+     * 添加监听
+     * @param eName 事件名
+     * @param fn 函数
+     * @param async 是否异步
+     * @param order 执行顺序, 越小越先执行
+     * @return {@link EP}
+     */
+    public EP listen(String eName, Runnable fn, boolean async, float order) {
+        if (fn == null) throw new NullPointerException("fn must not be null");
+        List<Listener> ls = lsMap.get(eName);
+        if (ls == null) {
+            synchronized (this) {
+                ls = lsMap.get(eName);
+                if (ls == null) {
+                    ls = new LinkedList<>(); lsMap.put(eName, ls);
+                }
+            }
+        }
+        Listener l = new Listener(); ls.add(l);
+        l.name = eName; l.fn = fn; l.async = async; l.order = order;
+        return this;
+    }
+
+
+    /**
+     * 添加监听
+     * @param eName 事件名
+     * @param fn 函数
+     * @param async 是否异步
+     * @param order 执行顺序, 越小越先执行
+     * @return {@link EP}
+     */
+    public EP listen(String eName, Function fn, boolean async, float order) {
+        if (fn == null) throw new NullPointerException("fn must not be null");
+        List<Listener> ls = lsMap.get(eName);
+        if (ls == null) {
+            synchronized (this) {
+                ls = lsMap.get(eName);
+                if (ls == null) {
+                    ls = new LinkedList<>(); lsMap.put(eName, ls);
+                }
+            }
+        }
+        Listener l = new Listener(); ls.add(l);
+        l.name = eName; l.fn1 = fn; l.async = async; l.order = order;
+        return this;
+    }
+
+
+    /**
+     * 添加监听
+     * @param eName 事件名
+     * @param fn 函数
+     * @param async 是否异步
+     * @param order 执行顺序, 越小越先执行
+     * @return {@link EP}
+     */
+    public EP listen(String eName, BiFunction fn, boolean async, float order) {
+        if (fn == null) throw new NullPointerException("fn must not be null");
+        List<Listener> ls = lsMap.get(eName);
+        if (ls == null) {
+            synchronized (this) {
+                ls = lsMap.get(eName);
+                if (ls == null) {
+                    ls = new LinkedList<>(); lsMap.put(eName, ls);
+                }
+            }
+        }
+        Listener l = new Listener(); ls.add(l);
+        l.name = eName; l.fn2 = fn; l.async = async; l.order = order;
+        return this;
+    }
+
+
+    /**
+     * 添加监听
+     * @param eName 事件名
+     * @param fn 函数
+     * @return {@link EP}
+     */
+    public EP listen(String eName, Runnable fn) { return listen(eName, fn, false, 0); }
+
+    /**
+     * 添加监听
+     * @param eName 事件名
+     * @param fn 函数
+     * @param async 是否异步
+     * @return {@link EP}
+     */
+    public EP listen(String eName, Runnable fn, boolean async) { return listen(eName, fn, async, 0); }
+
+    /**
+     * 添加监听
+     * @param eName 事件名
+     * @param fn 函数
+     * @return {@link EP}
+     */
+    public EP listen(String eName, Function fn) { return listen(eName, fn, false, 0); }
+
+    /**
+     * 添加监听
+     * @param eName 事件名
+     * @param fn 函数
+     * @param async 是否异步
+     * @return {@link EP}
+     */
+    public EP listen(String eName, Function fn, boolean async) { return listen(eName, fn, async, 0); }
+
+    /**
+     * 添加监听
+     * @param eName 事件名
+     * @param fn 函数
+     * @return {@link EP}
+     */
+    public EP listen(String eName, BiFunction fn) { return listen(eName, fn, false, 0); }
+
+    /**
+     * 添加监听
+     * @param eName 事件名
+     * @param fn 函数
+     * @param async 是否异步
+     * @return {@link EP}
+     */
+    public EP listen(String eName, BiFunction fn, boolean async) { return listen(eName, fn, async, 0); }
 
 
     /**
@@ -205,7 +341,15 @@ public class EP {
                 listener.m = m; m.setAccessible(true); listener.name = parseName(n, source);
                 if (listener.name == null) continue;
 
-                List<Listener> ls = lsMap.computeIfAbsent(listener.name, s -> new LinkedList<>());
+                List<Listener> ls = lsMap.get(listener.name);
+                if (ls == null) {
+                    synchronized (this) {
+                        ls = lsMap.get(listener.name);
+                        if (ls == null) {
+                            ls = new LinkedList<>(); lsMap.put(listener.name, ls);
+                        }
+                    }
+                }
                 // 同一个对象源中, 不能有相同的事件监听名. 忽略
                 if (ls.stream().anyMatch(l -> l.source == source && Objects.equals(l.name, listener.name))) {
                     log.warn("Exist listener. name: {}, source: {}", n, listener.source);
@@ -258,11 +402,7 @@ public class EP {
     }
 
 
-    /**
-     * 遍历一个类的方法
-     * @param clz
-     * @param fns
-     */
+    // 遍历一个类的方法
     protected void iterateMethod(final Class clz, Consumer<Method>... fns) {
         if (fns == null || fns.length < 1) return;
         Class c = clz;
@@ -273,12 +413,7 @@ public class EP {
     }
 
 
-    /**
-     * 查找类中的方法
-     * @param clz
-     * @param predicate
-     * @return
-     */
+    // 查找类中的方法
     protected Method findMethod(final Class clz, Predicate<Method> predicate) {
         Class c = clz;
         do {
@@ -299,7 +434,7 @@ public class EP {
          * 和 {@link #m} 只存在一个
          * 监听器执行体. (一段执行逻辑)
          */
-        protected Runnable fn;
+        protected Runnable fn; protected Function<Object, Object> fn1; protected BiFunction<Object, Object, Object> fn2;
         /**
          * 监听的事件名
          */
@@ -316,7 +451,9 @@ public class EP {
         // 调用此监听器
         protected void invoke(EC ec) {
             try {
-                if (fn != null) fn.run();
+                if (fn != null && (ec.args == null)) fn.run();
+                else if (fn1 != null && (ec.args != null && ec.args.length == 1)) ec.result = fn1.apply(ec.args[0]);
+                else if (fn2 != null && (ec.args != null && ec.args.length == 2)) ec.result = fn2.apply(ec.args[0], ec.args[1]);
                 else {
                     Object r = null;
                     if (m.getParameterCount() == 0) r = m.invoke(source); // 没有参数的情况.直接调用
@@ -345,6 +482,7 @@ public class EP {
                     }
                     if (!void.class.isAssignableFrom(m.getReturnType())) ec.result = r;
                 }
+
                 ec.passed(this, true);
                 if (ec.track) {
                     log.info("Passed listener of event '{}'. method: {}, id: {}, result: {}",
@@ -360,7 +498,7 @@ public class EP {
                         new Object[]{
                             name, ec.id,
                             (m == null ? "" : source.getClass().getSimpleName() + "." + m.getName()),
-                            (ec.source() == null ? null : ec.source().getClass().getSimpleName())
+                            (ec.source() == null ? "" : ec.source().getClass().getSimpleName())
                         }).getMessage(),
                     ec.ex);
             } finally {

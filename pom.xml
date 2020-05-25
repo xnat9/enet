@@ -9,7 +9,6 @@
     <version>0.0.11</version>
     <modules>
         <module>enet-common</module>
-        <module>enet-event</module>
         <module>enet-core</module>
         <module>enet-server</module>
         <module>enet-demo</module>

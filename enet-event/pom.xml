@@ -7,7 +7,7 @@
     <groupId>cn.xnatural.enet</groupId>
     <artifactId>enet-event</artifactId>
     <packaging>jar</packaging>
-    <version>0.0.13</version>
+    <version>0.0.14</version>
 
     <url>https://gitee.com/xnat/enet</url>
 

@@ -467,7 +467,10 @@ public class EP {
                             }
                             r = m.invoke(source, arr);
                         }
-                        else r = m.invoke(source, ec.args);
+                        else {
+                            Object arg = (ec.args == null || ec.args.length < 1) ? null : ec.args[0];
+                            r = m.invoke(source, arg);
+                        }
                     } else { // 参数个数多于1个的情况
                         Object[] args = new Object[m.getParameterCount()]; // 参数传少了, 补null
                         if (EC.class.isAssignableFrom(m.getParameterTypes()[0])) {

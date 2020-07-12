@@ -288,7 +288,7 @@ public class EC {
 
 
     public <T> T getAttr(Object key, Class<T> type, T defaultValue) {
-        if (attrs == null) return null;
+        if (attrs == null) return defaultValue;
         return type.cast(attrs.getOrDefault(key, defaultValue));
     }
 

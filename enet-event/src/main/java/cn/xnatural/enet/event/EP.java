@@ -472,14 +472,14 @@ public class EP {
                             r = m.invoke(source, arg);
                         }
                     } else { // 参数个数多于1个的情况
-                        Object[] args = new Object[m.getParameterCount()]; // 参数传少了, 补null
+                        Object[] args = new Object[m.getParameterCount()]; // 参数传少了, 补null, 传多了忽略
                         if (EC.class.isAssignableFrom(m.getParameterTypes()[0])) {
                             args[0] = ec;
                             if (ec.args != null) {
-                                for (int i = 1; i <= ec.args.length; i++) args[i] = ec.args[i-1];
+                                for (int i = 1; i <= ec.args.length && i < m.getParameterCount(); i++) args[i] = ec.args[i-1];
                             }
                         } else if (ec.args != null) {
-                            for (int i = 0; i < ec.args.length; i++) args[i] = ec.args[i];
+                            for (int i = 0; i < ec.args.length && i < m.getParameterCount(); i++) args[i] = ec.args[i];
                         }
                         r = m.invoke(source, args);
                     }

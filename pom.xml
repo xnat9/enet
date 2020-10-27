@@ -1,25 +1,28 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <project xmlns="http://maven.apache.org/POM/4.0.0"
-        xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
-        xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/maven-v4_0_0.xsd">
-
+         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
     <modelVersion>4.0.0</modelVersion>
+
     <groupId>cn.xnatural.enet</groupId>
-    <artifactId>enet</artifactId>
-    <version>0.0.11</version>
-    <modules>
-        <module>enet-common</module>
-        <module>enet-core</module>
-        <module>enet-server</module>
-        <module>enet-demo</module>
-    </modules>
-
-    <packaging>pom</packaging>
-
-    <name>enet</name>
-    <description>enet 事件驱动</description>
+    <artifactId>enet-event</artifactId>
+    <packaging>jar</packaging>
+    <version>1.0.0</version>
 
     <url>https://gitee.com/xnat/enet</url>
+
+    <dependencies>
+        <dependency>
+            <groupId>org.slf4j</groupId>
+            <artifactId>slf4j-api</artifactId>
+            <version>1.7.25</version>
+            <scope>provided</scope>
+        </dependency>
+    </dependencies>
+
+
+    <name>enet-event</name>
+    <description>enet 事件驱动 库</description>
 
     <licenses>
         <license>
@@ -28,7 +31,6 @@
             <distribution>repo</distribution>
         </license>
     </licenses>
-
 
     <scm>
         <url>https://gitee.com/xnat/enet</url>
@@ -73,6 +75,7 @@
             <plugin>
                 <groupId>org.apache.maven.plugins</groupId>
                 <artifactId>maven-source-plugin</artifactId>
+                <version>3.0.1</version>
                 <executions>
                     <execution>
                         <id>attach-sources</id>
@@ -85,6 +88,7 @@
             <plugin>
                 <groupId>org.apache.maven.plugins</groupId>
                 <artifactId>maven-scm-publish-plugin</artifactId>
+                <version>3.0.0</version>
                 <configuration>
                     <ignorePathsToDelete>
                         <ignorePathToDelete>javadocs</ignorePathToDelete>
@@ -159,6 +163,5 @@
             </distributionManagement>
         </profile>
     </profiles>
-
 
 </project>

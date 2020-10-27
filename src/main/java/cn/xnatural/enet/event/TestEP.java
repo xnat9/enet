@@ -1,29 +1,5 @@
-# enet
+package cn.xnatural.enet.event;
 
-## 介绍
- ep.fire("event1", "参数1", "参数2")
- 
- 工具包含三个组件: EL(事件监听), EP(事件中心), EC(事件执行上下文)
-
-## 安装教程
-```
-<dependency>
-    <groupId>cn.xnatural.enet</groupId>
-    <artifactId>enet-event</artifactId>
-    <version>0.0.15</version>
-</dependency>
-```
-### 事件驱动框架原理
-
-1. EL(name = 'event1') 注解可以把任意一个方法变成事件监听器
-
-2. 创建事件中心 EP ep = new EP();
-
-3. 注册事件: ep.addListenerSource(包含EL注解的对象)
-
-4. 触发事件: ep.fire('event1', "参数1", "参数2")
-
-```
 public class TestEP {
     public static void main(String[] args) {
         //1. 创建一个事件中心(解析对象中的所有事件方法, 和触发发布事件)
@@ -94,8 +70,3 @@ public class TestEP {
         return "aa";
     }
 }
-```
-
-## 参与贡献
-
-xnatural@msn.cn

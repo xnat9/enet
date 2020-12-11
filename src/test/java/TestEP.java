@@ -1,6 +1,9 @@
-package cn.xnatural.enet.event;
+import cn.xnatural.enet.event.EC;
+import cn.xnatural.enet.event.EL;
+import cn.xnatural.enet.event.EP;
 
 public class TestEP {
+
     public static void main(String[] args) {
         //1. 创建一个事件中心(解析对象中的所有事件方法, 和触发发布事件)
         EP ep = new EP();
@@ -21,6 +24,17 @@ public class TestEP {
                 // 事件成功结束后执行
             }
         }));
+
+        // 动态添加监听
+        ep.listen("dynEvent1", () -> {
+            System.out.println("执行动态事件: 无参");
+        });
+        ep.listen("dynEvent2", (p) -> {
+            System.out.println("执行动态事件:  入参: " + p);
+            return p;
+        });
+        ep.fire("dynEvent1");
+        System.out.println(ep.fire("dynEvent2", "3333"));
 
         // 开启debug模式
         ep.fire("hello", EC.of(source).debug().args("参数1"));

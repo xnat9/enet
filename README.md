@@ -81,6 +81,19 @@ ep.fire("hello", new EC().args("参数1").completeFn((ec) -> {
 ```
 
 ```
+// 动态添加监听
+ep.listen("dynEvent1", () -> {
+    System.out.println("执行动态事件: 无参");
+});
+ep.listen("dynEvent2", (p) -> {
+    System.out.println("执行动态事件:  入参: " + p);
+    return p;
+});
+ep.fire("dynEvent1");
+System.out.println(ep.fire("dynEvent2", "3333"));
+```
+
+```
 // 1. 同步执行: 强制
 ep.fire("hello", EC.of(source).sync().args("参数1"));
 // 2. 同步执行: 默认  监听器 @EL async 设置为false
@@ -97,6 +110,6 @@ ep.fire("ec"); // 自动创建EC对象
 ep.fire("ec", EC.of(source).attr("key1", "value1")); // 手动创建EC对象,并设置属性
 ```
 
-## 参与贡献
+### 参与贡献
 
 xnatural@msn.cn

@@ -452,8 +452,15 @@ public class EP {
         protected void invoke(EC ec) {
             try {
                 if (fn != null && (ec.args == null)) fn.run();
-                else if (fn1 != null && (ec.args != null && ec.args.length == 1)) ec.result = fn1.apply(ec.args[0]);
-                else if (fn2 != null && (ec.args != null && ec.args.length == 2)) ec.result = fn2.apply(ec.args[0], ec.args[1]);
+                else if (fn1 != null) {
+                    ec.result = fn1.apply(ec.args != null && ec.args.length > 0 ? ec.args[0] : null);
+                }
+                else if (fn2 != null) {
+                    ec.result = fn2.apply(
+                            ec.args != null && ec.args.length > 0 ? ec.args[0] : null,
+                            ec.args != null && ec.args.length > 1 ? ec.args[1] : null
+                    );
+                }
                 else {
                     Object r = null;
                     if (m.getParameterCount() == 0) r = m.invoke(source); // 没有参数的情况.直接调用

@@ -8,7 +8,7 @@
 <dependency>
     <groupId>cn.xnatural.enet</groupId>
     <artifactId>enet-event</artifactId>
-    <version>0.0.15</version>
+    <version>0.0.16</version>
 </dependency>
 ```
 ### 事件驱动库原理

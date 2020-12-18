@@ -7,7 +7,7 @@
     <groupId>cn.xnatural.enet</groupId>
     <artifactId>enet-event</artifactId>
     <packaging>jar</packaging>
-    <version>0.0.16</version>
+    <version>0.0.17</version>
 
     <url>https://gitee.com/xnat/enet</url>
 
@@ -25,7 +25,6 @@
             <scope>test</scope>
         </dependency>
     </dependencies>
-
 
     <name>enet-event</name>
     <description>enet 事件驱动 库</description>

@@ -21,7 +21,7 @@ public class EC {
     /**
      * 是否追踪执行.用于调试
      */
-    boolean  track;
+    protected boolean  track;
     /**
      * 强制异步. 如果设置了就会忽略 @EL中的设置
      */
@@ -150,7 +150,7 @@ public class EC {
      * @return
      */
     public boolean isSuccess() {
-        return isNoListener() || (willPass.size() == successPassed.size() && ex == null && errMsg == null && pause == false);
+        return isNoListener() || (willPass.size() == successPassed.size() && ex == null && errMsg == null && !pause);
     }
 
 
@@ -158,9 +158,7 @@ public class EC {
      * 是否没有监听器
      * @return
      */
-    public boolean isNoListener() {
-        return willPass == null || willPass.isEmpty();
-    }
+    public boolean isNoListener() { return willPass == null || willPass.isEmpty(); }
 
 
     /**
@@ -174,9 +172,11 @@ public class EC {
     }
 
 
-    public Consumer<EC> completeFn() {
-        return completeFn;
-    }
+    /**
+     * 事件结束函数
+     * @return
+     */
+    public Consumer<EC> completeFn() { return completeFn; }
 
 
     /**
@@ -191,6 +191,13 @@ public class EC {
      * @return
      */
     public EC resume() {this.pause = false; return this;}
+
+
+    /**
+     * 是否是截停状态
+     * @return
+     */
+    public boolean isPause() { return pause; }
 
 
     /**
@@ -210,7 +217,18 @@ public class EC {
     public Boolean isForceAsync() {return this.async;}
 
 
+    /**
+     * 设置debug模式
+     * @return
+     */
     public EC debug() { track = true; return this; }
+
+
+    /**
+     * 是否是debug模式
+     * @return
+     */
+    public boolean isTrack() { return track; }
 
 
     public EC args(Object... args) { this.args = args; return this; }
@@ -224,6 +242,10 @@ public class EC {
     public EC id(String id) {this.id = id; return this;}
 
 
+    /**
+     * 当前事件id
+     * @return
+     */
     public String id() {return this.id;}
 
 

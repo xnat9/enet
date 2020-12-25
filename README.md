@@ -109,7 +109,7 @@ ep.fire("hello", EC.of(source).debug().args("参数1"));
 ep.fire("ec"); // 自动创建EC对象
 ep.fire("ec", EC.of(source).attr("key1", "value1")); // 手动创建EC对象,并设置属性
 ```
-
+### [远程事件](https://gitee.com/xnat/remoter)
 ### 参与贡献
 
 xnatural@msn.cn

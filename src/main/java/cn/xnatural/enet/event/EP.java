@@ -496,7 +496,7 @@ public class EP {
                 ec.passed(this, true);
                 if (ec.track) {
                     log.info("Passed listener of event '{}'. method: {}, id: {}, result: {}",
-                        name, (m == null ? "" : source.getClass().getSimpleName() + "." + m.getName()),
+                        name, (m == null ? "" : source.getClass().getName() + "#" + m.getName()),
                         ec.id, ec.result
                     );
                 }
@@ -507,8 +507,8 @@ public class EP {
                         "Listener invoke error! eName: {}, id: {}, method: {}, event source: {}",
                         new Object[]{
                             name, ec.id,
-                            (m == null ? "" : source.getClass().getSimpleName() + "." + m.getName()),
-                            (ec.source() == null ? "" : ec.source().getClass().getSimpleName())
+                            (m == null ? "" : source.getClass().getName() + "#" + m.getName()),
+                            (ec.source() == null ? "" : ec.source().getClass().getName())
                         }).getMessage(),
                     ec.ex);
             } finally {

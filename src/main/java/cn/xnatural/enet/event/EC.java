@@ -101,9 +101,9 @@ public class EC {
 
     /**
      * 开始执行,初始化
-     * @param eName
-     * @param ls
-     * @param ep
+     * @param eName 事件名
+     * @param ls 监听器
+     * @param ep 事件中心
      */
     void start(String eName, List<Listener> ls, EP ep) {
         this.eName = eName; willPass = ls; this.ep = ep;
@@ -136,7 +136,6 @@ public class EC {
      * passed一个Listener 代表执行完成一个Listener.
      * @param l {@link Listener}
      * @param success 成功执行
-     * @return
      */
     EC passed(Listener l, boolean success) {
         if (success) successPassed.add(l);
@@ -147,7 +146,6 @@ public class EC {
 
     /**
      * 事件是否执行成功
-     * @return
      */
     public boolean isSuccess() {
         return isNoListener() || (willPass.size() == successPassed.size() && ex == null && errMsg == null && !pause);
@@ -156,15 +154,13 @@ public class EC {
 
     /**
      * 是否没有监听器
-     * @return
      */
     public boolean isNoListener() { return willPass == null || willPass.isEmpty(); }
 
 
     /**
      * 设置完成时回调函数
-     * @param completeFn
-     * @return
+     * @param completeFn 完成时回调函数
      */
     public EC completeFn(Consumer<EC> completeFn) {
         this.completeFn = completeFn;
@@ -173,36 +169,31 @@ public class EC {
 
 
     /**
-     * 事件结束函数
-     * @return
+     * 获取事件结束函数
      */
     public Consumer<EC> completeFn() { return completeFn; }
 
 
     /**
      * 挂起 和 {@link #resume()} 配套执行
-     * @return
      */
     public EC suspend() { this.pause = true; return this; }
 
 
     /**
      * 恢复 和 {@link #suspend()} 配套执行
-     * @return
      */
     public EC resume() {this.pause = false; return this;}
 
 
     /**
      * 是否是截停状态
-     * @return
      */
     public boolean isPause() { return pause; }
 
 
     /**
      * 强制同步执行
-     * @return
      */
     public EC sync() { return async(false); }
 
@@ -212,21 +203,18 @@ public class EC {
 
     /**
      * 是否为强制异步执行
-     * @return
      */
     public Boolean isForceAsync() {return this.async;}
 
 
     /**
-     * 设置debug模式
-     * @return
+     * 设置debug模式, 日志打印 事件执行前后详情
      */
     public EC debug() { track = true; return this; }
 
 
     /**
      * 是否是debug模式
-     * @return
      */
     public boolean isTrack() { return track; }
 
@@ -236,22 +224,19 @@ public class EC {
 
     /**
      * 设置id
-     * @param id
-     * @return
+     * @param id 事件id
      */
     public EC id(String id) {this.id = id; return this;}
 
 
     /**
      * 当前事件id
-     * @return
      */
     public String id() {return this.id;}
 
 
     /**
      * 事件名 {@link #eName}
-     * @return
      */
     public String eName() {return this.eName;}
 
@@ -267,14 +252,12 @@ public class EC {
 
     /**
      * 错误消息
-     * @return
      */
     public String errMsg() { return errMsg; }
 
 
     /**
      * 失败描述
-     * @return
      */
     public String failDesc() {
         return (ex() == null ? (errMsg() == null ? (pause ? "pausing" : "") : errMsg()) : (ex().getMessage() == null ? ex().getClass().getName() : ex().getMessage()));

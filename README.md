@@ -20,7 +20,7 @@ public class TestEP {
     // 用@EL注解标记一个方法为事件监听
     @EL(name = "hello")
     void hello() {
-        System.out.println("hello ");
+        System.out.println("hello world");
     }
 }
 ```
@@ -40,12 +40,13 @@ ep.addListenerSource(new TestEP());
 
 4. 触发事件
 ```
-ep.fire("hello")
+ep.fire("hello"); // 打印: hello world
 ```
 
 ### 其他用法
+
+#### 带参数事件
 ```
-// 带参数事件
 @EL(name = "event1")
 void hello(String p1, Integer p2) {
     System.out.println("p1: " + p1 + ", p2");
@@ -57,19 +58,19 @@ ep.fire("event1", "参数1", 2);
 ep.fire("event1");
 ```
 
+#### 有返回的事件
 ```
-// 有返回的事件
 @EL(name = "event1")
 String hello(String p1) {
-    return p1
+    return p1;
 }
 
 // 触发
 Object value = ep.fire("event1", "xxx");
 ```
 
+#### 事件执行完回调
 ```
-// 事件执行完 回调
 ep.fire("hello", new EC().args("参数1").completeFn((ec) -> {
     // 事件结束执行
 }));
@@ -80,8 +81,8 @@ ep.fire("hello", new EC().args("参数1").completeFn((ec) -> {
 }));
 ```
 
+#### 动态添加监听
 ```
-// 动态添加监听
 ep.listen("dynEvent1", () -> {
     System.out.println("执行动态事件: 无参");
 });
@@ -93,21 +94,29 @@ ep.fire("dynEvent1");
 System.out.println(ep.fire("dynEvent2", "3333"));
 ```
 
+#### 同步异步
 ```
 // 1. 同步执行: 强制
 ep.fire("hello", EC.of(source).sync().args("参数1"));
 // 2. 同步执行: 默认  监听器 @EL async 设置为false
 ```
 
+#### debug模式
+日志打印事件执行前后详情
 ```
-// 开启debug模式
-ep.fire("hello", EC.of(source).debug().args("参数1"));
+ep.fire("hello", EC.of(this).debug().args("参数1"));
 ```
 
+#### 事件执行上下文
 ```
+@EL(name = "ec")
+String ec(EC ec, String p1) {
+    return p1 + ec.getAttr("key1");
+}
+
 // 每次触发一个事件 都会有一个 EC 对象(事件执行上下文)
 ep.fire("ec"); // 自动创建EC对象
-ep.fire("ec", EC.of(source).attr("key1", "value1")); // 手动创建EC对象,并设置属性
+ep.fire("ec", EC.of(this).args("xx").attr("key1", "oo")); // 手动创建EC对象,并设置属性. 返回: xxoo
 ```
 ### [远程事件](https://gitee.com/xnat/remoter)
 ### 参与贡献

@@ -44,7 +44,7 @@ public class EP {
 
     /**
      * 初始化
-     * @param exec
+     * @param exec 线程池
      */
     protected void init(Executor exec, Logger log) {
         this.exec = exec;
@@ -126,7 +126,7 @@ public class EP {
 
     /**
      * 是否存在事件监听器
-     * @param eNames
+     * @param eNames 事件名
      * @return true if exist
      */
     public boolean exist(String...eNames) {
@@ -140,8 +140,7 @@ public class EP {
 
     /**
      * 添加对象源(解析出监听器)
-     * @param source
-     * @return
+     * @param source 事件源
      */
     public EP addListenerSource(Object source) {
         resolve(source);
@@ -152,7 +151,6 @@ public class EP {
     /**
      * 设置某个事件需要追踪执行
      * @param eNames 事件名字(可以多个)
-     * @return
      */
     public EP addTrackEvent(String... eNames) {
         if (eNames == null) return this;
@@ -163,8 +161,7 @@ public class EP {
 
     /**
      * 删除事件追踪
-     * @param eNames
-     * @return
+     * @param eNames 事件名
      */
     public EP delTrackEvent(String... eNames) {
         if (eNames == null) return this;
@@ -328,7 +325,7 @@ public class EP {
     /**
      * 从一个对象中 解析出 所有带有 {@link EL}注解的方法 转换成监听器{@link Listener}
      * 如果带有注解 {@link EL}的方法被重写, 则用子类的方法
-     * @param source
+     * @param source 事件源
      */
     protected void resolve(final Object source) {
         if (source == null) return;
@@ -370,9 +367,9 @@ public class EP {
     protected Pattern p = Pattern.compile("\\$\\{(?<attr>\\w+)\\}");
     /**
      * 支持表达式 ${attr}.eventName, ${attr}会被替换成 对象中的属性attr的值
-     * @param name
-     * @param source
-     * @return
+     * @param name 事件名
+     * @param source 事件源
+     * @return 解析后的事件名
      */
     protected String parseName(String name, Object source) {
         Matcher matcher = p.matcher(name);

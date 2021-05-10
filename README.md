@@ -4,7 +4,7 @@
  工具包含三个组件: EL(事件监听), EP(事件中心), EC(事件执行上下文)
 
 ### 安装教程
-```
+```xml
 <dependency>
     <groupId>cn.xnatural.enet</groupId>
     <artifactId>enet-event</artifactId>
@@ -14,7 +14,7 @@
 ### 事件驱动库原理
 
 1. 事件监听器
-```
+```java
 // 定义监听
 public class TestEP {
     // 用@EL注解标记一个方法为事件监听
@@ -26,27 +26,27 @@ public class TestEP {
 ```
 
 2. 事件中心
-```
+```java
 // 创建一个事件中心
 EP ep = new EP();
 ```
 
 3. 注册事件
 
-```
+```java
 //添加监听器
 ep.addListenerSource(new TestEP());
 ```
 
 4. 触发事件
-```
+```java
 ep.fire("hello"); // 打印: hello world
 ```
 
 ### 其他用法
 
 #### 带参数事件
-```
+```java
 @EL(name = "event1")
 void hello(String p1, Integer p2) {
     System.out.println("p1: " + p1 + ", p2");
@@ -59,7 +59,7 @@ ep.fire("event1");
 ```
 
 #### 有返回的事件
-```
+```java
 @EL(name = "event1")
 String hello(String p1) {
     return p1;
@@ -70,7 +70,7 @@ Object value = ep.fire("event1", "xxx");
 ```
 
 #### 事件执行完回调
-```
+```java
 ep.fire("hello", new EC().args("参数1").completeFn((ec) -> {
     // 事件结束执行
 }));
@@ -82,7 +82,7 @@ ep.fire("hello", new EC().args("参数1").completeFn((ec) -> {
 ```
 
 #### 动态添加监听
-```
+```java
 ep.listen("dynEvent1", () -> {
     System.out.println("执行动态事件: 无参");
 });
@@ -95,7 +95,7 @@ System.out.println(ep.fire("dynEvent2", "3333"));
 ```
 
 #### 同步异步
-```
+```java
 // 1. 同步执行: 强制
 ep.fire("hello", EC.of(source).sync().args("参数1"));
 // 2. 同步执行: 默认  监听器 @EL async 设置为false
@@ -103,12 +103,12 @@ ep.fire("hello", EC.of(source).sync().args("参数1"));
 
 #### debug模式
 日志打印事件执行前后详情
-```
+```java
 ep.fire("hello", EC.of(this).debug().args("参数1"));
 ```
 
 #### 事件执行上下文
-```
+```java
 @EL(name = "ec")
 String ec(EC ec, String p1) {
     return p1 + ec.getAttr("key1");

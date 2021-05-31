@@ -501,11 +501,12 @@ public class EP {
                 ec.passed(this, false).ex(e.getCause() == null ? e : e.getCause());
                 log.error(
                     MessageFormatter.arrayFormat(
-                        "Listener invoke error! eName: {}, id: {}, method: {}, event source: {}",
+                        "Listener invoke error! eName: {}, id: {}, method: {}, event source: {}, args: {}",
                         new Object[]{
                             name, ec.id,
                             (m == null ? "" : source.getClass().getName() + "#" + m.getName()),
-                            (ec.source() == null ? "" : ec.source().getClass().getName())
+                            (ec.source() == null ? "" : ec.source().getClass().getName()),
+                            Arrays.toString(ec.args)
                         }).getMessage(),
                     ec.ex);
             } finally {

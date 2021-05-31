@@ -52,6 +52,8 @@ public class TestEP {
         // 每次触发一个事件 都会有一个 EC 对象(事件执行上下文)
         ep.fire("ec"); // 自动创建EC对象
         ep.fire("ec", EC.of(source).attr("key1", "value1")); // 手动创建EC对象,并设置属性
+
+        ep.fire("error", "p1");
     }
 
     // 此方法被标注为一个名叫hello的事件方法.
@@ -82,5 +84,10 @@ public class TestEP {
 
     public String getXX() {
         return "aa";
+    }
+
+    @EL(name = "error")
+    void error(String p1) {
+        throw new RuntimeException("error");
     }
 }

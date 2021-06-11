@@ -9,8 +9,7 @@ import java.lang.reflect.Array;
 import java.lang.reflect.Method;
 import java.lang.reflect.Modifier;
 import java.util.*;
-import java.util.concurrent.ConcurrentHashMap;
-import java.util.concurrent.Executor;
+import java.util.concurrent.*;
 import java.util.function.BiFunction;
 import java.util.function.Consumer;
 import java.util.function.Function;
@@ -118,7 +117,31 @@ public class EP {
             }
 
             syncLs.forEach(l -> l.invoke(ec)); // 先执行同步监听器
-            asyncLs.forEach(l -> exec.execute(() -> l.invoke(ec)));
+            if (asyncLs.size() > 1) { // 至少两个以上 需要 分优先级 依次执行
+                //1. 按优先级分组
+                final Map<Float, Queue<Runnable>> orderGroupMap = new TreeMap<>();
+                for (Listener listener : asyncLs) {
+                    final Queue<Runnable> groupLs = orderGroupMap.computeIfAbsent(listener.order, f -> new ConcurrentLinkedQueue<>());
+                    groupLs.add(new Runnable() {
+                        @Override
+                        public void run() {
+                            listener.invoke(ec);
+                            groupLs.remove(this);
+                            if (groupLs.isEmpty()) { // 当前分组已执行完
+                                orderGroupMap.remove(listener.order);
+                                Iterator<Map.Entry<Float, Queue<Runnable>>> it = orderGroupMap.entrySet().iterator();
+                                if (it.hasNext()) { // 继续执行下一个分组
+                                    it.next().getValue().forEach(exec::execute);
+                                }
+                            }
+                        }
+                    });
+                }
+                //2. 开始执行第一个分组
+                orderGroupMap.entrySet().iterator().next().getValue().forEach(exec::execute);
+            } else {
+                asyncLs.forEach(l -> exec.execute(() -> l.invoke(ec)));
+            }
         }
         return ec.result;
     }
@@ -346,11 +369,6 @@ public class EP {
                             ls = new LinkedList<>(); lsMap.put(listener.name, ls);
                         }
                     }
-                }
-                // 同一个对象源中, 不能有相同的事件监听名. 忽略
-                if (ls.stream().anyMatch(l -> l.source == source && Objects.equals(l.name, listener.name))) {
-                    log.warn("Exist listener. name: {}, source: {}", n, listener.source);
-                    continue;
                 }
                 // 同一个对象源中, 不同的监听, 方法名不能相同.
                 if (ls.stream().anyMatch(l -> l.source == source && Objects.equals(l.m.getName(), listener.m.getName()))) {

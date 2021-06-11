@@ -24,7 +24,7 @@ public @interface EL {
     /**
      * 同相事件名的多个监听器的执行顺序.
      * 从小到大执行.即: 越小越先执行.
-     * NOTE: 当 {@link #async()} 为false时有用
+     * NOTE: 1. 先按优先级执行所有同步监听器. 2. 再按优先级执行所有异步监听器
      */
     float order() default 0;
 }

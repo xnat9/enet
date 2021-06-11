@@ -1,12 +1,26 @@
 import cn.xnatural.enet.event.EC;
 import cn.xnatural.enet.event.EL;
 import cn.xnatural.enet.event.EP;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
+import java.util.concurrent.Executors;
+import java.util.concurrent.ThreadFactory;
+import java.util.concurrent.atomic.AtomicInteger;
 
 public class TestEP {
 
-    public static void main(String[] args) {
+    static final Logger log = LoggerFactory.getLogger(TestEP.class);
+
+    public static void main(String[] args) throws Exception {
         //1. 创建一个事件中心(解析对象中的所有事件方法, 和触发发布事件)
-        EP ep = new EP();
+        final EP ep = new EP(Executors.newFixedThreadPool(2, new ThreadFactory() {
+            final AtomicInteger i = new AtomicInteger();
+            @Override
+            public Thread newThread(Runnable r) {
+                return new Thread(r, "ep-" + i.incrementAndGet());
+            }
+        }));
         //2. 解析对象中的事件方法. 此步骤会解析出对象中所有包含@EL的方法, 并加入到 ep(事件中心)去
         TestEP source = new TestEP();
         ep.addListenerSource(source);
@@ -53,6 +67,8 @@ public class TestEP {
         ep.fire("ec"); // 自动创建EC对象
         ep.fire("ec", EC.of(source).attr("key1", "value1")); // 手动创建EC对象,并设置属性
 
+        // 顺序测试
+        ep.fire("order");
         ep.fire("error", "p1");
     }
 
@@ -86,8 +102,34 @@ public class TestEP {
         return "aa";
     }
 
+    @EL(name = "order")
+    void order1() {
+        log.info("同步 order1");
+    }
+
+    @EL(name = "order", async = true)
+    void order2() {
+        log.info("异步 order2");
+    }
+
+    @EL(name = "order", async = true)
+    void order22() {
+        log.info("异步 order22");
+    }
+
+    @EL(name = "order", async = true)
+    void order222() {
+        log.info("异步 order222");
+    }
+
+    @EL(name = "order", async = true, order = 1f)
+    void order3() {
+        log.info("异步 order3");
+    }
+
     @EL(name = "error")
     void error(String p1) {
         throw new RuntimeException("error");
     }
+
 }

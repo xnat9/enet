@@ -9,7 +9,11 @@ import java.lang.reflect.Array;
 import java.lang.reflect.Method;
 import java.lang.reflect.Modifier;
 import java.util.*;
-import java.util.concurrent.*;
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.ConcurrentLinkedQueue;
+import java.util.concurrent.CopyOnWriteArrayList;
+import java.util.concurrent.Executor;
+import java.util.concurrent.atomic.AtomicInteger;
 import java.util.function.BiFunction;
 import java.util.function.Consumer;
 import java.util.function.Function;
@@ -58,9 +62,7 @@ public class EP {
      * {@link #doPublish(String, EC)}
      * @param eName 事件名
      */
-    public Object fire(String eName) {
-        return fire(eName, new EC());
-    }
+    public Object fire(String eName) { return fire(eName, new EC()); }
 
 
     /**
@@ -68,9 +70,7 @@ public class EP {
      * @param eName 事件名
      * @param args 监听器方法的参数列表
      */
-    public Object fire(String eName, Object...args) {
-        return fire(eName, new EC().args(args));
-    }
+    public Object fire(String eName, Object...args) { return fire(eName, new EC().args(args)); }
 
 
     /**
@@ -78,9 +78,7 @@ public class EP {
      * @param eName 事件名
      * @param ec 事件执行上下文
      */
-    public Object fire(String eName, EC ec) {
-        return doPublish(eName, ec);
-    }
+    public Object fire(String eName, EC ec) { return doPublish(eName, ec); }
 
 
     /**
@@ -165,10 +163,7 @@ public class EP {
      * 添加对象源(解析出监听器)
      * @param source 事件源
      */
-    public EP addListenerSource(Object source) {
-        resolve(source);
-        return this;
-    }
+    public EP addListenerSource(Object source) { resolve(source); return this; }
 
 
     /**
@@ -215,7 +210,7 @@ public class EP {
      * @param eName 事件名
      * @return this ep
      */
-    public EP removeEvent(String eName) {return removeEvent(eName, null);}
+    public EP removeEvent(String eName) { return removeEvent(eName, null); }
 
 
     /**
@@ -224,21 +219,22 @@ public class EP {
      * @param fn 函数
      * @param async 是否异步
      * @param order 执行顺序, 越小越先执行
+     * @param limit 执行次数限制
      * @return {@link EP}
      */
-    public EP listen(String eName, Runnable fn, boolean async, float order) {
+    public EP listen(String eName, Runnable fn, boolean async, float order, Integer limit) {
         if (fn == null) throw new NullPointerException("fn must not be null");
         List<Listener> ls = lsMap.get(eName);
         if (ls == null) {
             synchronized (this) {
                 ls = lsMap.get(eName);
                 if (ls == null) {
-                    ls = new LinkedList<>(); lsMap.put(eName, ls);
+                    ls = new CopyOnWriteArrayList<>(); lsMap.put(eName, ls);
                 }
             }
         }
-        Listener l = new Listener(); ls.add(l);
-        l.name = eName; l.fn = fn; l.async = async; l.order = order;
+        Listener l = new Listener(); ls.add(l); ls.sort(Comparator.comparing(o -> o.order));
+        l.name = eName; l.fn = fn; l.async = async; l.order = order; l.limit(limit);
         return this;
     }
 
@@ -249,21 +245,22 @@ public class EP {
      * @param fn 函数
      * @param async 是否异步
      * @param order 执行顺序, 越小越先执行
+     * @param limit 执行次数限制
      * @return {@link EP}
      */
-    public EP listen(String eName, Function fn, boolean async, float order) {
+    public EP listen(String eName, Function fn, boolean async, float order, Integer limit) {
         if (fn == null) throw new NullPointerException("fn must not be null");
         List<Listener> ls = lsMap.get(eName);
         if (ls == null) {
             synchronized (this) {
                 ls = lsMap.get(eName);
                 if (ls == null) {
-                    ls = new LinkedList<>(); lsMap.put(eName, ls);
+                    ls = new CopyOnWriteArrayList<>(); lsMap.put(eName, ls);
                 }
             }
         }
-        Listener l = new Listener(); ls.add(l);
-        l.name = eName; l.fn1 = fn; l.async = async; l.order = order;
+        Listener l = new Listener(); ls.add(l); ls.sort(Comparator.comparing(o -> o.order));
+        l.name = eName; l.fn1 = fn; l.async = async; l.order = order; l.limit(limit);
         return this;
     }
 
@@ -274,21 +271,22 @@ public class EP {
      * @param fn 函数
      * @param async 是否异步
      * @param order 执行顺序, 越小越先执行
+     * @param limit 执行次数限制
      * @return {@link EP}
      */
-    public EP listen(String eName, BiFunction fn, boolean async, float order) {
+    public EP listen(String eName, BiFunction fn, boolean async, float order, Integer limit) {
         if (fn == null) throw new NullPointerException("fn must not be null");
         List<Listener> ls = lsMap.get(eName);
         if (ls == null) {
             synchronized (this) {
                 ls = lsMap.get(eName);
                 if (ls == null) {
-                    ls = new LinkedList<>(); lsMap.put(eName, ls);
+                    ls = new CopyOnWriteArrayList<>(); lsMap.put(eName, ls);
                 }
             }
         }
-        Listener l = new Listener(); ls.add(l);
-        l.name = eName; l.fn2 = fn; l.async = async; l.order = order;
+        Listener l = new Listener(); ls.add(l); ls.sort(Comparator.comparing(o -> o.order));
+        l.name = eName; l.fn2 = fn; l.async = async; l.order = order; l.limit(limit);
         return this;
     }
 
@@ -299,7 +297,7 @@ public class EP {
      * @param fn 函数
      * @return {@link EP}
      */
-    public EP listen(String eName, Runnable fn) { return listen(eName, fn, false, 0); }
+    public EP listen(String eName, Runnable fn) { return listen(eName, fn, false, 0, null); }
 
     /**
      * 添加监听
@@ -308,7 +306,7 @@ public class EP {
      * @param async 是否异步
      * @return {@link EP}
      */
-    public EP listen(String eName, Runnable fn, boolean async) { return listen(eName, fn, async, 0); }
+    public EP listen(String eName, Runnable fn, boolean async) { return listen(eName, fn, async, 0, null); }
 
     /**
      * 添加监听
@@ -316,24 +314,7 @@ public class EP {
      * @param fn 函数
      * @return {@link EP}
      */
-    public EP listen(String eName, Function fn) { return listen(eName, fn, false, 0); }
-
-    /**
-     * 添加监听
-     * @param eName 事件名
-     * @param fn 函数
-     * @param async 是否异步
-     * @return {@link EP}
-     */
-    public EP listen(String eName, Function fn, boolean async) { return listen(eName, fn, async, 0); }
-
-    /**
-     * 添加监听
-     * @param eName 事件名
-     * @param fn 函数
-     * @return {@link EP}
-     */
-    public EP listen(String eName, BiFunction fn) { return listen(eName, fn, false, 0); }
+    public EP listen(String eName, Function fn) { return listen(eName, fn, false, 0, null); }
 
     /**
      * 添加监听
@@ -342,7 +323,24 @@ public class EP {
      * @param async 是否异步
      * @return {@link EP}
      */
-    public EP listen(String eName, BiFunction fn, boolean async) { return listen(eName, fn, async, 0); }
+    public EP listen(String eName, Function fn, boolean async) { return listen(eName, fn, async, 0, null); }
+
+    /**
+     * 添加监听
+     * @param eName 事件名
+     * @param fn 函数
+     * @return {@link EP}
+     */
+    public EP listen(String eName, BiFunction fn) { return listen(eName, fn, false, 0, null); }
+
+    /**
+     * 添加监听
+     * @param eName 事件名
+     * @param fn 函数
+     * @param async 是否异步
+     * @return {@link EP}
+     */
+    public EP listen(String eName, BiFunction fn, boolean async) { return listen(eName, fn, async, 0, null); }
 
 
     /**
@@ -358,7 +356,7 @@ public class EP {
             for (String n : el.name()) {
                 Listener listener = new Listener();
                 listener.async = el.async(); listener.source = source; listener.order = el.order();
-                listener.m = m; m.setAccessible(true); listener.name = parseName(n, source);
+                listener.m = m; m.setAccessible(true); listener.name = parseName(n, source); listener.limit(el.limit());
                 if (listener.name == null) continue;
 
                 List<Listener> ls = lsMap.get(listener.name);
@@ -366,7 +364,7 @@ public class EP {
                     synchronized (this) {
                         ls = lsMap.get(listener.name);
                         if (ls == null) {
-                            ls = new LinkedList<>(); lsMap.put(listener.name, ls);
+                            ls = new CopyOnWriteArrayList<>(); lsMap.put(listener.name, ls);
                         }
                     }
                 }
@@ -462,10 +460,31 @@ public class EP {
          * 是否异步
          */
         protected boolean async;
+        /**
+         * 执行限制次数
+         */
+        protected Integer limit;
+        /**
+         * 执行次数统计
+         */
+        protected AtomicInteger count;
+
+        /**
+         * 设置执行次数限制
+         * @param limit 限制
+         */
+        protected Listener limit(Integer limit) {
+            if (limit != null && limit > 0) {
+                this.limit = limit;
+                count = new AtomicInteger();
+            }
+            return this;
+        }
 
         // 调用此监听器
         protected void invoke(EC ec) {
             try {
+                if (limit != null && limit > 0) count.getAndIncrement();
                 if (fn != null && (ec.args == null)) fn.run();
                 else if (fn1 != null) {
                     ec.result = fn1.apply(ec.args != null && ec.args.length > 0 ? ec.args[0] : null);
@@ -528,6 +547,9 @@ public class EP {
                         }).getMessage(),
                     ec.ex);
             } finally {
+                if (limit != null && limit > 0 && count.get() >= limit) {
+                    lsMap.get(name).remove(this);
+                }
                 ec.tryFinish();
             }
         }

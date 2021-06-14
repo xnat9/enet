@@ -85,18 +85,12 @@ public class EC {
     protected Map<Object, Object> attrs;
 
 
-    public static EC of(Object source) {
-        return new EC(source);
-    }
-    public static EC of(Object key, Object value) {
-        return new EC().attr(key, value);
-    }
+    public static EC of(Object source) { return new EC(source); }
+    public static EC of(Object key, Object value) { return new EC().attr(key, value); }
 
 
     public EC() {}
-    public EC(Object source) {
-        this.source = source;
-    }
+    public EC(Object source) { this.source = source; }
 
 
     /**
@@ -274,10 +268,7 @@ public class EC {
     }
 
 
-    public EC result(Object result) {
-        this.result = result;
-        return this;
-    }
+    public EC result(Object result) { this.result = result; return this; }
 
 
     public EP ep() { return ep; }
@@ -298,12 +289,8 @@ public class EC {
     }
 
 
-    public <T> T getAttr(Object key, Class<T> type) {
-        return getAttr(key, type, null);
-    }
+    public <T> T getAttr(Object key, Class<T> type) { return getAttr(key, type, null); }
 
 
-    public Object getAttr(Object key) {
-        return attrs == null ? null : attrs.get(key);
-    }
+    public Object getAttr(Object key) { return attrs == null ? null : attrs.get(key); }
 }

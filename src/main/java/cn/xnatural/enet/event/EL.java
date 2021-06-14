@@ -27,4 +27,11 @@ public @interface EL {
      * NOTE: 1. 先按优先级执行所有同步监听器. 2. 再按优先级执行所有异步监听器
      */
     float order() default 0;
+
+    /**
+     * 执行次数限制
+     * 小于1 : 不限制
+     * NOTE: 达到限制会删除监听
+     */
+    int limit() default -1;
 }

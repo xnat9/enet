@@ -10,7 +10,7 @@ ep.fire("event1", "参数1", "参数2")
 <dependency>
     <groupId>cn.xnatural.enet</groupId>
     <artifactId>enet-event</artifactId>
-    <version>0.0.19/version>
+    <version>0.0.19</version>
 </dependency>
 ```
 # 事件驱动库原理
@@ -161,13 +161,23 @@ void order3() {log.info("异步 order3");}
 ```
 > 所以会先执行 order1, 结束后再并发执行(order2,order22,order22), 结束后再执行 order3
 
+## 执行次数限制
+```java
+@EL(name = "once", limit = 1)
+void once() { log.info("只执行一次"); }
+```
+```java
+ep.fire("once");
+ep.fire("once");
+```
+
 ## debug模式
 日志打印事件执行前后详情
 ```java
 // 方法1
 ep.fire("hello", EC.of(this).debug().args("参数1"));
 ```
-```
+```java
 // 方法2
 ep.addTrackEvent("hello");
 ```

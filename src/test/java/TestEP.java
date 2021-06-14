@@ -69,6 +69,11 @@ public class TestEP {
 
         // 顺序测试
         ep.fire("order");
+
+        // 执行次数限制
+        ep.fire("once");
+        ep.fire("once");
+
         ep.fire("error", "p1");
     }
 
@@ -126,6 +131,11 @@ public class TestEP {
     void order3() {
         log.info("异步 order3");
     }
+
+
+    @EL(name = "once", limit = 1)
+    void once() { log.info("只执行一次"); }
+
 
     @EL(name = "error")
     void error(String p1) {

@@ -10,7 +10,7 @@ ep.fire("event1", "参数1", "参数2")
 <dependency>
     <groupId>cn.xnatural.enet</groupId>
     <artifactId>enet-event</artifactId>
-    <version>0.0.19</version>
+    <version>0.0.20</version>
 </dependency>
 ```
 # 事件驱动库原理

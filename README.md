@@ -15,6 +15,53 @@ ep.fire("event1", "参数1", "参数2")
 ```
 # 事件驱动库原理
 
+<!--
+@startuml
+class EP {
+  #{field} Map<String, Listener> lsMap;
+  +{method} fire(String 事件名, Object...参数);
+}
+
+note left of EP::lsMap
+  所有监听器映射
+  关联@EL方法
+end note
+
+note right of EP::fire
+  事件触发
+end note
+
+EP <|-- Server1 : 收集监听器
+EP <|-- Server2 : 收集监听器
+EP <|-- Server3 : 收集监听器
+
+class Server1 {
+  @EL(name = "aa")
+  void aa()
+  
+  @EL(name = "bb")
+  void xx()
+}
+
+class Server2  {
+  @EL(name = "aa")
+  void aa()
+
+  @EL(name = "xx")
+  String xx()
+}
+
+class Server3  {
+  @EL(name = "cc")
+  String cc()
+
+  @EL(name = "dd")
+  Object dd()
+}
+@enduml
+-->
+![Image text](http://www.plantuml.com/plantuml/png/XP91Im91583lyoiUTb5I8RsfXHTlHe6_ODoPrOrrDsOdMJ2XeWA9K46Zi4Edwj1148JgxpYJ_Ojcjy5i5RmDxttplJVlJT7ZcF6JXeqC6tiUb0wXXG2sMgP5RTA6VNnSg71cERKab2sFKuUoFR0z5SyhRhlLeBpkAj2q68t_aZ3xk9bzJaNlDWa7rIDgy7GwBReNSZXEv54R8SVb56ngSd1DLJ6N2trA9pjdyh7pDUgBtfjuU9NtJs9ygUBYQZ8_7nHBPNdtBYT3H1q2WKIhc5MhBrn18mXq3_ENPz7jB_7gVONJL0egb3Kfsu4SoC7qUtIzg1aXCXk9x1f23rCN2IUgceyxk45X5s8Onn8gr7Gj0XZ7WtE4g5R_2DzNHFk_CmERfP6yxuTvlQ9rqkogr32MBnd6gfQGWD1x1a92RL4DNFsf7m00)
+
 1. 事件监听器
 ```java
 // 定义监听
